@@ -1,4 +1,31 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-*.tgz
+
+# Test coverage
+coverage/
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Package artifacts
+*.tgz
