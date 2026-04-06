@@ -26,5 +26,11 @@ Chosen option: "", because [justification].
 - Good:
 - Bad:
 
+### Cost of Ownership
+<!-- What are the ongoing costs and benefits of this decision? -->
+- **Maintenance burden**: <!-- What does this add to ongoing maintenance? New dependencies to update, monitoring to watch, migrations to run, concepts for new devs to learn? -->
+- **Ongoing benefits**: <!-- What does this save or enable over time? -->
+- **Sunset criteria**: <!-- Under what conditions should we revisit, replace, or remove this? -->
+
 ### Confirmation
 <!-- How will we verify this decision was correct? Metrics, tests, review date? -->

@@ -24,9 +24,9 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 **Grimoire docs first, codebase second.** The `.grimoire/docs/` directory is a pre-computed map of the codebase — it tells you where code lives, what utilities exist, what patterns to follow, and what the data layer looks like. Read these *instead of* exploring the raw codebase. Only read specific source files when the docs don't have what you need.
 
 **Always read:**
-- `manifest.md` for the change summary
+- `manifest.md` for the change summary, **including Assumptions and Pre-Mortem sections**
 - All proposed `.feature` files
-- All proposed decision records
+- All proposed decision records, **including Cost of Ownership sections**
 - The current baseline (`features/`, `.grimoire/decisions/`) for context on what's changing
 
 **Read from grimoire docs (these replace codebase exploration):**
@@ -97,6 +97,20 @@ Good task (specific enough to execute):
 - Each new external API → client wrapper task referencing `schema_ref` for the full contract
 - Data tasks come BEFORE feature implementation tasks — the models must exist before code that uses them
 - Order: schema/model changes → migrations → seed data (if any) → then feature code
+
+**From manifest Assumptions:**
+- Each unvalidated assumption on the critical path → a verification task (spike, proof-of-concept, or integration test that confirms the assumption holds)
+- If an assumption turns out to be wrong during planning, flag it to the user — it may invalidate the change
+
+**From manifest Pre-Mortem:**
+- Each failure mode with a mitigation → the mitigation becomes a task or an edge case to cover in an existing task
+- Each failure mode marked "accepted" → add a comment in the relevant code or test noting the accepted risk, so future developers understand the trade-off
+- Pre-mortem risks often reveal missing scenarios — if a failure mode isn't covered by any Gherkin scenario, consider whether it should be
+
+**From decision Cost of Ownership:**
+- Prefer implementation approaches that minimize the maintenance burden identified in the ADR
+- If the ADR identifies sunset criteria, add a task to document them where they'll be seen (e.g., a comment in config, a monitoring alert, or a calendar reminder)
+- If maintenance burden is high, prefer simpler alternatives even if they're less elegant
 
 **Existing code to reuse:**
 - If `.grimoire/docs/` has area docs, check the Reusable Code tables for utilities that apply to this change

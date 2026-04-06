@@ -199,6 +199,11 @@ Chosen option: "PostgreSQL with pgvector", because it consolidates relational an
 - Good: Single database to manage, strong ecosystem
 - Bad: Heavier than SQLite for local dev
 
+### Cost of Ownership
+- **Maintenance burden**: Requires managed PostgreSQL hosting, pgvector extension updates, team must know PostgreSQL-specific features
+- **Ongoing benefits**: Single database to operate and back up, pgvector improvements land automatically
+- **Sunset criteria**: Revisit if vector query volume exceeds what pgvector handles efficiently, or if a dedicated vector store becomes necessary for latency
+
 ### Confirmation
 Verify with load test that pgvector queries meet <100ms p95 target.
 ```
@@ -216,6 +221,14 @@ branch:
 
 ## Why
 [1-2 sentences on problem/opportunity]
+
+## Assumptions
+<!-- What must be true for this change to work? List beliefs that haven't been validated. -->
+- [assumption]: [evidence or "unvalidated"]
+
+## Pre-Mortem
+<!-- Imagine this change has failed or caused a production incident 6 months from now. What went wrong? -->
+- [risk]: [mitigation or "accepted"]
 
 ## Feature Changes
 - **ADDED** `<capability>/<name>.feature` — [what it adds]
@@ -397,7 +410,10 @@ e2e/
 Before moving past draft stage:
 - [ ] Every Feature has a user story (As a / I want / So that)
 - [ ] Every Scenario has at least Given + When + Then
-- [ ] Feature files parse without syntax errors
+- [ ] Feature files parse without syntax errors (validated via `@cucumber/gherkin` parser)
 - [ ] MADR records have valid YAML frontmatter (status, date)
+- [ ] MADR records include Cost of Ownership (maintenance burden, ongoing benefits, sunset criteria)
 - [ ] Manifest lists all added/modified/removed artifacts
+- [ ] Manifest includes Assumptions (what must be true, with evidence status)
+- [ ] Manifest includes Pre-Mortem (failure modes and mitigations)
 - [ ] No implementation details in feature files (WHAT not HOW)

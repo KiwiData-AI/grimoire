@@ -22,17 +22,28 @@ Before doing anything, determine what kind of change this is:
 
 If unclear, ask the user one clarifying question to route correctly.
 
-### 2. Check Existing State
+### 2. Research Existing Solutions
+Before designing anything, search for well-maintained tools, libraries, or frameworks that already solve the problem (or a close variant of it). This applies to both behavioral features and architectural decisions.
+
+- **Search broadly**: npm/PyPI packages, framework built-ins, platform features, SaaS APIs, open-source projects. Use web search if needed.
+- **Evaluate what you find**: Is it actively maintained? Does it fit the project's stack and constraints? What are its design trade-offs?
+- **Present findings to the user** before drafting:
+  - If an existing tool solves the problem well → recommend adopting it. The draft becomes an ADR documenting the adoption decision.
+  - If an existing tool is close but has different design trade-offs → document it as prior art. Note what it does well and where the project's needs diverge. This becomes valuable context in the ADR's "Considered Options" and helps future readers understand why custom code was written.
+  - If nothing exists → note this in the manifest. A gap in the ecosystem is useful context.
+- **The goal is not to avoid writing code** — it's to make informed build-vs-reuse decisions and to learn from existing implementations before designing new ones.
+
+### 3. Check Existing State
 - Read `features/` to understand the current behavioral baseline
 - Read `.grimoire/decisions/` to understand existing architecture decisions
 - Check `.grimoire/changes/` for any in-progress changes that might overlap
 - If there's a conflict with an active change, flag it
 
-### 3. Scaffold the Change
+### 4. Scaffold the Change
 - Choose a `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`)
 - Create `.grimoire/changes/<change-id>/`
 
-### 4. Draft Artifacts
+### 5. Draft Artifacts
 **For behavioral changes:**
 - Write proposed `.feature` files in `.grimoire/changes/<change-id>/features/<capability>/`
 - If modifying an existing feature, copy the current baseline first, then modify
@@ -99,13 +110,16 @@ github_api:
 
 **For all changes:**
 - Write `manifest.md` listing all artifacts, what's added/modified/removed, and why
+- Include an **Assumptions** section: list what must be true for this change to succeed. For each assumption, note whether there is evidence or it is unvalidated. Unvalidated assumptions on the critical path should be flagged to the user.
+- Include a **Pre-Mortem** section: imagine this change has failed or caused a production incident 6 months from now — what went wrong? List 2-5 plausible failure modes with mitigations or "accepted" if the risk is acknowledged.
+- Before drafting, consider whether **existing tools, libraries, or patterns** already solve the problem. If a well-maintained package, framework feature, or existing codebase utility handles the need, prefer it over writing new code. Note any "build vs. reuse" decisions in the manifest or as an ADR if the choice is significant.
 
-### 5. Collaborate
+### 6. Collaborate
 - Present the draft to the user
 - Iterate based on feedback
 - Do NOT proceed to plan stage without user approval
 
-### 6. Validate
+### 7. Validate
 - Verify `.feature` files have valid Gherkin syntax
 - Verify MADR records have valid YAML frontmatter (status, date)
 - Verify manifest is complete and accurate

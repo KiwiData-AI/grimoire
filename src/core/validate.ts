@@ -1,6 +1,14 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
+import matter from "gray-matter";
+import {
+  GherkinClassicTokenMatcher,
+  Parser,
+  AstBuilder,
+} from "@cucumber/gherkin";
+import { IdGenerator } from "@cucumber/messages";
+import type { GherkinDocument, Scenario as GherkinScenario } from "@cucumber/messages";
 import { findProjectRoot, resolveChangePath } from "../utils/paths.js";
 import { findFiles } from "../utils/fs.js";
 
@@ -150,7 +158,37 @@ async function validateSingleChange(
   }
 }
 
-function validateFeatureFile(
+function parseGherkin(content: string): GherkinDocument | null {
+  try {
+    const parser = new Parser(
+      new AstBuilder(IdGenerator.uuid()),
+      new GherkinClassicTokenMatcher()
+    );
+    return parser.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+function getScenarios(doc: GherkinDocument): GherkinScenario[] {
+  if (!doc.feature) return [];
+  const scenarios: GherkinScenario[] = [];
+  for (const child of doc.feature.children) {
+    if (child.scenario) {
+      scenarios.push(child.scenario);
+    }
+    if (child.rule) {
+      for (const ruleChild of child.rule.children) {
+        if (ruleChild.scenario) {
+          scenarios.push(ruleChild.scenario);
+        }
+      }
+    }
+  }
+  return scenarios;
+}
+
+export function validateFeatureFile(
   filePath: string,
   content: string,
   strict: boolean
@@ -158,66 +196,76 @@ function validateFeatureFile(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  if (!content.match(/^Feature:/m)) {
-    errors.push("Missing Feature: declaration");
+  const doc = parseGherkin(content);
+
+  if (!doc || !doc.feature) {
+    errors.push("Invalid Gherkin syntax — could not parse feature file");
+    return { file: filePath, errors, warnings };
   }
 
-  if (!content.match(/^\s+Scenario(?: Outline)?:/m)) {
+  const feature = doc.feature;
+
+  if (!feature.name || feature.name.trim() === "") {
+    errors.push("Missing Feature name");
+  }
+
+  const scenarios = getScenarios(doc);
+
+  if (scenarios.length === 0) {
     errors.push("No scenarios found");
   }
 
-  // Check each Scenario and Scenario Outline has at least When + Then
-  const scenarios = content
-    .split(/^\s+Scenario(?: Outline)?:/m)
-    .slice(1);
   for (const scenario of scenarios) {
-    const scenarioName =
-      scenario.split("\n")[0]?.trim() || "unnamed";
+    const name = scenario.name || "unnamed";
+    const keywords = scenario.steps.map((s) => s.keyword.trim());
 
-    if (!scenario.match(/^\s+When /m)) {
-      errors.push(`Scenario "${scenarioName}" missing When step`);
+    if (!keywords.includes("When")) {
+      errors.push(`Scenario "${name}" missing When step`);
     }
-    if (!scenario.match(/^\s+Then /m)) {
-      errors.push(`Scenario "${scenarioName}" missing Then step`);
+    if (!keywords.includes("Then")) {
+      errors.push(`Scenario "${name}" missing Then step`);
     }
 
-    // Check Scenario Outline has Examples
-    const isOutline = content
-      .split(scenarioName)[0]
-      ?.match(/Scenario Outline:\s*$/m);
-    if (isOutline && !scenario.match(/^\s+Examples:/m)) {
-      errors.push(
-        `Scenario Outline "${scenarioName}" missing Examples table`
-      );
+    // Scenario Outline must have Examples
+    if (
+      scenario.keyword === "Scenario Outline" &&
+      scenario.examples.length === 0
+    ) {
+      errors.push(`Scenario Outline "${name}" missing Examples table`);
     }
   }
 
   if (strict) {
-    // Check for user story
+    // Check for user story in feature description
+    const description = feature.description || "";
     if (
-      !content.match(/As an?\s/i) ||
-      !content.match(/I want\s/i) ||
-      !content.match(/So that\s/i)
+      !description.match(/As an?\s/i) ||
+      !description.match(/I want\s/i) ||
+      !description.match(/So that\s/i)
     ) {
       warnings.push(
         "Missing user story (As a / I want / So that)"
       );
     }
 
-    // Warn about implementation details
+    // Warn about implementation details in step text
     const implKeywords =
       /\b(database|SQL|API|endpoint|HTTP|POST|GET|class|function|method|import|module)\b/i;
-    if (implKeywords.test(content)) {
-      warnings.push(
-        "Possible implementation details in feature file (should describe WHAT not HOW)"
-      );
+    for (const scenario of scenarios) {
+      for (const step of scenario.steps) {
+        if (implKeywords.test(step.text)) {
+          warnings.push(
+            `Possible implementation details in step: "${step.keyword.trim()} ${step.text}" (should describe WHAT not HOW)`
+          );
+        }
+      }
     }
   }
 
   return { file: filePath, errors, warnings };
 }
 
-function validateDecisionFile(
+export function validateDecisionFile(
   filePath: string,
   content: string,
   strict: boolean
@@ -226,15 +274,14 @@ function validateDecisionFile(
   const warnings: string[] = [];
 
   // Check YAML frontmatter
+  const { data: fm } = matter(content);
   if (!content.startsWith("---")) {
     errors.push("Missing YAML frontmatter");
   } else {
-    const frontmatter = content.split("---")[1] || "";
-
-    if (!frontmatter.match(/status:/)) {
+    if (!fm.status) {
       errors.push("Frontmatter missing 'status' field");
     }
-    if (!frontmatter.match(/date:/)) {
+    if (!fm.date) {
       errors.push("Frontmatter missing 'date' field");
     }
   }
@@ -257,6 +304,9 @@ function validateDecisionFile(
     if (!content.match(/^### Consequences/m)) {
       warnings.push("Missing 'Consequences' section");
     }
+    if (!content.match(/^### Cost of Ownership/m)) {
+      warnings.push("Missing 'Cost of Ownership' section");
+    }
     if (!content.match(/^### Confirmation/m)) {
       warnings.push("Missing 'Confirmation' section");
     }
@@ -272,7 +322,7 @@ const VALID_MANIFEST_STATUSES = [
   "complete",
 ];
 
-function validateManifest(
+export function validateManifest(
   filePath: string,
   content: string,
   strict: boolean
@@ -280,6 +330,7 @@ function validateManifest(
   const errors: string[] = [];
   const warnings: string[] = [];
 
+  const { data: mfm } = matter(content);
   if (!content.startsWith("---")) {
     if (strict) {
       errors.push("Missing YAML frontmatter (status, branch)");
@@ -287,14 +338,11 @@ function validateManifest(
       warnings.push("Missing YAML frontmatter (status, branch)");
     }
   } else {
-    const frontmatter = content.split("---")[1] || "";
-
-    const statusMatch = frontmatter.match(/status:\s*(\S+)/);
-    if (!statusMatch) {
+    if (!mfm.status) {
       errors.push("Frontmatter missing 'status' field");
-    } else if (!VALID_MANIFEST_STATUSES.includes(statusMatch[1])) {
+    } else if (!VALID_MANIFEST_STATUSES.includes(mfm.status)) {
       errors.push(
-        `Invalid status "${statusMatch[1]}" — must be one of: ${VALID_MANIFEST_STATUSES.join(", ")}`
+        `Invalid status "${mfm.status}" — must be one of: ${VALID_MANIFEST_STATUSES.join(", ")}`
       );
     }
   }
@@ -310,6 +358,15 @@ function validateManifest(
     errors.push(
       "Must have at least one of 'Feature Changes' or 'Decisions' section"
     );
+  }
+
+  if (strict) {
+    if (!content.match(/^## Assumptions/m)) {
+      warnings.push("Missing 'Assumptions' section");
+    }
+    if (!content.match(/^## Pre-Mortem/m)) {
+      warnings.push("Missing 'Pre-Mortem' section");
+    }
   }
 
   return { file: filePath, errors, warnings };

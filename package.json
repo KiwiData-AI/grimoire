@@ -45,9 +45,13 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@cucumber/gherkin": "^39.0.0",
+    "@cucumber/messages": "^32.2.0",
     "chalk": "^5.5.0",
     "commander": "^14.0.0",
     "fast-glob": "^3.3.0",
+    "gray-matter": "^4.0.3",
+    "simple-git": "^3.33.0",
     "yaml": "^2.8.0"
   },
   "devDependencies": {
