@@ -40,8 +40,8 @@ export async function generatePr(options: PrOptions): Promise<void> {
   // Read artifacts
   const manifest = await readFileOrEmpty(join(changeDir, "manifest.md"));
   const tasks = await readFileOrEmpty(join(changeDir, "tasks.md"));
-  const features = await readFeatureFiles(changeDir);
-  const decisions = await readDecisionFiles(changeDir);
+  const features = await readArtifactFiles(changeDir, "features", ".feature");
+  const decisions = await readArtifactFiles(changeDir, "decisions", ".md");
 
   // Parse manifest
   const whySection = extractSection(manifest, "Why");
@@ -109,21 +109,23 @@ export async function generatePr(options: PrOptions): Promise<void> {
 }
 
 async function detectActiveChange(changesDir: string): Promise<string | null> {
+  let entries;
   try {
-    const entries = await readdir(changesDir, { withFileTypes: true });
-    const changes = entries.filter((e) => e.isDirectory()).map((e) => e.name);
-    if (changes.length === 1) return changes[0];
-    if (changes.length > 1) {
-      console.log(chalk.bold("Active changes:"));
-      for (const c of changes) {
-        console.log(`  - ${c}`);
-      }
-      throw new Error("Multiple active changes. Specify one: grimoire pr <change-id>");
-    }
-    return null;
+    entries = await readdir(changesDir, { withFileTypes: true });
   } catch {
     return null;
   }
+
+  const changes = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+  if (changes.length === 1) return changes[0];
+  if (changes.length > 1) {
+    console.log(chalk.bold("Active changes:"));
+    for (const c of changes) {
+      console.log(`  - ${c}`);
+    }
+    throw new Error("Multiple active changes. Specify one: grimoire pr <change-id>");
+  }
+  return null;
 }
 
 async function readFileOrEmpty(path: string): Promise<string> {
@@ -134,24 +136,10 @@ async function readFileOrEmpty(path: string): Promise<string> {
   }
 }
 
-async function readFeatureFiles(changeDir: string): Promise<string[]> {
-  const featuresDir = join(changeDir, "features");
+async function readArtifactFiles(changeDir: string, subdir: string, ext: string): Promise<string[]> {
+  const dir = join(changeDir, subdir);
   try {
-    const files = await collectFiles(featuresDir, ".feature");
-    const contents: string[] = [];
-    for (const f of files) {
-      contents.push(await readFile(f, "utf-8"));
-    }
-    return contents;
-  } catch {
-    return [];
-  }
-}
-
-async function readDecisionFiles(changeDir: string): Promise<string[]> {
-  const decisionsDir = join(changeDir, "decisions");
-  try {
-    const files = await collectFiles(decisionsDir, ".md");
+    const files = await collectFiles(dir, ext);
     const contents: string[] = [];
     for (const f of files) {
       contents.push(await readFile(f, "utf-8"));
@@ -221,16 +209,7 @@ function formatTitle(
 ): string {
   const cleanTitle = manifestTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, "");
 
-  // Derive type from change-id prefix
-  const type = changeId.startsWith("add-")
-    ? "feat"
-    : changeId.startsWith("update-") || changeId.startsWith("change-")
-      ? "feat"
-      : changeId.startsWith("fix-")
-        ? "fix"
-        : changeId.startsWith("remove-")
-          ? "feat"
-          : "feat";
+  const type = changeId.startsWith("fix-") ? "fix" : "feat";
 
   if (style === "angular") {
     // Try to extract scope from change-id

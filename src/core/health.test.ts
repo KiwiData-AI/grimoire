@@ -169,4 +169,140 @@ describe("runHealth", () => {
     expect(logs.some((l) => l.includes("grimoire health"))).toBe(true);
     expect(logs.some((l) => l.includes("Overall"))).toBe(true);
   });
+
+  it("reads unit coverage from jest/vitest summary JSON", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("coverage-summary.json")) {
+        return JSON.stringify({ total: { lines: { pct: 85.5 } } }) as any;
+      }
+      throw new Error("ENOENT");
+    });
+
+    const result = await captureJson(() => runHealth({ json: true }));
+    const unitCov = result.metrics.find((m: any) => m.name === "unit_coverage");
+    expect(unitCov).toBeDefined();
+    expect(unitCov.score).toBe(86); // rounded
+    expect(unitCov.label).toContain("86% line coverage");
+  });
+
+  it("reads unit coverage from pytest-cov format", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("status.json")) {
+        return JSON.stringify({ totals: { percent_covered: 72.3 } }) as any;
+      }
+      throw new Error("ENOENT");
+    });
+
+    const result = await captureJson(() => runHealth({ json: true }));
+    const unitCov = result.metrics.find((m: any) => m.name === "unit_coverage");
+    expect(unitCov.score).toBe(72);
+  });
+
+  it("data_schema reports model count when schema exists", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("schema.yml")) {
+        return "User:\n  fields:\n    - name\nOrder:\n  fields:\n    - id\n" as any;
+      }
+      throw new Error("ENOENT");
+    });
+
+    const result = await captureJson(() => runHealth({ json: true }));
+    const schema = result.metrics.find((m: any) => m.name === "data_schema");
+    expect(schema.score).toBe(100);
+    expect(schema.label).toContain("2 models");
+  });
+
+  it("area_docs reports documented count from index.yml", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("index.yml")) {
+        return "areas:\n  - directory: src\n  - directory: lib\n" as any;
+      }
+      throw new Error("ENOENT");
+    });
+
+    const result = await captureJson(() => runHealth({ json: true }));
+    const areaDocs = result.metrics.find((m: any) => m.name === "area_docs");
+    expect(areaDocs.score).toBe(100);
+    expect(areaDocs.label).toContain("2/2");
+  });
+
+  it("updates badges in existing file with markers", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("README.md")) {
+        return "# My Project\n<!-- GRIMOIRE:HEALTH:START -->\nold badges\n<!-- GRIMOIRE:HEALTH:END -->\nMore content" as any;
+      }
+      throw new Error("ENOENT");
+    });
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await runHealth({ json: false, badges: "README.md" });
+
+    const writeCall = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("README.md")
+    );
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("GRIMOIRE:HEALTH:START");
+    expect(content).toContain("More content");
+    expect(content).not.toContain("old badges");
+  });
+
+  it("prepends badges to file without markers", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("README.md")) {
+        return "# My Project\nSome content\n" as any;
+      }
+      throw new Error("ENOENT");
+    });
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await runHealth({ json: false, badges: "README.md" });
+
+    const writeCall = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("README.md")
+    );
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("GRIMOIRE:HEALTH:START");
+    expect(content).toContain("# My Project");
+    // Badges should come before original content
+    const badgeIdx = content.indexOf("GRIMOIRE:HEALTH:START");
+    const contentIdx = content.indexOf("# My Project");
+    expect(badgeIdx).toBeLessThan(contentIdx);
+  });
+
+  it("test_coverage reports step definition matches", async () => {
+    mockReaddir.mockImplementation(async (path: any) => {
+      if (String(path).includes("features/steps")) return ["login_steps.py"] as any;
+      throw new Error("ENOENT");
+    });
+    mockFindFiles.mockImplementation(async (dir: string) => {
+      if (dir.includes("features") && !dir.includes("steps")) return ["/fake/root/features/login.feature"];
+      if (dir.includes("steps")) return ["/fake/root/features/steps/login_steps.py"];
+      return [];
+    });
+    mockReadFileOrNull.mockImplementation(async (path: string) => {
+      if (path.includes(".feature")) {
+        return `Feature: Login
+  Scenario: User authenticates
+    Given valid credentials
+    When user submits login form
+    Then user sees dashboard`;
+      }
+      if (path.includes("login_steps")) {
+        return `@given("valid credentials")\ndef step_credentials():\n    pass\n@when("user submits login form")\ndef step_submit():\n    pass`;
+      }
+      return null;
+    });
+
+    const result = await captureJson(() => runHealth({ json: true }));
+    const testCov = result.metrics.find((m: any) => m.name === "test_coverage");
+    expect(testCov).toBeDefined();
+    expect(testCov.score).toBeGreaterThan(0);
+  });
 });

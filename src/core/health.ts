@@ -129,7 +129,7 @@ async function checkDecisions(root: string): Promise<Metric> {
 
     const { data: fm } = matter(content);
     const status = fm.status ? String(fm.status).trim() : "";
-    if (!status || status === "accepted" || status === "proposed" || !status.includes("superseded")) {
+    if (!status.includes("superseded")) {
       current++;
     }
   }

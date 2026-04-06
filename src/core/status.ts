@@ -62,24 +62,17 @@ export async function getChangeStatus(
     // no manifest
   }
 
-  // Find feature files
+  // Find feature and decision files
   try {
     const glob = (await import("fast-glob")).default;
-    status.artifacts.features = await glob("features/**/*.feature", {
-      cwd: changePath,
-    });
+    const [features, decisions] = await Promise.all([
+      glob("features/**/*.feature", { cwd: changePath }),
+      glob("decisions/**/*.md", { cwd: changePath }),
+    ]);
+    status.artifacts.features = features;
+    status.artifacts.decisions = decisions;
   } catch {
-    // no features dir
-  }
-
-  // Find decision files
-  try {
-    const glob = (await import("fast-glob")).default;
-    status.artifacts.decisions = await glob("decisions/**/*.md", {
-      cwd: changePath,
-    });
-  } catch {
-    // no decisions dir
+    // no features/decisions
   }
 
   // Parse tasks

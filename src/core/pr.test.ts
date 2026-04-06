@@ -140,6 +140,65 @@ describe("generatePr", () => {
     ).rejects.toThrow("No active change");
   });
 
+  it("warns about incomplete tasks in pretty print mode", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("manifest.md")) return manifest as any;
+      if (p.includes("tasks.md")) return "- [x] Done\n- [ ] Not done" as any;
+      throw new Error("ENOENT");
+    });
+    mockReaddir.mockResolvedValue([] as any);
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await generatePr({ changeId: "add-auth", create: false, review: false, json: false });
+
+    const output = logs.join("\n");
+    expect(output).toContain("PR Preview");
+    expect(output).toContain("1 task(s) still incomplete");
+  });
+
+  it("generates body with empty why section", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) return "# Change: Minimal\n" as any;
+      throw new Error("ENOENT");
+    });
+    mockReaddir.mockResolvedValue([] as any);
+
+    const result = await captureJson(() =>
+      generatePr({ changeId: "add-minimal", create: false, review: false, json: true })
+    );
+
+    expect(result.body).toContain("No summary provided");
+  });
+
+  it("includes decision titles in body", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("manifest.md")) return manifest as any;
+      if (p.endsWith(".md") && p.includes("decisions")) return "# Use JWT for auth\n" as any;
+      throw new Error("ENOENT");
+    });
+    mockReaddir.mockImplementation(async (path: any, opts?: any) => {
+      const p = String(path);
+      if (p.includes("decisions")) {
+        return [{ name: "0001-use-jwt.md", isFile: () => true, isDirectory: () => false, parentPath: `/fake/root/.grimoire/changes/add-auth/decisions` }] as any;
+      }
+      return [] as any;
+    });
+
+    const result = await captureJson(() =>
+      generatePr({ changeId: "add-auth", create: false, review: false, json: true })
+    );
+
+    expect(result.body).toContain("Decisions");
+    expect(result.body).toContain("Use JWT for auth");
+    expect(result.body).toContain("ADR confirmation criteria met");
+  });
+
   it("includes scenarios from feature files", async () => {
     mockReadFile.mockImplementation(async (path: any) => {
       const p = String(path);
@@ -155,7 +214,6 @@ describe("generatePr", () => {
       if (p.includes("decisions")) throw new Error("ENOENT");
       return [] as any;
     });
-    // Override readFile for feature file
     const origImpl = mockReadFile.getMockImplementation()!;
     mockReadFile.mockImplementation(async (path: any) => {
       const p = String(path);
@@ -168,5 +226,68 @@ describe("generatePr", () => {
     );
 
     expect(result.body).toContain("User logs in");
+  });
+
+  it("includes Scenario Outline in scenarios", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("manifest.md")) return manifest as any;
+      throw new Error("ENOENT");
+    });
+    mockReaddir.mockImplementation(async (path: any, opts?: any) => {
+      const p = String(path);
+      if (p.includes("features")) {
+        return [{ name: "auth.feature", isFile: () => true, isDirectory: () => false, parentPath: `/fake/root/.grimoire/changes/add-auth/features` }] as any;
+      }
+      return [] as any;
+    });
+    const origImpl2 = mockReadFile.getMockImplementation()!;
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith(".feature")) return "Feature: Auth\n  Scenario Outline: Login with <role>\n    Given a <role> user\n" as any;
+      return origImpl2(path);
+    });
+
+    const result = await captureJson(() =>
+      generatePr({ changeId: "add-auth", create: false, review: false, json: true })
+    );
+
+    expect(result.body).toContain("Login with <role>");
+  });
+
+  it("detects single active change automatically", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) return "# Change: Auto detected\n## Why\nTest.\n" as any;
+      throw new Error("ENOENT");
+    });
+    mockReaddir.mockImplementation(async (path: any, opts?: any) => {
+      const p = String(path);
+      if (p.includes("changes") && !p.includes("auto-change")) {
+        return [{ name: "auto-change", isDirectory: () => true }] as any;
+      }
+      return [] as any;
+    });
+
+    const result = await captureJson(() =>
+      generatePr({ create: false, review: false, json: true })
+    );
+
+    expect(result.changeId).toBe("auto-change");
+  });
+
+  it("counts complete and incomplete tasks correctly", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("manifest.md")) return manifest as any;
+      if (p.includes("tasks.md")) return "- [x] Task A\n- [x] Task B\n- [ ] Task C\n- [ ] Task D\n- [ ] Task E" as any;
+      throw new Error("ENOENT");
+    });
+    mockReaddir.mockResolvedValue([] as any);
+
+    const result = await captureJson(() =>
+      generatePr({ changeId: "add-auth", create: false, review: false, json: true })
+    );
+
+    expect(result.body).toContain("Tasks: 2/5 complete");
   });
 });

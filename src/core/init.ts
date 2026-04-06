@@ -73,45 +73,23 @@ export async function initProject(
     console.log(`  ${chalk.green("created")} ${dir}/`);
   }
 
-  // Copy decision template
-  const templateSrc = join(PACKAGE_ROOT, "templates", "decision.md");
-  const templateDest = join(root, ".grimoire", "decisions", "template.md");
-  if (!(await fileExists(templateDest))) {
-    await copyFile(templateSrc, templateDest);
-    console.log(`  ${chalk.green("created")} .grimoire/decisions/template.md`);
-  } else {
-    console.log(`  ${chalk.yellow("exists")}  .grimoire/decisions/template.md`);
-  }
+  // Copy template files
+  const templates: Array<[string, string]> = [
+    ["decision.md", ".grimoire/decisions/template.md"],
+    ["context.yml", ".grimoire/docs/context.yml"],
+    ["debt-exceptions.yml", ".grimoire/debt-exceptions.yml"],
+    ["mapignore", ".grimoire/mapignore"],
+    ["mapkeys", ".grimoire/mapkeys"],
+  ];
 
-  // Copy project context template
-  const contextSrc = join(PACKAGE_ROOT, "templates", "context.yml");
-  const contextDest = join(root, ".grimoire", "docs", "context.yml");
-  if (!(await fileExists(contextDest))) {
-    await copyFile(contextSrc, contextDest);
-    console.log(`  ${chalk.green("created")} .grimoire/docs/context.yml`);
-  } else {
-    console.log(`  ${chalk.yellow("exists")}  .grimoire/docs/context.yml`);
-  }
-
-  // Copy debt exceptions template
-  const debtExSrc = join(PACKAGE_ROOT, "templates", "debt-exceptions.yml");
-  const debtExDest = join(root, ".grimoire", "debt-exceptions.yml");
-  if (!(await fileExists(debtExDest))) {
-    await copyFile(debtExSrc, debtExDest);
-    console.log(`  ${chalk.green("created")} .grimoire/debt-exceptions.yml`);
-  } else {
-    console.log(`  ${chalk.yellow("exists")}  .grimoire/debt-exceptions.yml`);
-  }
-
-  // Copy map config files
-  for (const configFile of ["mapignore", "mapkeys"]) {
-    const configSrc = join(PACKAGE_ROOT, "templates", configFile);
-    const configDest = join(root, ".grimoire", configFile);
-    if (!(await fileExists(configDest))) {
-      await copyFile(configSrc, configDest);
-      console.log(`  ${chalk.green("created")} .grimoire/${configFile}`);
+  for (const [src, dest] of templates) {
+    const srcPath = join(PACKAGE_ROOT, "templates", src);
+    const destPath = join(root, dest);
+    if (!(await fileExists(destPath))) {
+      await copyFile(srcPath, destPath);
+      console.log(`  ${chalk.green("created")} ${dest}`);
     } else {
-      console.log(`  ${chalk.yellow("exists")}  .grimoire/${configFile}`);
+      console.log(`  ${chalk.yellow("exists")}  ${dest}`);
     }
   }
 

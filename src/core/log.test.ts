@@ -123,4 +123,60 @@ describe("generateLog", () => {
     expect(result).toHaveLength(1);
     expect(result[0].changeId).toBe("valid");
   });
+
+  it("pretty prints with month headers and entry details", async () => {
+    mockReaddir.mockResolvedValue([
+      { name: "2026-03-15-add-auth", isDirectory: () => true, isFile: () => false },
+    ] as any);
+    mockReadFile.mockResolvedValue(manifestContent as any);
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await generateLog({ json: false });
+
+    const output = logs.join("\n");
+    expect(output).toContain("Grimoire Change Log");
+    expect(output).toContain("March 2026");
+    expect(output).toContain("add-auth");
+    expect(output).toContain("Add authentication");
+    expect(output).toContain("Features:");
+    expect(output).toContain("Decisions:");
+    expect(output).toContain("Scenarios:");
+    expect(output).toContain("1 change(s) total");
+  });
+
+  it("truncates scenarios when more than 3", async () => {
+    const manyScenarios = `# Change: Big feature
+
+## Why
+Lots of work.
+
+## Scenarios Added
+- "Scenario one"
+- "Scenario two"
+- "Scenario three"
+- "Scenario four"
+- "Scenario five"
+
+## End
+`;
+    mockReaddir.mockResolvedValue([
+      { name: "2026-01-10-big-feature", isDirectory: () => true, isFile: () => false },
+    ] as any);
+    mockReadFile.mockResolvedValue(manyScenarios as any);
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await generateLog({ json: false });
+
+    const output = logs.join("\n");
+    expect(output).toContain("+2 more");
+  });
+
 });

@@ -109,4 +109,61 @@ describe("getChangeStatus", () => {
     expect(result.artifacts.features).toEqual(["features/auth.feature"]);
     expect(result.artifacts.decisions).toEqual(["decisions/001.md"]);
   });
+
+  it("pretty prints status with all details", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("manifest.md")) return "---\nstatus: implementing\nbranch: feat/auth\n---\n# Change";
+      if (p.includes("tasks.md")) return "- [x] Task A\n- [ ] Task B\n- [ ] Task C";
+      throw new Error("ENOENT");
+    });
+    mockGlob.mockImplementation(async (pattern: any) => {
+      if (String(pattern).includes(".feature")) return ["features/login.feature"] as any;
+      return [] as any;
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await getChangeStatus("test-change", { json: false });
+
+    const output = logs.join("\n");
+    expect(output).toContain("Change: test-change");
+    expect(output).toContain("feat/auth");
+    expect(output).toContain("Artifacts:");
+    expect(output).toContain("1/3 complete");
+    expect(output).toContain("Pending tasks:");
+    expect(output).toContain("Task B");
+    expect(output).toContain("Task C");
+  });
+
+  it("pretty prints draft stage with no tasks", async () => {
+    mockReadFile.mockRejectedValue(new Error("ENOENT"));
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await getChangeStatus("empty-change", { json: false });
+
+    const output = logs.join("\n");
+    expect(output).toContain("Change: empty-change");
+    expect(output).toContain("not yet planned");
+    expect(output).toContain("missing");
+  });
+
+  it("lists pending tasks in JSON output", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("manifest.md")) return "---\nstatus: draft\n---\n";
+      if (p.includes("tasks.md")) return "- [x] Done task\n- [ ] Pending one\n- [ ] Pending two";
+      throw new Error("ENOENT");
+    });
+
+    const result = await captureJson(() => getChangeStatus("test", { json: true }));
+    expect(result.artifacts.tasks.pending).toEqual(["Pending one", "Pending two"]);
+  });
 });
