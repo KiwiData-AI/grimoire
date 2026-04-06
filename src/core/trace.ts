@@ -1,11 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import chalk from "chalk";
+import { simpleGit } from "simple-git";
 import { findProjectRoot } from "../utils/paths.js";
-
-const execFileAsync = promisify(execFile);
 
 interface TraceOptions {
   json: boolean;
@@ -137,6 +134,7 @@ async function getCommits(
   line?: number
 ): Promise<CommitTrace[]> {
   const commits: CommitTrace[] = [];
+  const git = simpleGit(root);
 
   try {
     // Use git log with trailer parsing
@@ -155,7 +153,7 @@ async function getCommits(
       args.push("--", relFile);
     }
 
-    const { stdout } = await execFileAsync("git", args, { cwd: root });
+    const stdout = await git.raw(args);
 
     for (const rawLine of stdout.trim().split("\n")) {
       if (!rawLine) continue;

@@ -10,8 +10,8 @@ vi.mock("../utils/paths.js", () => ({
   findProjectRoot: vi.fn().mockResolvedValue("/fake/root"),
 }));
 
-vi.mock("node:child_process", () => ({
-  execFile: vi.fn(),
+vi.mock("simple-git", () => ({
+  simpleGit: vi.fn(() => ({ raw: vi.fn().mockResolvedValue("") })),
 }));
 
 import { readFile, readdir } from "node:fs/promises";

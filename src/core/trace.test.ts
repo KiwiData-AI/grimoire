@@ -10,26 +10,20 @@ vi.mock("node:fs/promises", async () => {
   return { ...actual, readFile: vi.fn(), readdir: vi.fn() };
 });
 
-vi.mock("node:child_process", async () => {
-  const { promisify } = await import("node:util");
-  const fn = vi.fn();
-  const asyncFn = vi.fn(async () => ({ stdout: "", stderr: "" }));
-  (fn as any)[promisify.custom] = asyncFn;
-  return { execFile: fn, spawn: vi.fn() };
-});
+const mockGitRaw = vi.fn();
+vi.mock("simple-git", () => ({
+  simpleGit: vi.fn(() => ({ raw: mockGitRaw })),
+}));
 
 import { readFile, readdir } from "node:fs/promises";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 
 const mockReadFile = vi.mocked(readFile);
 const mockReaddir = vi.mocked(readdir);
-const mockExecFileAsync = () => (execFile as any)[promisify.custom] as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockReaddir.mockRejectedValue(new Error("ENOENT"));
-  mockExecFileAsync().mockRejectedValue(new Error("no history"));
+  mockGitRaw.mockRejectedValue(new Error("no history"));
 });
 
 function captureJson(fn: () => Promise<void>): Promise<any> {
@@ -48,7 +42,7 @@ const gitLogOutput = `${commitHash}\x1f2026-01-15\x1fFred\x1fAdd authentication\
 
 describe("traceFile", () => {
   it("handles file with no git history", async () => {
-    mockExecFileAsync().mockRejectedValue(new Error("no history"));
+    mockGitRaw.mockRejectedValue(new Error("no history"));
 
     const logs: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
@@ -59,7 +53,7 @@ describe("traceFile", () => {
   });
 
   it("outputs commits in json mode", async () => {
-    mockExecFileAsync().mockResolvedValue({ stdout: gitLogOutput, stderr: "" });
+    mockGitRaw.mockResolvedValue(gitLogOutput);
 
     const result = await captureJson(() => traceFile("src/auth.ts", { json: true }));
     expect(result.commits).toHaveLength(1);
@@ -71,7 +65,7 @@ describe("traceFile", () => {
   });
 
   it("links change IDs to archive entries", async () => {
-    mockExecFileAsync().mockResolvedValue({ stdout: gitLogOutput, stderr: "" });
+    mockGitRaw.mockResolvedValue(gitLogOutput);
 
     mockReaddir.mockImplementation(async (path: any) => {
       if (String(path).includes("archive")) return ["2026-01-15-add-auth"] as any;
@@ -93,7 +87,7 @@ describe("traceFile", () => {
   });
 
   it("parses file:line target format", async () => {
-    mockExecFileAsync().mockResolvedValue({ stdout: gitLogOutput, stderr: "" });
+    mockGitRaw.mockResolvedValue(gitLogOutput);
 
     const result = await captureJson(() => traceFile("src/auth.ts:42", { json: true }));
     expect(result.file).toContain("auth.ts");
@@ -102,7 +96,7 @@ describe("traceFile", () => {
 
   it("deduplicates commits by hash", async () => {
     const dupeOutput = `${commitHash}\x1f2026-01-15\x1fFred\x1fAdd auth\x1f\n${commitHash}\x1f2026-01-15\x1fFred\x1fAdd auth\x1f`;
-    mockExecFileAsync().mockResolvedValue({ stdout: dupeOutput, stderr: "" });
+    mockGitRaw.mockResolvedValue(dupeOutput);
 
     const result = await captureJson(() => traceFile("src/auth.ts", { json: true }));
     expect(result.commits).toHaveLength(1);

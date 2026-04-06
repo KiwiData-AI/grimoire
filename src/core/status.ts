@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
+import matter from "gray-matter";
 import { findProjectRoot, resolveChangePath } from "../utils/paths.js";
 
 interface StatusOptions {
@@ -54,13 +55,9 @@ export async function getChangeStatus(
     );
     status.artifacts.manifest = true;
 
-    if (manifestContent.startsWith("---")) {
-      const frontmatter = manifestContent.split("---")[1] || "";
-      const statusMatch = frontmatter.match(/status:\s*(\S+)/);
-      if (statusMatch) status.status = statusMatch[1];
-      const branchMatch = frontmatter.match(/branch:\s*(\S+)/);
-      if (branchMatch) status.branch = branchMatch[1];
-    }
+    const { data: fm } = matter(manifestContent);
+    if (fm.status) status.status = fm.status;
+    if (fm.branch) status.branch = fm.branch;
   } catch {
     // no manifest
   }

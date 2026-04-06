@@ -1,10 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, basename } from "node:path";
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
+import { simpleGit } from "simple-git";
 import { loadConfig } from "../utils/config.js";
 import { findProjectRoot, resolveChangePath } from "../utils/paths.js";
+import { spawnWithStdin } from "../utils/spawn.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -300,11 +302,8 @@ async function runPostImplReview(
   prBody: string
 ): Promise<string> {
   try {
-    const { stdout: diff } = await execFileAsync(
-      "git",
-      ["diff", "main...HEAD"],
-      { cwd: root, timeout: 30_000 }
-    );
+    const git = simpleGit(root);
+    const diff = await git.diff(["main...HEAD"]);
 
     if (!diff.trim()) {
       return "No diff found against main. Skipping review.";
@@ -384,43 +383,3 @@ async function createPr(
   );
 }
 
-/**
- * Spawn a command with stdin piped, avoiding sh -c shell interpretation.
- */
-function spawnWithStdin(
-  command: string,
-  args: string[],
-  input: string,
-  cwd: string
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const parts = command.split(/\s+/);
-    const proc = spawn(parts[0], [...parts.slice(1), ...args], {
-      cwd,
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: 120_000,
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    proc.stdout.on("data", (data: Buffer) => {
-      stdout += data.toString();
-    });
-    proc.stderr.on("data", (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    proc.on("error", reject);
-    proc.on("close", (code) => {
-      if (code === 0 || stdout.trim()) {
-        resolve(stdout.trim());
-      } else {
-        reject(new Error(stderr.trim() || `Command exited with code ${code}`));
-      }
-    });
-
-    proc.stdin.write(input);
-    proc.stdin.end();
-  });
-}

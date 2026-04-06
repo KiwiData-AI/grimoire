@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import { parse as parseYaml } from "yaml";
+import matter from "gray-matter";
 import { findProjectRoot, safePath } from "../utils/paths.js";
 import { loadConfig } from "../utils/config.js";
 import { readFileOrNull, escapeRegex, findFiles } from "../utils/fs.js";
@@ -126,19 +127,10 @@ async function checkDecisions(root: string): Promise<Metric> {
     if (!content) continue;
     total++;
 
-    const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
-    if (fmMatch) {
-      const statusMatch = fmMatch[1].match(/^status:\s*(.+)$/m);
-      const status = statusMatch?.[1]?.trim() ?? "";
-      if (
-        status === "accepted" ||
-        status === "proposed" ||
-        !status.includes("superseded")
-      ) {
-        current++;
-      }
-    } else {
-      current++; // No frontmatter = assume current
+    const { data: fm } = matter(content);
+    const status = fm.status ? String(fm.status).trim() : "";
+    if (!status || status === "accepted" || status === "proposed" || !status.includes("superseded")) {
+      current++;
     }
   }
 

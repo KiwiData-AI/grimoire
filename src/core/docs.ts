@@ -2,6 +2,7 @@ import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import chalk from "chalk";
 import { parse as parseYaml } from "yaml";
+import matter from "gray-matter";
 import { findProjectRoot, safePath } from "../utils/paths.js";
 import { loadConfig } from "../utils/config.js";
 import { findFiles } from "../utils/fs.js";
@@ -414,16 +415,9 @@ async function buildDecisionsSection(
     if (!content) continue;
 
     // Extract frontmatter
-    const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
-    let status = "—";
-    let date = "—";
-    if (fmMatch) {
-      const fm = fmMatch[1];
-      const statusMatch = fm.match(/^status:\s*(.+)$/m);
-      const dateMatch = fm.match(/^date:\s*(.+)$/m);
-      if (statusMatch) status = statusMatch[1].trim();
-      if (dateMatch) date = dateMatch[1].trim();
-    }
+    const { data: fm } = matter(content);
+    const status = fm.status ? String(fm.status).trim() : "—";
+    const date = fm.date ? String(fm.date).trim() : "—";
 
     // Extract title
     const titleMatch = content.match(/^#\s+(.+)$/m);
@@ -549,12 +543,8 @@ async function buildActiveSection(
     const summary = titleMatch ? titleMatch[1].trim() : dir;
 
     // Extract status from frontmatter
-    const fmMatch = manifest.match(/^---\s*\n([\s\S]*?)\n---/);
-    let status = "draft";
-    if (fmMatch) {
-      const statusMatch = fmMatch[1].match(/^status:\s*(.+)$/m);
-      if (statusMatch) status = statusMatch[1].trim();
-    }
+    const { data: activeFm } = matter(manifest);
+    const status = activeFm.status ? String(activeFm.status).trim() : "draft";
 
     // Check task progress
     let taskProgress = "";

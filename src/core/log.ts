@@ -1,11 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import chalk from "chalk";
+import { simpleGit } from "simple-git";
 import { findProjectRoot } from "../utils/paths.js";
-
-const execFileAsync = promisify(execFile);
 
 interface LogOptions {
   from?: string;
@@ -196,11 +193,8 @@ async function resolveDate(
 
   // Try as a git tag
   try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["log", "-1", "--format=%aI", ref],
-      { cwd: root }
-    );
+    const git = simpleGit(root);
+    const stdout = await git.raw(["log", "-1", "--format=%aI", ref]);
     return stdout.trim().split("T")[0];
   } catch {
     console.error(

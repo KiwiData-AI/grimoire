@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
+import matter from "gray-matter";
 import { findProjectRoot } from "../utils/paths.js";
 import { fileExists } from "../utils/fs.js";
 
@@ -57,13 +58,9 @@ export async function listChanges(json: boolean): Promise<void> {
           join(changePath, "manifest.md"),
           "utf-8"
         );
-        if (manifestContent.startsWith("---")) {
-          const frontmatter = manifestContent.split("---")[1] || "";
-          const statusMatch = frontmatter.match(/status:\s*(\S+)/);
-          if (statusMatch) status = statusMatch[1];
-          const branchMatch = frontmatter.match(/branch:\s*(\S+)/);
-          if (branchMatch) branch = branchMatch[1];
-        }
+        const { data: fm } = matter(manifestContent);
+        if (fm.status) status = fm.status;
+        if (fm.branch) branch = fm.branch;
       }
 
       let stage = "draft";

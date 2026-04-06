@@ -1,12 +1,14 @@
 import { writeFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import chalk from "chalk";
+import { simpleGit } from "simple-git";
 import { loadConfig } from "../utils/config.js";
 import { findProjectRoot } from "../utils/paths.js";
+import { spawnWithStdin } from "../utils/spawn.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -189,19 +191,12 @@ async function runLlmStep(
   let files: string[] = [];
   if (changedOnly) {
     try {
-      const { stdout } = await execFileAsync(
-        "git",
-        ["diff", "--name-only", "HEAD"],
-        { cwd: root }
-      );
-      files = stdout.trim().split("\n").filter(Boolean);
+      const git = simpleGit(root);
+      const diffOutput = await git.diff(["--name-only", "HEAD"]);
+      files = diffOutput.trim().split("\n").filter(Boolean);
       if (files.length === 0) {
         // Try staged files
-        const { stdout: staged } = await execFileAsync(
-          "git",
-          ["diff", "--name-only", "--cached"],
-          { cwd: root }
-        );
+        const staged = await git.diff(["--name-only", "--cached"]);
         files = staged.trim().split("\n").filter(Boolean);
       }
     } catch {
@@ -285,43 +280,3 @@ function printStepResult(result: StepResult): void {
   }
 }
 
-/**
- * Spawn a command with stdin piped, avoiding sh -c shell interpretation.
- */
-function spawnWithStdin(
-  command: string,
-  args: string[],
-  input: string,
-  cwd: string
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const parts = command.split(/\s+/);
-    const proc = spawn(parts[0], [...parts.slice(1), ...args], {
-      cwd,
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: 120_000,
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    proc.stdout.on("data", (data: Buffer) => {
-      stdout += data.toString();
-    });
-    proc.stderr.on("data", (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    proc.on("error", reject);
-    proc.on("close", (code) => {
-      if (code === 0 || stdout.trim()) {
-        resolve(stdout.trim());
-      } else {
-        reject(new Error(stderr.trim() || `Command exited with code ${code}`));
-      }
-    });
-
-    proc.stdin.write(input);
-    proc.stdin.end();
-  });
-}
