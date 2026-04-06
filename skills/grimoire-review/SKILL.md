@@ -33,6 +33,7 @@ Read all artifacts for the change:
 - `data.yml` — proposed schema changes (if present)
 - Read `.grimoire/config.yaml` for project context (language, tools, conventions)
 - Read `.grimoire/docs/data/schema.yml` for current data baseline (if it exists)
+- Read `.grimoire/docs/context.yml` for deployment environment, related services, and infrastructure (if it exists) — this informs security review (cross-service auth), engineering review (deployment constraints), and data review (infrastructure availability)
 - Read relevant `.grimoire/docs/` area docs if they exist
 - Skim the areas of the codebase the tasks reference
 
@@ -75,6 +76,7 @@ Evaluate:
 - **Dependencies**: Do the tasks introduce new dependencies? Are there known vulnerability concerns? Check that package names are real and correctly spelled — hallucinated or typosquatted package names are a supply chain attack vector.
 - **Vulnerable packages**: If the tasks add or upgrade dependencies, check for known vulnerabilities. Cross-reference against the project's dependency audit tool (configured in `.grimoire/config.yaml` under `dep_audit`). Flag any package without a clear provenance or with a very low download count.
 - **Attack surface**: Does this change expose new endpoints, APIs, or interfaces? What could an attacker target?
+- **Cross-service security**: If `context.yml` lists related services, does the change properly authenticate when calling them? Are service-to-service auth boundaries maintained? Is data from sibling services validated at the boundary?
 - **Secrets**: Are there hardcoded credentials, tokens, or keys in the design? Check that API keys, database credentials, and tokens are loaded from environment variables or secret stores, never inline.
 
 If the change has no security-relevant surface (e.g., a pure UI text change), say so briefly and move on. Not every change needs a deep security review.

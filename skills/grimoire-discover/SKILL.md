@@ -9,9 +9,14 @@ Generate a structured project map in `.grimoire/docs/` from a codebase snapshot.
 - Loose match: "discover", "map", "standards", "conventions", "DRY", "utilities", "codebase layout"
 
 ## Prerequisites
-Run `grimoire map` first. This produces `.grimoire/docs/.snapshot.json` — a structural scan of the directory tree, key files, and file extension counts. The snapshot is the input; this skill adds the semantic layer.
+
+**Structural snapshot:** Run `grimoire map` first. This produces `.grimoire/docs/.snapshot.json` — a structural scan of the directory tree, key files, and file extension counts. The snapshot is the input for directory structure; this skill adds the semantic layer.
 
 If `.snapshot.json` doesn't exist or is stale, tell the user to run `grimoire map` (or `grimoire map --refresh` to diff against existing docs).
+
+**Symbol intelligence (recommended):** If `codebase-memory-mcp` is available as an MCP server, use its graph tools (`search_graph`, `get_architecture`, `query_graph`) to query symbols, call graphs, and architecture instead of reading source files manually. This provides AST-parsed symbols across 66 languages, call-path tracing, and dead code detection — far more accurate than regex extraction.
+
+If `codebase-memory-mcp` is not available, fall back to reading source files directly to identify symbols and patterns.
 
 ## What It Produces
 
@@ -27,7 +32,7 @@ If `.snapshot.json` doesn't exist or is stale, tell the user to run `grimoire ma
 
 ## Workflow
 
-### 1. Load Snapshot
+### 1. Load Snapshot and Graph
 Read `.grimoire/docs/.snapshot.json`. This gives you:
 - **directories** — every directory with file counts, extensions, key files, and subdirectories
 - **keyFiles** — significant files (entry points, configs, route files, etc.) with their detected type
@@ -37,6 +42,14 @@ Read `.grimoire/docs/.snapshot.json`. This gives you:
 Use this as your roadmap. The snapshot tells you WHERE to look; you add WHAT it means.
 
 If the snapshot includes a `duplicates` section (from `grimoire map --duplicates`), use it to populate "Known Duplicates" sections in area docs. This tells the plan skill where code is already duplicated so it can consolidate rather than add more.
+
+**If `codebase-memory-mcp` is available**, also query the graph for each area:
+- `search_graph` — find all symbols (functions, classes, types) in a directory
+- `trace_call_path` — understand how modules connect (inbound/outbound calls)
+- `get_architecture` — get a high-level module/dependency overview
+- `query_graph` — Cypher-like queries for specific relationships (e.g., `MATCH (f:Function)-[:CALLS]->(g) WHERE f.file STARTS WITH 'src/api/' RETURN f.name, g.name`)
+
+This replaces the need to manually read every source file to extract symbols. The graph gives you AST-accurate function signatures, call relationships, and dead code detection across 66 languages.
 
 ### 2. Determine Scope
 Ask the user what to document:
@@ -54,7 +67,13 @@ For each directory cluster in the snapshot, read the actual code to understand:
 - File extensions (tells you the language/type mix)
 - Key files (tells you what framework patterns are in use)
 
-**From reading the code (your job):**
+**From `codebase-memory-mcp` graph (if available):**
+- All symbols in the area: functions, classes, types, constants with signatures
+- Call graph: what calls what, both inbound and outbound
+- Dead code: functions with zero callers
+- Cross-service HTTP links: REST routes and their callers
+
+**From reading the code (your job — or to supplement the graph):**
 - What the module/area is responsible for
 - Reusable functions, classes, utilities that other code should import
 - Naming conventions and structural patterns
@@ -241,7 +260,41 @@ weather_api:
 
 If `.grimoire/docs/data/` already exists, update it rather than regenerating. Diff against existing schema.yml to flag new models or removed fields.
 
-### 6. Generate Index
+### 6. Generate Project Context
+
+Scan the codebase for deployment and infrastructure artifacts, then populate `.grimoire/docs/context.yml`. This file captures the project's ecosystem — how it's deployed, what services it talks to, and what infrastructure it depends on. If `context.yml` doesn't exist, copy it from the template first (`grimoire init` creates it, but this handles projects initialized before this feature).
+
+**Where to look:**
+
+| Artifact | What it tells you |
+|----------|------------------|
+| `Dockerfile`, `docker-compose.yml` | Containerized deployment; compose reveals linked services, databases, caches |
+| `k8s/`, `kubernetes/`, `Chart.yaml`, `helmfile.yaml` | Kubernetes deployment; manifests reveal services, ingresses, config maps |
+| `*.tf`, `terraform/`, `cdk.json`, `serverless.yml` | Infrastructure-as-code; reveals cloud provider, services, and architecture |
+| `.github/workflows/`, `.gitlab-ci.yml`, `Jenkinsfile`, `.circleci/` | CI/CD platform and deploy triggers |
+| `Procfile`, `app.json`, `vercel.json`, `netlify.toml` | PaaS deployment target |
+| `fly.toml`, `render.yaml`, `railway.json` | PaaS deployment target |
+| `.env.example`, `.env.template` | Environment variables reveal infrastructure dependencies (DB hosts, cache URLs, API keys) |
+| `docker-compose.yml` services | Related services, databases, caches, queues running locally |
+| API client wrappers, SDK config | Internal service dependencies |
+
+**Workflow:**
+1. Scan for the artifacts above — note what exists
+2. Read `docker-compose.yml` (if present) — it's the richest source of service and infrastructure dependencies
+3. Read `.env.example` (if present) — environment variables reveal what the project connects to
+4. Read CI/CD config files — identify the platform, key workflows, and deploy triggers
+5. Read IaC files (Terraform, CDK, etc.) — identify cloud provider and provisioned resources
+6. Populate `context.yml` with what you found — fill in real values, remove unused commented sections
+7. Present findings to the user for confirmation — they'll know about services and infrastructure that aren't discoverable from code alone (e.g., a shared auth service, a data warehouse they push to)
+
+**Rules:**
+- Only populate sections where you found evidence. Leave sections empty (with comments) rather than guessing.
+- Use environment variable references (`${DATABASE_HOST}`) for hostnames and credentials — never hardcode real values.
+- The `services` section is for **internal/sibling services** your org owns. Third-party APIs (Stripe, Twilio, etc.) belong in `schema.yml` under `external_api`.
+- If `context.yml` already exists and has content, update it rather than overwriting — the user may have manually added entries.
+- Ask the user about anything you can't determine from code: "I see a Redis connection in docker-compose but I'm not sure if it's just cache or also used for sessions — which is it?"
+
+### 7. Generate Index
 Create or update `.grimoire/docs/index.yml`:
 
 ```yaml
@@ -316,7 +369,8 @@ These are read by `grimoire map` and affect the snapshot this skill consumes.
 - Run `grimoire map --refresh` periodically to detect new undocumented areas, then `/grimoire:discover` to fill the gaps
 
 ## Important
-- **Start from the snapshot.** Don't scan the filesystem yourself — `grimoire map` already did that. Read `.snapshot.json` for structure, then read actual code files for meaning.
+- **Start from the snapshot.** Don't scan the filesystem yourself — `grimoire map` already did that. Read `.snapshot.json` for structure, then use `codebase-memory-mcp` graph queries for symbols and call graphs (if available), and read actual code files for meaning.
+- **Prefer graph queries over file reads.** If `codebase-memory-mcp` is available, use `search_graph` and `query_graph` to find symbols, call paths, and architecture rather than reading every source file. This is faster, more accurate (AST-parsed), and uses fewer tokens.
 - **Document what IS, not what should be.** This is a map of the actual codebase, not aspirational standards. If the code is inconsistent, note it — don't paper over it.
 - **Point, don't copy.** Reference files and line numbers as exemplars. Don't duplicate code into the docs — it goes stale.
 - **Focus on what helps LLMs.** The goal is preventing duplicate code and misplaced files. Prioritize: reusable utilities > file placement > naming conventions > architectural patterns.

@@ -291,6 +291,139 @@ The bake project (`~/Code/kiwi-dev/bake/.claude/commands/`) has mature Django-sp
 
 ---
 
+## AI Tech Debt & Refactoring Tools Landscape
+
+Research into what tools exist for AI-powered tech debt detection, tracking, and refactoring — and where grimoire-refactor fits (April 2026).
+
+### Formal Frameworks for Tech Debt
+
+**There is no "Gherkin for tech debt."** No single dominant machine-readable specification exists. The landscape:
+
+| Format | What it is | Adoption | Grimoire usage |
+|--------|-----------|----------|----------------|
+| **SARIF** | OASIS standard JSON schema for static analysis results | High (GitHub, Microsoft, SonarQube) | Too heavy for human-authored debt tracking. Could be an export format. |
+| **CodeClimate Issue Spec** | JSON schema with categories, severity, remediation_points, fingerprint | Medium (GitLab adopted it) | Borrowed: category taxonomy, severity levels, fingerprint for dedup. |
+| **SQALE** | Methodology mapping remediation cost to ISO 25010 quality characteristics | Medium (SonarQube used it) | Informed prioritization ordering. Too formal for a YAML register. |
+| **Fowler's Quadrant** | Deliberate/Inadvertent × Prudent/Reckless | High (conceptual) | Adopted: required field when accepting debt via exceptions. |
+| **SEI/CMU TDI** | Academic taxonomy: description, consequences, causes, evidence | Low (research only) | Borrowed: `consequences` and `causes` fields in register items. |
+| **.snyk / .trivyignore** | Acceptance files with expiry dates and justifications | High (security tools) | Model for `debt-exceptions.yml` — accept with reason, owner, expiry. |
+| **Stepsize** | IDE extension for annotating debt inline | Medium | Closest to a formal register. Manual-only, no AI detection. |
+| **TechnicalDebtRecords** (GitHub) | Open-source Go tool with 17-field records | Very low | MADR-like in spirit but virtually no adoption. |
+
+Grimoire's register format combines CodeClimate structure (categories, fingerprint) + SEI/CMU fields (consequences, causes) + Fowler quadrant (intent classification) + .snyk pattern (exceptions with expiry).
+
+### AI Coding Assistants — Refactoring Features
+
+| Tool | Detection | AI Refactoring | Debt Register | Exceptions | Workflow |
+|------|-----------|---------------|--------------|------------|----------|
+| **Cursor** | Duplicates, anti-patterns | Multi-file Composer (10-100+ files) | No | No | IDE only |
+| **GitHub Copilot + Code Quality** | CodeQL-based (public preview Oct 2025) | Coding agent (1-2 file changes) | Partial (backlog view) | No | PR checks, quality gates |
+| **Sourcegraph Cody** | Codebase-wide context | Batch Changes (multi-repo) | No | No | Enterprise, no free tier |
+| **Windsurf** (Cognition AI) | Pattern detection | Cascade agent (multi-file) | No | No | IDE only |
+| **Tabnine** | PR-level code review | Chat-based suggestions | No | No | Enterprise only |
+| **Amazon Q / AWS Transform** | Migration-scoped | Best for upgrades (1.1B+ lines processed) | No | No | CI/CD native, AWS-centric |
+| **JetBrains AI + Junie** | IntelliJ inspections | Autonomous multi-step refactoring | No | No | IDE + new CLI/SDK |
+
+**Key finding:** GitClear research shows Copilot correlates with increased code churn and decreased code reuse — it may *create* debt faster than it removes it. Refactoring dropped from 25% of changes (2021) to 10% (2024) — a 60% decline — attributed to AI-generated code skipping cleanup.
+
+### Dedicated Code Quality / Tech Debt Tools
+
+| Tool | Detection | Refactoring | Register | Exceptions | Pricing |
+|------|-----------|-------------|----------|------------|---------|
+| **CodeScene** | Best-in-class (hotspots, behavioral, CodeHealth) | ACE agent (newer) | Partial (dashboards, trends) | No | €18/author/mo |
+| **SonarQube** | Strong (rule-based, debt-in-minutes, SQALE) | AI CodeFix (GPT-4o/Claude) | Partial (baselines, quality gates) | `//NOSONAR` (no reason/expiry) | Community free, Dev $170/yr |
+| **DeepSource** | AI-native, sub-5% false positive rate | Autofix AI | No | No | Free OSS, Team $24/user/mo |
+| **Codacy** | SAST, SCA, DAST, secrets | AI Guardrails | No | No | $15/user/mo |
+| **CodeClimate** | Duplication, complexity, file health | No | No (GPA scores only) | No | Free OSS, paid from $16/user/mo |
+| **Snyk Code** | Security-focused SAST (80% fix accuracy) | AI autofixes | No | `.snyk` policy files | Free tier, Team $25/mo |
+| **Qodana** (JetBrains) | 3,000+ IntelliJ inspections in CI | No AI | Partial (baselines) | No | Free Community, $12/contributor/mo |
+| **Stepsize** | None (manual annotation) | None | **Yes** (the only real register) | No | Free tier, Team $12/user/mo |
+| **Qodo** (CodiumAI, $70M Series B) | Multi-agent review | Test generation | No | No | Enterprise |
+| **Byteable** | Semantic graph analysis | Autonomous CI/CD refactoring | Partial (audit trail) | No | Enterprise |
+
+### Claude Code / MCP Skills for Tech Debt
+
+| Skill/Tool | Source | What It Does | Register? |
+|------------|--------|-------------|-----------|
+| **tech-debt-tracker** | alirezarezvani/claude-skills | 3-component: Scanner, Prioritizer, Dashboard. 4-phase roadmap. | No |
+| **Technical Debt Analyzer** | mcpmarket.com | Identifies/quantifies/prioritizes with ROI-based remediation plans. | No |
+| **Tech Debt Finder** | mcpmarket.com | Basic code issue identification. | No |
+| **/refactor-suggest** | DEV Community | Static analysis for refactoring opportunities ranked by severity. CI-compatible. | No |
+| **Code Refactoring Expert** | mcpmarket.com | AI-guided refactoring skill. | No |
+| **Claude Command Suite** | qdhenry/Claude-Command-Suite | 216+ commands including `/dev:refactor-code`. | No |
+
+**All existing Claude Code skills treat debt as ephemeral** — scan, report, done. Nothing persists across sessions, nothing tracks status, nothing supports exceptions or acceptance.
+
+### Open Source AI Refactoring
+
+| Project | Approach | Status |
+|---------|----------|--------|
+| **FlightVin/automated-refactoring** | Cron-based LLM scan → auto PR | Research prototype |
+| **llm-refactoring-plugin** | JetBrains plugin using LLMs | Research |
+| **oceansen/debtguardian.ai** | GitHub repo scanner for tech/security debt | Early stage |
+| **Refact.ai** | Open source (BSD 3-Clause) AI coding agent, self-hostable | Active, model-agnostic |
+| **SDK4ED Toolbox** | EU research project: TD principal, interest, breaking point | Academic |
+
+### Academic Research
+
+| Paper | Key Finding |
+|-------|-------------|
+| **DebtGuardian** (Springer, 2025) | First open-source LLM framework for detecting TD from source code changes. Zero-shot + few-shot prompting with guardrails validation. |
+| **PromptDebt** (ACM, 2025) | Identifies "prompt smells" and "prompt requirement smells" as new debt categories specific to LLM projects. |
+| **Self-Admitted TD in LLM Software** (arXiv, Jan 2026) | LLM code has median 1,144 days before first self-admitted debt appears. 3 LLM-specific debt types identified. |
+| **LLM-Driven Code Refactoring** (Queen's U, 2025) | **Up to 76% of initial LLM refactoring suggestions are hallucinations.** Multi-gate validation required. |
+| **Enterprise Architecture Debt via LLMs** (arXiv, April 2026) | Uses LLMs to analyze unstructured documentation for architecture-level debt. |
+
+The Queen's University finding (76% hallucination rate) is critical — grimoire's red-green BDD cycle in the apply phase directly mitigates this. A hallucinated refactoring that breaks behavior will fail the red-green test.
+
+### Where grimoire-refactor Sits
+
+**No existing tool combines all three: AI detection + structured register + exception/acceptance workflow.**
+
+| Capability | grimoire-refactor | Nearest competitor |
+|------------|-------------------|-------------------|
+| Multi-dimensional scanning (9 categories) | Yes | CodeScene (~6 dimensions) |
+| Structured YAML debt register with fingerprint dedup | Yes | Stepsize (UI-based, not file-based) |
+| Exception/acceptance with Fowler quadrant | **Unique** | SonarQube `//NOSONAR` (no reason/expiry) |
+| Expiring exceptions | **Unique** | `.snyk` (security only) |
+| Consequences field (forces "what if we don't fix") | **Unique** | CodeScene shows productivity impact |
+| Feeds into plan→apply pipeline | **Unique** | All others: detect → maybe fix ad-hoc |
+| Works across LLM agents (Claude, Codex, Cursor) | Yes | CodeScene ACE (IDE only) |
+| Hotspot analysis (churn × complexity) | Yes (borrowed from CodeScene's approach) | CodeScene (the originator) |
+
+**Competitive advantages:**
+1. The exception/acceptance workflow is genuinely novel — no tool in the market lets you formally accept debt with reason, intent classification, owner, and expiry date
+2. Pipeline integration closes the loop: detect → register → accept/fix → draft → plan → apply → resolved
+3. Red-green BDD in the apply phase mitigates the 76% hallucination rate in LLM refactoring suggestions
+4. File-based YAML register works with any editor/agent — no SaaS dependency, no vendor lock-in
+
+**Risks:**
+- CodeScene's behavioral analysis is more sophisticated (organizational patterns, knowledge silos) — grimoire's hotspot scan is a simpler approximation
+- LLM-driven scanning will have false positives — the triage flow (batches of 3-5, user decides) mitigates this
+- Register maintenance requires discipline — monthly re-scans and exception expiry help
+
+### Sources
+
+- CodeScene — codescene.com/manage-and-reduce-technical-debt
+- Stepsize — stepsize.com/technical-debt
+- SonarQube — docs.sonarsource.com (SQALE, metrics, issue management)
+- CodeClimate Analyzer Spec — github.com/codeclimate/platform/blob/master/spec/analyzers/SPEC.md
+- SARIF OASIS Standard — docs.oasis-open.org/sarif/sarif/v2.1.0
+- SQALE — wikipedia.org/wiki/SQALE
+- SEI CMU — sei.cmu.edu/blog/got-technical-debt-track-technical-debt
+- Martin Fowler — martinfowler.com/bliki/TechnicalDebtQuadrant.html
+- GitHub Code Quality — github.blog/changelog/2025-10-28-github-code-quality-in-public-preview
+- AWS Transform — aws.amazon.com/blogs/devops/aws-transform-custom
+- GitClear AI Code Quality Report — gitclear-public.s3.us-west-2.amazonaws.com
+- Queen's University — LLM-Driven Code Refactoring: Opportunities and Limitations (2025)
+- DebtGuardian — Springer (2025)
+- PromptDebt — ACM (2025)
+- alirezarezvani/claude-skills — github.com
+- DEV Community — /refactor-suggest article
+- Qodo $70M Series B — techcrunch.com (March 2026)
+
+---
+
 ## Open Questions
 
 - How do we handle Background sections that need to change across features?

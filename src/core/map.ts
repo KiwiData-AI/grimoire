@@ -5,7 +5,6 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import { findProjectRoot } from "../utils/paths.js";
-import { extractSymbols, generateCompressedMap, type SymbolInfo } from "./symbols.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -17,8 +16,6 @@ interface MapOptions {
   refresh: boolean;
   maxDepth: number;
   duplicates: boolean;
-  symbols: boolean;
-  compress: boolean;
 }
 
 interface DirectoryInfo {
@@ -52,7 +49,6 @@ interface MapSnapshot {
   projectRoot: string;
   directories: DirectoryInfo[];
   keyFiles: KeyFileInfo[];
-  symbols: SymbolInfo[];
   undocumented: string[];
   removed: string[];
   duplicates: DuplicateReport | null;
@@ -162,25 +158,11 @@ export async function generateMap(options: MapOptions): Promise<void> {
     duplicates = await runJscpd(root, ignorePatterns);
   }
 
-  // Extract symbols (function signatures, classes, exports)
-  let symbols: SymbolInfo[] = [];
-  if (options.symbols) {
-    console.log(chalk.dim("\nExtracting symbols..."));
-    const symbolMap = await extractSymbols(root, ignorePatterns);
-    symbols = symbolMap.symbols;
-    console.log(
-      chalk.dim(
-        `  ${symbolMap.symbols.length} symbols from ${symbolMap.fileCount} files`
-      )
-    );
-  }
-
   const snapshot: MapSnapshot = {
     generatedAt: new Date().toISOString(),
     projectRoot: ".",
     directories,
     keyFiles,
-    symbols,
     undocumented,
     removed,
     duplicates,
@@ -288,18 +270,6 @@ export async function generateMap(options: MapOptions): Promise<void> {
     );
   }
 
-  // Symbol summary
-  if (symbols.length > 0) {
-    const byKind = new Map<string, number>();
-    for (const s of symbols) {
-      byKind.set(s.kind, (byKind.get(s.kind) ?? 0) + 1);
-    }
-    console.log(chalk.bold("\nSymbols:"));
-    for (const [kind, count] of [...byKind.entries()].sort()) {
-      console.log(`  ${kind.padEnd(12)} ${count}`);
-    }
-  }
-
   // Write snapshot for the skill to consume
   await mkdir(docsDir, { recursive: true });
   await writeFile(
@@ -309,17 +279,6 @@ export async function generateMap(options: MapOptions): Promise<void> {
   console.log(
     chalk.dim(`\nSnapshot saved to .grimoire/docs/.snapshot.json`)
   );
-
-  // Write compressed symbol map if requested
-  if (options.compress && symbols.length > 0) {
-    const compressed = generateCompressedMap(symbols, root);
-    await writeFile(join(docsDir, ".symbols.md"), compressed);
-    console.log(
-      chalk.dim(
-        `Compressed symbol map saved to .grimoire/docs/.symbols.md`
-      )
-    );
-  }
 }
 
 async function scanDirectory(

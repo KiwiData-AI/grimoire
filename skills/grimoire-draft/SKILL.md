@@ -36,6 +36,7 @@ Before designing anything, search for well-maintained tools, libraries, or frame
 ### 3. Check Existing State
 - Read `features/` to understand the current behavioral baseline
 - Read `.grimoire/decisions/` to understand existing architecture decisions
+- Read `.grimoire/docs/context.yml` (if it exists) to understand the deployment environment, related services, and infrastructure — this tells you what's available (caches, queues, sibling services) and what constraints apply (deployment target, environments)
 - Check `.grimoire/changes/` for any in-progress changes that might overlap
 - If there's a conflict with an active change, flag it
 

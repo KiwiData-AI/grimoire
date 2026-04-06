@@ -237,6 +237,37 @@ Before importing a module, calling a function, or adding a dependency — confir
 - **Use what the codebase already has.** Before writing a utility, check if one exists. Before adding a dependency, check if the standard library covers it. Before creating a pattern, check if the codebase has an established way to do this.
 - **No speculative code.** Don't add TODO comments for future work, don't stub out interfaces for planned features, don't add configuration for things that have one value. Build what's needed now.
 
+### Single Responsibility
+Every function, class, and file you write must have one job. If you catch yourself writing a function that does two things, split it. Symptoms of violation:
+- A function name contains "and" (`fetchAndRender`, `validateAndSave`) — split it
+- A function is longer than ~30 lines — it's probably doing more than one thing
+- A class has methods that don't use the same instance state — it's two classes merged into one
+- A file mixes concerns (route handler + business logic + data access in one file) — separate the layers
+
+### Use Proven Patterns
+Follow established patterns that the plan specifies. Do not invent bespoke architectures:
+- If the plan says ETL, keep extract/transform/load as distinct, named stages — don't merge them into a monolith function
+- If the framework has a convention (Django views, Express middleware, React hooks), follow it. Don't create a parallel system
+- For security: use parameterized queries (never string concatenation for SQL), use the framework's CSRF protection, hash passwords with bcrypt/argon2 (never MD5/SHA for passwords), validate and sanitize all user input at the boundary. If you're implementing auth, use the framework's auth system or a proven library (passport, django.contrib.auth, next-auth) — never roll your own token generation or session management
+
+### Naming Conventions
+Names are documentation. Every name you write should make the code readable without comments:
+- **Functions**: verb + noun describing what it does — `calculate_total`, `send_notification`, `validate_email`
+- **Booleans**: prefix with `is_`, `has_`, `can_`, `should_` — `is_active`, `has_permission`
+- **Collections**: use plurals — `users`, `order_items`, `pending_tasks`
+- **Constants**: UPPER_SNAKE_CASE with descriptive names — `MAX_RETRY_ATTEMPTS`, not `MAX` or `N`
+- **Files**: name after the single thing the file does — `invoice_calculator.py`, not `utils2.py`
+- No single-letter variables except in trivial loops (`for i in range`). No abbreviations unless they're domain-standard (`url`, `http`, `id`)
+
+### Avoid Deep Nesting
+Code with more than 3 levels of indentation is hard to read and usually a sign of mixed concerns. When you find yourself nesting deeply:
+- **Use guard clauses / early returns** — check error conditions first and return early, keeping the happy path un-indented
+- **Extract inner blocks into named functions** — if a nested block has a clear purpose, give it a name
+- **Use pipeline/chain patterns** — instead of nested `if`s processing data, use `map`/`filter`/`reduce` or equivalent
+- **Flatten with `continue`/`break`** — in loops, handle skip conditions at the top of the loop body
+
+If the task's logic inherently requires deep nesting, that's a signal to restructure: either the task is doing too much (split it) or the approach needs rethinking (use a lookup table, strategy pattern, or state machine instead of nested conditionals).
+
 ## Important
 - **Tests are not optional.** Every task produces both production code and passing step definitions. No exceptions.
 - **Red-green is mandatory, not aspirational.** A test must fail before it passes. If it doesn't fail, it's not a real test. Fix it before moving on.

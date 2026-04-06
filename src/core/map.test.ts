@@ -16,11 +16,6 @@ vi.mock("../utils/paths.js", () => ({
   findProjectRoot: vi.fn().mockResolvedValue("/fake/root"),
 }));
 
-vi.mock("./symbols.js", () => ({
-  extractSymbols: vi.fn().mockResolvedValue({ symbols: [], fileCount: 0 }),
-  generateCompressedMap: vi.fn().mockReturnValue("# Symbols"),
-}));
-
 vi.mock("node:child_process", async () => {
   const { promisify } = await import("node:util");
   const fn = vi.fn();
@@ -30,12 +25,10 @@ vi.mock("node:child_process", async () => {
 });
 
 import { readFile, readdir, writeFile } from "node:fs/promises";
-import { extractSymbols, generateCompressedMap } from "./symbols.js";
 
 const mockReadFile = vi.mocked(readFile);
 const mockReaddir = vi.mocked(readdir);
 const mockWriteFile = vi.mocked(writeFile);
-const mockExtractSymbols = vi.mocked(extractSymbols);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -87,8 +80,6 @@ describe("generateMap", () => {
       refresh: false,
       maxDepth: 3,
       duplicates: false,
-      symbols: false,
-      compress: false,
     });
 
     const output = JSON.parse(logs.join(""));
@@ -118,8 +109,6 @@ describe("generateMap", () => {
       refresh: false,
       maxDepth: 3,
       duplicates: false,
-      symbols: false,
-      compress: false,
     });
 
     const output = JSON.parse(logs.join(""));
@@ -152,8 +141,6 @@ describe("generateMap", () => {
       refresh: false,
       maxDepth: 3,
       duplicates: false,
-      symbols: false,
-      compress: false,
     });
 
     const output = JSON.parse(logs.join(""));
@@ -186,8 +173,6 @@ describe("generateMap", () => {
       refresh: false,
       maxDepth: 3,
       duplicates: false,
-      symbols: false,
-      compress: false,
     });
 
     const output = JSON.parse(logs.join(""));
@@ -222,8 +207,6 @@ describe("generateMap", () => {
       refresh: false,
       maxDepth: 3,
       duplicates: false,
-      symbols: false,
-      compress: false,
     });
 
     const output = JSON.parse(logs.join(""));
@@ -266,20 +249,14 @@ describe("generateMap", () => {
       refresh: true,
       maxDepth: 3,
       duplicates: false,
-      symbols: false,
-      compress: false,
     });
 
     const output = JSON.parse(logs.join(""));
     expect(output.undocumented).toContain("lib");
   });
 
-  it("extracts symbols when symbols option is true", async () => {
+  it("snapshot has no symbols field", async () => {
     mockReaddir.mockImplementation(async () => [] as any);
-    mockExtractSymbols.mockResolvedValue({
-      symbols: [{ file: "src/a.ts", name: "foo", kind: "function", line: 1, exported: true }],
-      fileCount: 1,
-    } as any);
 
     const logs: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
@@ -291,40 +268,12 @@ describe("generateMap", () => {
       refresh: false,
       maxDepth: 3,
       duplicates: false,
-      symbols: true,
-      compress: false,
     });
 
-    // Filter out non-JSON log lines (e.g., "Extracting symbols...")
-    const jsonLine = logs.find((l) => l.startsWith("{"));
-    expect(jsonLine).toBeDefined();
-    const output = JSON.parse(jsonLine!);
-    expect(output.symbols).toHaveLength(1);
-    expect(output.symbols[0].name).toBe("foo");
-  });
-
-  it("writes compressed symbol map when compress is true", async () => {
-    mockReaddir.mockImplementation(async () => [] as any);
-    mockExtractSymbols.mockResolvedValue({
-      symbols: [{ file: "src/a.ts", name: "foo", kind: "function", line: 1, exported: true }],
-      fileCount: 1,
-    } as any);
-
-    vi.spyOn(console, "log").mockImplementation(() => {});
-
-    await generateMap({
-      json: false,
-      refresh: false,
-      maxDepth: 3,
-      duplicates: false,
-      symbols: true,
-      compress: true,
-    });
-
-    const symbolsWrite = mockWriteFile.mock.calls.find((c) =>
-      String(c[0]).includes(".symbols.md")
-    );
-    expect(symbolsWrite).toBeDefined();
+    const output = JSON.parse(logs.join(""));
+    expect(output.symbols).toBeUndefined();
+    expect(output.directories).toBeDefined();
+    expect(output.keyFiles).toBeDefined();
   });
 
   it("pretty prints directory tree in non-json mode", async () => {
@@ -346,11 +295,36 @@ describe("generateMap", () => {
       refresh: false,
       maxDepth: 3,
       duplicates: false,
-      symbols: false,
-      compress: false,
     });
 
     expect(logs.some((l) => l.includes("Project Map"))).toBe(true);
     expect(logs.some((l) => l.includes("src/"))).toBe(true);
+  });
+
+  it("writes snapshot to .grimoire/docs/.snapshot.json", async () => {
+    mockReaddir.mockImplementation(async (path: any) => {
+      if (String(path) === "/fake/root") {
+        return makeDirEntries(["app.ts"]) as any;
+      }
+      return [] as any;
+    });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await generateMap({
+      json: false,
+      refresh: false,
+      maxDepth: 3,
+      duplicates: false,
+    });
+
+    const snapshotWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes(".snapshot.json")
+    );
+    expect(snapshotWrite).toBeDefined();
+    const written = JSON.parse(snapshotWrite![1] as string);
+    expect(written.directories).toBeDefined();
+    expect(written.keyFiles).toBeDefined();
+    expect(written.symbols).toBeUndefined();
   });
 });

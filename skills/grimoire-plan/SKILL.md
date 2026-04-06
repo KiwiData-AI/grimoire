@@ -32,6 +32,7 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 **Read from grimoire docs (these replace codebase exploration):**
 - **`.grimoire/docs/<area>.md`** for each area the change touches — these contain: key files with responsibilities, reusable utilities (exact function names, file paths, line numbers), naming conventions, structural patterns, and "Where New Code Goes" guidance. This is the information that lets you write tasks with exact file paths without reading every source file.
 - **`.grimoire/docs/data/schema.yml`** — the full data model: every table/collection, field types, relationships, indexes, and external API contracts with `source:` pointers to ORM code. Read this instead of reading individual model files.
+- **`.grimoire/docs/context.yml`** — the project's deployment environment, related services, infrastructure dependencies, CI/CD pipelines, and observability setup. Read this to understand deployment constraints (e.g., Lambda means no long-running processes, Kubernetes means you may need health check endpoints), cross-service boundaries (e.g., auth is handled by a sibling service, not this project), and infrastructure available at runtime (e.g., Redis is available for caching, RabbitMQ for async tasks).
 - **`.grimoire/docs/.snapshot.json`** `duplicates` section if present — existing clones in areas you're touching, so tasks consolidate rather than add more.
 
 **Read proposed data changes:**
@@ -50,6 +51,28 @@ Create `.grimoire/changes/<change-id>/tasks.md`. **Every scenario must produce b
 **THE PLAN MUST BE SPECIFIC ENOUGH TO EXECUTE WITHOUT FURTHER PLANNING.**
 
 **THE PLAN MUST PREFER SIMPLICITY.** For each task, choose the approach with the least code, fewest new files, and smallest surface area. If a task can be solved by adding a few lines to an existing file, don't create a new module. If a standard library function does the job, don't pull in a dependency. If three lines of inline code are clearer than a helper, keep them inline. Flag any task that introduces a new abstraction, utility, or pattern — it needs a reason.
+
+**THE PLAN MUST USE PROVEN PATTERNS, NOT INVENT NEW ONES.** When the task fits a well-known pattern, name it and follow it:
+- **Data pipelines** → ETL (Extract, Transform, Load) or ELT. Name stages explicitly. Don't invent a bespoke "data flow."
+- **Web applications** → MVC, MVP, or MVVM depending on the framework's conventions. Follow the framework, don't fight it.
+- **APIs** → RESTful resource design, or the project's existing API style. Don't mix conventions.
+- **Background jobs** → Producer/consumer, pub/sub, or the framework's job/task pattern (e.g., Celery tasks, Bull queues).
+- **State management** → Use the framework's idiomatic approach (Redux, Vuex, signals, etc.), not a hand-rolled event system.
+- **Authentication & security** → Always recommend proven security processes: OAuth2/OIDC for auth flows, bcrypt/argon2 for password hashing, CSRF protection for forms, parameterized queries for database access. Never roll custom crypto, custom auth tokens, or custom session management when a battle-tested library exists.
+
+If no established pattern applies, state that explicitly in the task and explain why.
+
+**THE PLAN MUST ENFORCE SINGLE RESPONSIBILITY.** Each file, class, and function should do one thing:
+- A function that fetches data should not also format it for display
+- A class that manages database access should not also handle HTTP responses
+- A module that defines routes should not also contain business logic
+- If a task description combines two distinct responsibilities (e.g., "fetch and render", "validate and persist"), split it into separate tasks or explicitly call out the boundary in the task description
+- When planning new files, each file should have a clear, singular purpose. Name it after what it does, not what feature it supports
+
+**THE PLAN MUST USE CLEAR NAMING AND FLAT STRUCTURE.**
+- Variables, functions, classes, and files must have descriptive names that reveal intent — `calculate_invoice_total` not `calc`, `UserAuthenticationService` not `UAS`, `test_login_redirects_to_dashboard` not `test_login_1`
+- Avoid abbreviations unless they are universally understood in the domain (e.g., `URL`, `HTTP`, `ID`)
+- Avoid deep nesting: if a task would produce code with more than 3 levels of indentation, restructure it. Use early returns/guard clauses, extract helper functions, or use pipeline/chain patterns. The plan should call this out explicitly when the task involves conditional or iterative logic
 
 Each task must include:
 - **What file(s) to create or edit** — exact paths, not vague references

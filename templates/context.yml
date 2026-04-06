@@ -1,0 +1,110 @@
+# Grimoire Project Context
+# Captures the deployment environment, related services, and infrastructure
+# that this project depends on or interacts with.
+#
+# This file is NOT a decision record — it describes what IS.
+# Update it when the environment changes (new service, migration, etc.)
+#
+# Created by: grimoire init
+# Last updated: YYYY-MM-DD
+
+# --- Deployment ---
+# How and where this project is deployed.
+
+deployment:
+  # target: ecs | kubernetes | heroku | vercel | lambda | vm | docker-compose | manual
+  target:
+  # regions: [us-east-1, eu-west-1]
+  regions: []
+  # environments and their URLs or identifiers
+  environments:
+    # dev:
+    #   url: https://dev.example.com
+    #   notes: "auto-deploys from main"
+    # staging:
+    #   url: https://staging.example.com
+    # production:
+    #   url: https://example.com
+  # Path to deploy scripts, Helm charts, Terraform, CDK, etc.
+  scripts: []
+    # - path: deploy/
+    #   type: terraform
+    # - path: k8s/
+    #   type: helm
+    # - path: .github/workflows/deploy.yml
+    #   type: github-actions
+
+# --- Related Services ---
+# Sibling services this project communicates with at runtime.
+# These are services your team or org owns — for third-party APIs,
+# use schema.yml's external_api section instead.
+
+services: []
+  # - name: auth-service
+  #   repo: github.com/org/auth-service
+  #   owner: platform-team
+  #   purpose: "Handles OAuth2 flows and token issuance"
+  #   protocol: grpc
+  #   port: 50051
+  # - name: notification-service
+  #   repo: github.com/org/notifications
+  #   owner: platform-team
+  #   purpose: "Email, SMS, and push notifications"
+  #   protocol: rest
+  #   base_url: http://notifications.internal:8080
+  # - name: frontend
+  #   repo: github.com/org/web-app
+  #   owner: product-team
+  #   purpose: "React SPA — consumes this project's API"
+  #   protocol: rest
+
+# --- Infrastructure ---
+# Runtime dependencies: databases, caches, queues, storage, etc.
+
+infrastructure: []
+  # - type: postgres
+  #   purpose: "Primary data store"
+  #   host: "${DATABASE_HOST}"
+  #   notes: "RDS, multi-AZ in production"
+  # - type: redis
+  #   purpose: "Cache and session store"
+  #   host: "${REDIS_HOST}"
+  # - type: rabbitmq
+  #   purpose: "Async task queue"
+  #   host: "${BROKER_HOST}"
+  #   notes: "CloudAMQP in production, docker locally"
+  # - type: s3
+  #   purpose: "User uploads and media"
+  #   bucket: "${MEDIA_BUCKET}"
+
+# --- CI/CD ---
+# Where the build and deploy pipelines live.
+
+ci_cd:
+  # platform: github-actions | gitlab-ci | circleci | jenkins | buildkite
+  platform:
+  # Key workflow files
+  workflows: []
+    # - path: .github/workflows/ci.yml
+    #   purpose: "Lint, test, build on every PR"
+    # - path: .github/workflows/deploy.yml
+    #   purpose: "Deploy to staging on merge to main, production on tag"
+  # deploy_trigger: "merge to main" | "git tag" | "manual"
+  deploy_trigger:
+
+# --- Observability ---
+# Where to look when things break.
+
+observability:
+  # logging:
+  #   platform: datadog | cloudwatch | elk | grafana-loki
+  #   dashboard: https://app.datadoghq.com/logs?query=service:my-project
+  # monitoring:
+  #   platform: datadog | prometheus | cloudwatch
+  #   dashboard: https://grafana.internal/d/api-latency
+  # alerting:
+  #   platform: pagerduty | opsgenie | slack
+  #   channel: "#oncall-alerts"
+  # error_tracking:
+  #   platform: sentry | bugsnag | rollbar
+  #   project: https://sentry.io/org/project/

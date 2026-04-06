@@ -83,6 +83,26 @@ export async function initProject(
     console.log(`  ${chalk.yellow("exists")}  .grimoire/decisions/template.md`);
   }
 
+  // Copy project context template
+  const contextSrc = join(PACKAGE_ROOT, "templates", "context.yml");
+  const contextDest = join(root, ".grimoire", "docs", "context.yml");
+  if (!(await fileExists(contextDest))) {
+    await copyFile(contextSrc, contextDest);
+    console.log(`  ${chalk.green("created")} .grimoire/docs/context.yml`);
+  } else {
+    console.log(`  ${chalk.yellow("exists")}  .grimoire/docs/context.yml`);
+  }
+
+  // Copy debt exceptions template
+  const debtExSrc = join(PACKAGE_ROOT, "templates", "debt-exceptions.yml");
+  const debtExDest = join(root, ".grimoire", "debt-exceptions.yml");
+  if (!(await fileExists(debtExDest))) {
+    await copyFile(debtExSrc, debtExDest);
+    console.log(`  ${chalk.green("created")} .grimoire/debt-exceptions.yml`);
+  } else {
+    console.log(`  ${chalk.yellow("exists")}  .grimoire/debt-exceptions.yml`);
+  }
+
   // Copy map config files
   for (const configFile of ["mapignore", "mapkeys"]) {
     const configSrc = join(PACKAGE_ROOT, "templates", configFile);
@@ -133,8 +153,12 @@ export async function initProject(
   console.log("Directory structure:");
   console.log("  features/              Gherkin feature files (behavioral specs)");
   console.log("  .grimoire/decisions/   MADR decision records (architectural specs)");
+  console.log("  .grimoire/docs/        Project docs, data schema, and context");
   console.log("  .grimoire/changes/     Changes in progress");
   console.log("  .grimoire/archive/     Completed changes\n");
+  console.log("Next steps:");
+  console.log("  Edit .grimoire/docs/context.yml to describe your deployment,");
+  console.log("  related services, and infrastructure.\n");
 }
 
 function buildMinimalConfig(): GrimoireConfig {
@@ -590,6 +614,7 @@ async function installSkills(root: string): Promise<void> {
     "grimoire-bug",
     "grimoire-commit",
     "grimoire-pr",
+    "grimoire-refactor",
   ];
 
   for (const skill of skillNames) {
