@@ -1,0 +1,733 @@
+{
+  "statistics": {
+    "detectionDate": "2026-04-05T21:27:26.479Z",
+    "formats": {
+      "typescript": {
+        "sources": {
+          "<repo>/src/utils/paths.ts": {
+            "lines": 35,
+            "tokens": 278,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/core/validate.ts": {
+            "lines": 317,
+            "tokens": 2646,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 7,
+            "duplicatedTokens": 91,
+            "percentage": 2.21,
+            "percentageTokens": 3.44,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/core/update.ts": {
+            "lines": 111,
+            "tokens": 970,
+            "sources": 1,
+            "clones": 6,
+            "duplicatedLines": 75,
+            "duplicatedTokens": 720,
+            "percentage": 67.57,
+            "percentageTokens": 74.23,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/core/status.ts": {
+            "lines": 169,
+            "tokens": 1461,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/core/map.ts": {
+            "lines": 457,
+            "tokens": 4149,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/core/list.ts": {
+            "lines": 222,
+            "tokens": 2067,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 7,
+            "duplicatedTokens": 91,
+            "percentage": 3.15,
+            "percentageTokens": 4.4,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/core/init.ts": {
+            "lines": 174,
+            "tokens": 1497,
+            "sources": 1,
+            "clones": 6,
+            "duplicatedLines": 75,
+            "duplicatedTokens": 720,
+            "percentage": 43.1,
+            "percentageTokens": 48.1,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/core/archive.ts": {
+            "lines": 123,
+            "tokens": 919,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/commands/validate.ts": {
+            "lines": 13,
+            "tokens": 149,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/commands/update.ts": {
+            "lines": 13,
+            "tokens": 148,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/commands/status.ts": {
+            "lines": 11,
+            "tokens": 121,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/commands/map.ts": {
+            "lines": 16,
+            "tokens": 178,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/commands/list.ts": {
+            "lines": 22,
+            "tokens": 210,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/commands/init.ts": {
+            "lines": 13,
+            "tokens": 148,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/commands/archive.ts": {
+            "lines": 11,
+            "tokens": 121,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/cli/index.ts": {
+            "lines": 26,
+            "tokens": 210,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/src/index.ts": {
+            "lines": 7,
+            "tokens": 97,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 1740,
+          "tokens": 15369,
+          "sources": 17,
+          "clones": 7,
+          "duplicatedLines": 82,
+          "duplicatedTokens": 811,
+          "percentage": 4.71,
+          "percentageTokens": 5.28,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "markdown": {
+        "sources": {
+          "<repo>/skills/grimoire-verify/SKILL.md": {
+            "lines": 107,
+            "tokens": 1232,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/skills/grimoire-remove/SKILL.md": {
+            "lines": 92,
+            "tokens": 1103,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/skills/grimoire-plan/SKILL.md": {
+            "lines": 145,
+            "tokens": 1881,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/skills/grimoire-draft/SKILL.md": {
+            "lines": 68,
+            "tokens": 908,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/skills/grimoire-discover/SKILL.md": {
+            "lines": 166,
+            "tokens": 2122,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/skills/grimoire-audit/SKILL.md": {
+            "lines": 109,
+            "tokens": 1796,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/skills/grimoire-apply/SKILL.md": {
+            "lines": 138,
+            "tokens": 2515,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/templates/manifest.md": {
+            "lines": 22,
+            "tokens": 57,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/templates/decision.md": {
+            "lines": 28,
+            "tokens": 57,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/RESEARCH.md": {
+            "lines": 653,
+            "tokens": 10315,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/README.md": {
+            "lines": 275,
+            "tokens": 2548,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/AGENTS.md": {
+            "lines": 347,
+            "tokens": 3798,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 2150,
+          "tokens": 28332,
+          "sources": 12,
+          "clones": 0,
+          "duplicatedLines": 0,
+          "duplicatedTokens": 0,
+          "percentage": 0,
+          "percentageTokens": 0,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "json": {
+        "sources": {
+          "<repo>/.grimoire/docs/.snapshot.json": {
+            "lines": 213,
+            "tokens": 1131,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/tsconfig.json": {
+            "lines": 18,
+            "tokens": 125,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "<repo>/package.json": {
+            "lines": 50,
+            "tokens": 277,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 281,
+          "tokens": 1533,
+          "sources": 3,
+          "clones": 0,
+          "duplicatedLines": 0,
+          "duplicatedTokens": 0,
+          "percentage": 0,
+          "percentageTokens": 0,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "gherkin": {
+        "sources": {
+          "<repo>/templates/example.feature": {
+            "lines": 22,
+            "tokens": 204,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 22,
+          "tokens": 204,
+          "sources": 1,
+          "clones": 0,
+          "duplicatedLines": 0,
+          "duplicatedTokens": 0,
+          "percentage": 0,
+          "percentageTokens": 0,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      }
+    },
+    "total": {
+      "lines": 4193,
+      "tokens": 45438,
+      "sources": 33,
+      "clones": 7,
+      "duplicatedLines": 82,
+      "duplicatedTokens": 811,
+      "percentage": 1.96,
+      "percentageTokens": 1.78,
+      "newDuplicatedLines": 0,
+      "newClones": 0
+    }
+  },
+  "duplicates": [
+    {
+      "format": "typescript",
+      "lines": 8,
+      "fragment": "const changesDir = join(root, \".grimoire\", \"changes\");\n\n  try {\n    const entries = await readdir(changesDir, { withFileTypes: true });\n    const changes = entries.filter((e) => e.isDirectory());\n\n    if (changes.length === 0) {\n      if",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/core/list.ts",
+        "start": 20,
+        "end": 27,
+        "startLoc": {
+          "line": 20,
+          "column": 3,
+          "position": 167
+        },
+        "endLoc": {
+          "line": 27,
+          "column": 3,
+          "position": 258
+        }
+      },
+      "secondFile": {
+        "name": "src/core/validate.ts",
+        "start": 29,
+        "end": 35,
+        "startLoc": {
+          "line": 29,
+          "column": 5,
+          "position": 233
+        },
+        "endLoc": {
+          "line": 35,
+          "column": 8,
+          "position": 323
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 9,
+      "fragment": ", access } from \"node:fs/promises\";\nimport { join, dirname } from \"node:path\";\nimport { fileURLToPath } from \"node:url\";\nimport chalk from \"chalk\";\n\nconst __dirname = dirname(fileURLToPath(import.meta.url));\nconst PACKAGE_ROOT = join(__dirname, \"..\", \"..\");\n\ninterface InitOptions",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/core/init.ts",
+        "start": 1,
+        "end": 9,
+        "startLoc": {
+          "line": 1,
+          "column": 9,
+          "position": 14
+        },
+        "endLoc": {
+          "line": 9,
+          "column": 12,
+          "position": 104
+        }
+      },
+      "secondFile": {
+        "name": "src/core/update.ts",
+        "start": 1,
+        "end": 9,
+        "startLoc": {
+          "line": 1,
+          "column": 6,
+          "position": 14
+        },
+        "endLoc": {
+          "line": 9,
+          "column": 14,
+          "position": 104
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 16,
+      "fragment": "(root: string): Promise<void> {\n  const agentsPath = join(root, \"AGENTS.md\");\n  const grimoireAgents = await readFile(\n    join(PACKAGE_ROOT, \"AGENTS.md\"),\n    \"utf-8\"\n  );\n\n  const marker = \"<!-- GRIMOIRE:START -->\";\n  const endMarker = \"<!-- GRIMOIRE:END -->\";\n  const managedBlock = `${marker}\\n${grimoireAgents}\\n${endMarker}`;\n\n  if (await exists(agentsPath)) {\n    const existing = await readFile(agentsPath, \"utf-8\");\n\n    if (existing.includes(marker)) {\n      // Replace existing managed block",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/core/init.ts",
+        "start": 106,
+        "end": 121,
+        "startLoc": {
+          "line": 106,
+          "column": 16,
+          "position": 857
+        },
+        "endLoc": {
+          "line": 121,
+          "column": 34,
+          "position": 1009
+        }
+      },
+      "secondFile": {
+        "name": "src/core/update.ts",
+        "start": 43,
+        "end": 58,
+        "startLoc": {
+          "line": 43,
+          "column": 17,
+          "position": 332
+        },
+        "endLoc": {
+          "line": 58,
+          "column": 6,
+          "position": 484
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 8,
+      "fragment": "const updated = existing.replace(\n        new RegExp(`${escapeRegex(marker)}[\\\\s\\\\S]*?${escapeRegex(endMarker)}`),\n        managedBlock\n      );\n      await writeFile(agentsPath, updated);\n      console.log(`  ${chalk.blue(\"updated\")} AGENTS.md (grimoire section)`);\n    } else {\n      // Append managed block",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/core/init.ts",
+        "start": 122,
+        "end": 129,
+        "startLoc": {
+          "line": 122,
+          "column": 7,
+          "position": 1012
+        },
+        "endLoc": {
+          "line": 129,
+          "column": 24,
+          "position": 1091
+        }
+      },
+      "secondFile": {
+        "name": "src/core/update.ts",
+        "start": 58,
+        "end": 67,
+        "startLoc": {
+          "line": 58,
+          "column": 7,
+          "position": 484
+        },
+        "endLoc": {
+          "line": 67,
+          "column": 6,
+          "position": 567
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 10,
+      "fragment": "await writeFile(agentsPath, existing + \"\\n\\n\" + managedBlock + \"\\n\");\n      console.log(`  ${chalk.blue(\"appended\")} AGENTS.md (grimoire section)`);\n    }\n  } else {\n    await writeFile(agentsPath, managedBlock + \"\\n\");\n    console.log(`  ${chalk.green(\"created\")} AGENTS.md`);\n  }\n}\n\nasync function installSkills",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/core/init.ts",
+        "start": 130,
+        "end": 139,
+        "startLoc": {
+          "line": 130,
+          "column": 7,
+          "position": 1094
+        },
+        "endLoc": {
+          "line": 139,
+          "column": 14,
+          "position": 1189
+        }
+      },
+      "secondFile": {
+        "name": "src/core/update.ts",
+        "start": 67,
+        "end": 76,
+        "startLoc": {
+          "line": 67,
+          "column": 7,
+          "position": 567
+        },
+        "endLoc": {
+          "line": 76,
+          "column": 13,
+          "position": 662
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 22,
+      "fragment": "(root: string): Promise<void> {\n  const skillsDir = join(root, \".claude\", \"skills\");\n  const sourceSkillsDir = join(PACKAGE_ROOT, \"skills\");\n\n  const skillNames = [\n    \"grimoire-draft\",\n    \"grimoire-plan\",\n    \"grimoire-apply\",\n    \"grimoire-verify\",\n    \"grimoire-audit\",\n    \"grimoire-remove\",\n    \"grimoire-discover\",\n  ];\n\n  for (const skill of skillNames) {\n    const destDir = join(skillsDir, skill);\n    await mkdir(destDir, { recursive: true });\n\n    const src = join(sourceSkillsDir, skill, \"SKILL.md\");\n    const dest = join(destDir, \"SKILL.md\");\n    await copyFile(src, dest);\n    console.log(`  ${chalk.green",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/core/init.ts",
+        "start": 139,
+        "end": 160,
+        "startLoc": {
+          "line": 139,
+          "column": 14,
+          "position": 1190
+        },
+        "endLoc": {
+          "line": 160,
+          "column": 6,
+          "position": 1390
+        }
+      },
+      "secondFile": {
+        "name": "src/core/update.ts",
+        "start": 76,
+        "end": 97,
+        "startLoc": {
+          "line": 76,
+          "column": 13,
+          "position": 663
+        },
+        "endLoc": {
+          "line": 97,
+          "column": 5,
+          "position": 863
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 16,
+      "fragment": ")} .claude/skills/${skill}/SKILL.md`);\n  }\n}\n\nasync function exists(path: string): Promise<boolean> {\n  try {\n    await access(path);\n    return true;\n  } catch {\n    return false;\n  }\n}\n\nfunction escapeRegex(str: string): string {\n  return str.replace(/[.*+?^${}()|[\\]\\\\]/g, \"\\\\$&\");\n}",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/core/init.ts",
+        "start": 160,
+        "end": 175,
+        "startLoc": {
+          "line": 160,
+          "column": 10,
+          "position": 1393
+        },
+        "endLoc": {
+          "line": 175,
+          "column": 2,
+          "position": 1497
+        }
+      },
+      "secondFile": {
+        "name": "src/core/update.ts",
+        "start": 97,
+        "end": 112,
+        "startLoc": {
+          "line": 97,
+          "column": 10,
+          "position": 866
+        },
+        "endLoc": {
+          "line": 112,
+          "column": 2,
+          "position": 970
+        }
+      }
+    }
+  ]
+}

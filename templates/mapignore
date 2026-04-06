@@ -1,0 +1,49 @@
+# Directories and patterns to ignore when scanning the codebase
+# Uses glob-style patterns, one per line
+# Lines starting with # are comments
+
+# Version control
+.git
+
+# Dependencies
+node_modules
+.venv
+venv
+env
+vendor
+bower_components
+
+# Build output
+dist
+build
+.next
+.nuxt
+out
+target
+
+# Caches
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.tox
+.cache
+.parcel-cache
+.turbo
+
+# Coverage and test artifacts
+coverage
+.nyc_output
+htmlcov
+
+# IDE and OS
+.idea
+.vscode
+.DS_Store
+
+# Package metadata
+*.egg-info
+.eggs
+
+# Containers
+.docker
