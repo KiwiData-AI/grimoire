@@ -163,4 +163,252 @@ Because we need this.
     // strict mode: missing frontmatter is an error
     expect(result.errorCount).toBeGreaterThan(0);
   });
+
+  it("validates all changes when no changeId provided", async () => {
+    const { readdir } = await import("node:fs/promises");
+    const mockReaddir = vi.mocked(readdir);
+    mockReaddir.mockResolvedValue([
+      { name: "change-a", isDirectory: () => true },
+    ] as any);
+
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return "---\nstatus: draft\n---\n## Why\nBecause.\n## Feature Changes\n- foo";
+      }
+      throw new Error("not found");
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    const result = await validateChange(undefined, { strict: false, json: true });
+    expect(result.errorCount).toBe(0);
+  });
+
+  it("validates feature file with missing When/Then steps", async () => {
+    const featureContent = `Feature: Incomplete
+  Scenario: Missing steps
+    Given something
+`;
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return "---\nstatus: draft\n---\n## Why\nBecause.\n## Feature Changes\n- foo";
+      }
+      return featureContent;
+    });
+    mockFindFiles.mockImplementation(async (_dir: string, ext: string) => {
+      if (ext === ".feature") return ["/fake/root/.grimoire/changes/test/features/test.feature"];
+      return [];
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await validateChange("test", { strict: false, json: true });
+    const output = logs.join("\n");
+    expect(output).toContain("missing When step");
+    expect(output).toContain("missing Then step");
+  });
+
+  it("strict mode warns about missing user story and implementation details", async () => {
+    const featureContent = `Feature: Database access
+  Scenario: Query users
+    When I call the API endpoint
+    Then I get SQL results
+`;
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return "---\nstatus: draft\n---\n## Why\nBecause.\n## Feature Changes\n- foo";
+      }
+      return featureContent;
+    });
+    mockFindFiles.mockImplementation(async (_dir: string, ext: string) => {
+      if (ext === ".feature") return ["/fake/root/.grimoire/changes/test/features/test.feature"];
+      return [];
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await validateChange("test", { strict: true, json: true });
+    const output = logs.join("\n");
+    expect(output).toContain("Missing user story");
+    expect(output).toContain("implementation details");
+  });
+
+  it("validates decision file with all required sections", async () => {
+    const decisionContent = `---
+status: accepted
+date: 2026-01-15
+---
+# Use PostgreSQL
+
+## Context and Problem Statement
+Need a database.
+
+## Considered Options
+1. PostgreSQL
+2. MySQL
+
+## Decision Outcome
+PostgreSQL.
+`;
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return "---\nstatus: draft\n---\n## Why\nBecause.\n## Decisions\n- foo";
+      }
+      return decisionContent;
+    });
+    mockFindFiles.mockImplementation(async (_dir: string, ext: string) => {
+      if (ext === ".md") return ["/fake/root/.grimoire/changes/test/decisions/001.md"];
+      return [];
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    const result = await validateChange("test", { strict: false, json: true });
+    expect(result.errorCount).toBe(0);
+  });
+
+  it("strict mode warns about missing decision sections", async () => {
+    const decisionContent = `---
+status: accepted
+date: 2026-01-15
+---
+# Use PostgreSQL
+
+## Context and Problem Statement
+Need a database.
+
+## Considered Options
+1. PostgreSQL
+
+## Decision Outcome
+PostgreSQL.
+`;
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return "---\nstatus: draft\n---\n## Why\nBecause.\n## Decisions\n- foo";
+      }
+      return decisionContent;
+    });
+    mockFindFiles.mockImplementation(async (_dir: string, ext: string) => {
+      if (ext === ".md") return ["/fake/root/.grimoire/changes/test/decisions/001.md"];
+      return [];
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await validateChange("test", { strict: true, json: true });
+    const output = logs.join("\n");
+    expect(output).toContain("Decision Drivers");
+    expect(output).toContain("Consequences");
+    expect(output).toContain("Confirmation");
+  });
+
+  it("pretty prints results in non-json mode", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return "---\nstatus: draft\n---\n## Why\nBecause.\n## Feature Changes\n- foo";
+      }
+      throw new Error("not found");
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await validateChange("test", { strict: false, json: false });
+    expect(logs.some((l) => l.includes("Validation passed"))).toBe(true);
+  });
+
+  it("detects missing manifest", async () => {
+    mockReadFile.mockRejectedValue(new Error("ENOENT"));
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    const result = await validateChange("test", { strict: false, json: true });
+    expect(result.errorCount).toBe(1);
+    expect(logs.join("\n")).toContain("Manifest file missing");
+  });
+
+  it("detects missing frontmatter status field", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return "---\nbranch: main\n---\n## Why\nBecause.\n## Feature Changes\n- foo";
+      }
+      throw new Error("not found");
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await validateChange("test", { strict: false, json: true });
+    expect(logs.join("\n")).toContain("missing 'status'");
+  });
+
+  it("detects manifest missing both Feature Changes and Decisions", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return "---\nstatus: draft\n---\n## Why\nBecause.";
+      }
+      throw new Error("not found");
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await validateChange("test", { strict: false, json: true });
+    expect(logs.join("\n")).toContain("Must have at least one");
+  });
+
+  it("detects decision missing required sections", async () => {
+    const decisionContent = `---
+status: accepted
+date: 2026-01-15
+---
+# Incomplete Decision
+`;
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return "---\nstatus: draft\n---\n## Why\nBecause.\n## Decisions\n- foo";
+      }
+      return decisionContent;
+    });
+    mockFindFiles.mockImplementation(async (_dir: string, ext: string) => {
+      if (ext === ".md") return ["/fake/root/.grimoire/changes/test/decisions/001.md"];
+      return [];
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+      logs.push(args.join(" "));
+    });
+
+    await validateChange("test", { strict: false, json: true });
+    const output = logs.join("\n");
+    expect(output).toContain("Context and Problem Statement");
+    expect(output).toContain("Considered Options");
+    expect(output).toContain("Decision Outcome");
+  });
 });
