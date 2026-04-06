@@ -2,8 +2,6 @@
 
 **BDD-powered AI coding assistant.** Everything you need to maintain solid, well-tested code when building with LLMs.
 
-Grimoire solves the [11 most common problems](#problems-grimoire-solves) with AI-assisted development: context window limits, hallucinations, regressions, fix loops, style drift, poor codebase navigation, security gaps, and the "vibe coding" debt crisis. It does this by making every code change start with a spec and end with a passing test.
-
 ```
 Your request → Gherkin spec → Implementation plan → Red-green BDD → Verified, auditable code
 ```
@@ -53,24 +51,6 @@ You: "Users should be able to log in with 2FA"
 → grimoire archive    Syncs to baseline, archives manifest
 → grimoire pr         Generates PR description from artifacts
 ```
-
-## Problems Grimoire Solves
-
-Based on [industry research](RESEARCH.md) into the most common issues with AI coding agents (April 2026):
-
-| # | Problem | How Grimoire Addresses It | Rating |
-|---|---------|--------------------------|--------|
-| 1 | **Context window limits** | Area docs + data schema + symbol maps replace raw codebase exploration. Subagent-per-task prevents context bloat. | Partial |
-| 2 | **Hallucinations** | Area docs ground the AI in real file paths and function signatures. Verify + check catch consequences. | Partial |
-| 3 | **Regressions** | Red-green BDD, verify step, check pipeline, feature branches. Existing tests must keep passing. | **Strong** |
-| 4 | **Fix loops** | Max 3 attempts per task with different approaches. After 3 failures, stop and ask the user. | Partial |
-| 5 | **Style drift** | Area docs document conventions. Plan references real patterns. Check pipeline enforces linting/formatting. | **Strong** |
-| 6 | **Poor codebase navigation** | `grimoire map --symbols` + `/grimoire:discover` gives the AI a structural map without reading every file. | **Strong** |
-| 7 | **Security & quality gaps** | Check pipeline: lint → format → duplicates → complexity → tests → security → dep audit → secrets → best practices. | Partial |
-| 8 | **Productivity paradox** | Structured workflow (spec → plan → apply) reduces time spent correcting AI output. | Indirect |
-| 9 | **Non-determinism** | Specs define success criteria. If the output passes verify + check, it meets the spec regardless of how it got there. | Partial |
-| 10 | **Developer experience** | Out of scope (tool-level, not workflow-level). | — |
-| 11 | **Vibe coding debt** | Every piece of code traces to a spec, a plan, and a decision. Code nobody understands is structurally impossible. | **Strong** |
 
 ## Workflow
 
@@ -129,9 +109,9 @@ For each task:
 
 `grimoire archive` syncs features to baseline, accepts decisions, updates data schema, and archives the manifest.
 
-## Codebase Intelligence
+## Features
 
-### Symbol Extraction
+### Codebase Intelligence
 
 ```bash
 grimoire map --symbols      # Extract function signatures, classes, exports
@@ -142,7 +122,7 @@ Extracts the API surface of your codebase — function signatures, class definit
 
 The symbol map feeds into area docs and the plan skill, giving the AI function-level knowledge of the codebase without reading every source file.
 
-### Area Docs (for LLMs)
+### Area Docs
 
 `grimoire map` + `/grimoire:discover` generates docs in `.grimoire/docs/`:
 
@@ -176,11 +156,11 @@ stripe_payments:
 
 Works for SQL tables, document collections, and external API contracts. The AI reads this instead of model files.
 
-### For Humans
+### Human-Readable Docs
 
 `grimoire docs` generates `.grimoire/docs/OVERVIEW.md` — project summary, architecture, features, data model, decisions, recent changes, and active work in one browsable document.
 
-## Pre-Commit Pipeline
+### Pre-Commit Pipeline
 
 ```
 grimoire check
@@ -201,14 +181,9 @@ grimoire check
 
 Tools are auto-detected during `grimoire init`. Supports linters, formatters, test frameworks, duplicate detection (jscpd), complexity analysis, security scanners, dependency auditing (npm audit, pip-audit, safety), secret detection (detect-secrets, gitleaks, trufflehog), and LLM-based reviews.
 
-### Hooks
+`grimoire init` also sets up enforcement hooks for Claude Code (`.claude/hooks.json`) and git (`.git/hooks/pre-commit`).
 
-`grimoire init` sets up enforcement hooks:
-
-- **Claude Code** — `.claude/hooks.json` with pre-commit checks and trailer verification
-- **Git** — `.git/hooks/pre-commit` as fallback for other agents/editors
-
-## Test Quality Intelligence
+### Test Quality
 
 ```bash
 grimoire test-quality              # Analyze all test files
@@ -224,7 +199,7 @@ Static analysis that catches weak tests before they provide false confidence:
 
 Supports Python and JavaScript/TypeScript. Integrated into the apply skill (quality gate per task) and verify skill (test intelligence phase).
 
-## Project Health
+### Project Health
 
 ```
 grimoire health
@@ -245,7 +220,7 @@ grimoire health
 grimoire health --badges README.md  # Write shields.io badges
 ```
 
-## Audit Trail
+### Audit Trail
 
 Every commit includes a `Change:` git trailer:
 
@@ -261,69 +236,7 @@ Scenarios: "Login with valid TOTP code", "Login with expired TOTP code"
 
 Branches follow `<type>/<change-id>`: `feat/add-2fa-login`, `fix/handle-null-pricing`.
 
-## Agent Configuration
-
-`grimoire init` asks for your preferred agents:
-
-```yaml
-# .grimoire/config.yaml
-llm:
-  thinking:              # Used for planning, review
-    command: claude
-    model: opus
-  coding:                # Used for implementation, checks
-    command: claude
-    model: sonnet
-```
-
-Separate thinking and coding agents let you use a stronger model for design and a faster model for implementation (like Aider's Architect mode).
-
-## Skills Reference
-
-| Skill | Purpose |
-|-------|---------|
-| `/grimoire:draft` | Draft features and/or decisions collaboratively |
-| `/grimoire:plan` | Generate detailed implementation tasks from specs |
-| `/grimoire:review` | Multi-perspective design review (optional) |
-| `/grimoire:apply` | Execute tasks with strict red-green BDD |
-| `/grimoire:verify` | Post-implementation verification + test quality |
-| `/grimoire:audit` | Discover undocumented features and decisions |
-| `/grimoire:remove` | Tracked feature removal with impact assessment |
-| `/grimoire:discover` | Generate area docs and data schema from codebase |
-| `/grimoire:bug` | Disciplined bug fix with reproduction test first |
-| `/grimoire:commit` | Contextual commit messages with change trailers |
-| `/grimoire:pr` | Generate PR description + optional diff review |
-
-## CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `grimoire init [path]` | Initialize grimoire (auto-detects tools, installs skills, sets up hooks) |
-| `grimoire update [path]` | Update AGENTS.md, skills, and hooks to latest version |
-| `grimoire list` | List active changes (with conflict detection) |
-| `grimoire list --features` | List feature files |
-| `grimoire list --decisions` | List decision records |
-| `grimoire status <id>` | Show change status, branch, and task progress |
-| `grimoire validate [id]` | Validate features, decisions, and manifests |
-| `grimoire archive <id>` | Archive a completed change |
-| `grimoire map` | Structural codebase scan |
-| `grimoire map --symbols` | Extract function signatures, classes, exports |
-| `grimoire map --compress` | Generate compressed symbol map (`.symbols.md`) |
-| `grimoire map --duplicates` | Run jscpd duplicate detection |
-| `grimoire map --refresh` | Diff against existing docs, show gaps |
-| `grimoire check [steps...]` | Run pre-commit pipeline |
-| `grimoire pr [id]` | Generate PR description from change artifacts |
-| `grimoire pr --create` | Create PR via gh/glab |
-| `grimoire pr --review` | Run post-implementation LLM review of diff |
-| `grimoire test-quality [files]` | Analyze test files for quality issues |
-| `grimoire log [--from] [--to]` | Generate change log / release notes |
-| `grimoire trace <file[:line]>` | Trace file to originating grimoire change |
-| `grimoire docs` | Generate human-readable project overview |
-| `grimoire health [--badges]` | Project health score with optional badges |
-
-Most commands support `--json` for machine-readable output.
-
-## Multi-LLM Support
+### Multi-LLM Support
 
 Grimoire works with any AI coding assistant that reads AGENTS.md:
 
@@ -332,11 +245,14 @@ Grimoire works with any AI coding assistant that reads AGENTS.md:
 
 AGENTS.md is an [open standard](https://agents.md/) supported by 60K+ repos. Grimoire generates and manages the grimoire section within it.
 
-## Walkthrough: A Complete Change
+## Walkthrough
 
-Here's what a full grimoire cycle looks like end-to-end — adding two-factor authentication to an existing login feature.
+Here's a full grimoire cycle end-to-end — adding two-factor authentication to an existing login feature.
 
-### 1. Draft
+<details>
+<summary>Expand walkthrough</summary>
+
+### Draft
 
 ```
 You: "Users should verify their identity with a TOTP code after entering their password"
@@ -385,7 +301,7 @@ Feature: Login with two-factor authentication
 
 You review and approve. Manifest status: `draft` → `approved`.
 
-### 2. Plan
+### Plan
 
 The AI runs `/grimoire:plan`, reads the approved features + area docs + data schema, and generates `tasks.md`:
 
@@ -410,26 +326,18 @@ The AI runs `/grimoire:plan`, reads the approved features + area docs + data sch
       - When: POST to `/verify-totp/` with valid code from `pyotp.TOTP(secret).now()`
       - Then: assert response redirects to `/dashboard/` (status 302)
       - Then: assert session `is_2fa_verified` is True
-- [ ] 2.2 Implement `VerifyTOTPView` in `src/views/auth.py`:
-      - Accept POST with `code` field
-      - Validate against user's `totp_secret` using `pyotp`
-      - On success: set `session['is_2fa_verified'] = True`, redirect to dashboard
-      - On failure: re-render verification page with error
+- [ ] 2.2 Implement `VerifyTOTPView` in `src/views/auth.py`
 
 ## 3. Error Cases
 - [ ] 3.1 Write step defs for scenario: "Login rejected with expired TOTP code"
-      ...
 - [ ] 3.2 Write step defs for scenario: "Login rejected with invalid TOTP code"
-      ...
 
 ## 4. Verification
 - [ ] 4.1 Run `pytest tests/ -k "auth"` — all new scenarios green
 - [ ] 4.2 Run `pytest tests/` — no regressions in existing tests
 ```
 
-You review and approve.
-
-### 3. Apply
+### Apply
 
 The AI runs `/grimoire:apply`, creates branch `feat/add-2fa-login`, and works through tasks:
 
@@ -448,7 +356,6 @@ Task 2.2: Implement VerifyTOTPView
   → Running: pytest tests/ -k "successful_login_with_valid_totp"
   ✓ PASSED (green)
   → Test quality check: assert response.status_code == 302 ✓ strong assertion
-  → Marking task 2.2 complete
 
   ...continues through all tasks...
 
@@ -459,7 +366,7 @@ Task 4.2: Full regression check
 
 Every commit includes `Change: add-2fa-login` trailer. `tasks.md` is updated in real time.
 
-### 4. Verify
+### Verify
 
 The AI runs `/grimoire:verify`:
 
@@ -482,28 +389,76 @@ The AI runs `/grimoire:verify`:
 Recommendation: Ready to archive.
 ```
 
-### 5. PR & Archive
+### PR & Archive
 
 ```bash
 grimoire pr --create        # Creates PR via gh with full description
 grimoire archive add-2fa-login  # Syncs features, accepts decision, archives manifest
 ```
 
-The feature files move to `features/auth/login.feature` (baseline). The decision moves to `.grimoire/decisions/0003-totp-library.md` with status `accepted`. The manifest is archived to `.grimoire/archive/2026-04-05-add-2fa-login/`.
+The feature files move to `features/auth/login.feature` (baseline). The decision moves to `.grimoire/decisions/0003-totp-library.md` with status `accepted`. The manifest is archived to `.grimoire/archive/`.
 
 `grimoire trace src/views/auth.py:42` now shows: commit `abc123` → Change: `add-2fa-login` → features: `auth/login.feature` → decision: `0003-totp-library.md`.
 
----
+</details>
 
-## Config Reference
+## Reference
 
-Full `.grimoire/config.yaml` schema. Generated by `grimoire init` with auto-detection.
+### Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `/grimoire:draft` | Draft features and/or decisions collaboratively |
+| `/grimoire:plan` | Generate detailed implementation tasks from specs |
+| `/grimoire:review` | Multi-perspective design review (optional) |
+| `/grimoire:apply` | Execute tasks with strict red-green BDD |
+| `/grimoire:verify` | Post-implementation verification + test quality |
+| `/grimoire:audit` | Discover undocumented features and decisions |
+| `/grimoire:remove` | Tracked feature removal with impact assessment |
+| `/grimoire:discover` | Generate area docs and data schema from codebase |
+| `/grimoire:bug` | Disciplined bug fix with reproduction test first |
+| `/grimoire:commit` | Contextual commit messages with change trailers |
+| `/grimoire:pr` | Generate PR description + optional diff review |
+
+### CLI
+
+| Command | Description |
+|---------|-------------|
+| `grimoire init [path]` | Initialize grimoire (auto-detects tools, installs skills, sets up hooks) |
+| `grimoire update [path]` | Update AGENTS.md, skills, and hooks to latest version |
+| `grimoire list` | List active changes (with conflict detection) |
+| `grimoire list --features` | List feature files |
+| `grimoire list --decisions` | List decision records |
+| `grimoire status <id>` | Show change status, branch, and task progress |
+| `grimoire validate [id]` | Validate features, decisions, and manifests |
+| `grimoire archive <id>` | Archive a completed change |
+| `grimoire map` | Structural codebase scan |
+| `grimoire map --symbols` | Extract function signatures, classes, exports |
+| `grimoire map --compress` | Generate compressed symbol map (`.symbols.md`) |
+| `grimoire map --duplicates` | Run jscpd duplicate detection |
+| `grimoire map --refresh` | Diff against existing docs, show gaps |
+| `grimoire check [steps...]` | Run pre-commit pipeline |
+| `grimoire pr [id]` | Generate PR description from change artifacts |
+| `grimoire pr --create` | Create PR via gh/glab |
+| `grimoire pr --review` | Run post-implementation LLM review of diff |
+| `grimoire test-quality [files]` | Analyze test files for quality issues |
+| `grimoire log [--from] [--to]` | Generate change log / release notes |
+| `grimoire trace <file[:line]>` | Trace file to originating grimoire change |
+| `grimoire docs` | Generate human-readable project overview |
+| `grimoire health [--badges]` | Project health score with optional badges |
+
+Most commands support `--json` for machine-readable output.
+
+### Configuration
+
+`grimoire init` generates `.grimoire/config.yaml` with auto-detected tools.
+
+<details>
+<summary>Full config schema</summary>
 
 ```yaml
-# Grimoire project configuration
-version: 1
+# .grimoire/config.yaml
 
-# Project metadata — used by skills and AGENTS.md
 project:
   language: typescript           # Auto-detected: python, typescript, javascript, go, rust
   package_manager: npm           # Auto-detected: npm, yarn, pnpm, uv, poetry, pip, cargo
@@ -511,29 +466,27 @@ project:
   doc_tool: typedoc              # sphinx, mkdocs, typedoc, jsdoc, rustdoc, godoc
   comment_style: tsdoc           # google, numpy, sphinx, jsdoc, tsdoc, pep257
 
-# Where specs live
 features_dir: features           # Gherkin feature files
 decisions_dir: .grimoire/decisions  # MADR decision records
 
-# AI agent configuration
+# Separate thinking (planning, review) and coding (implementation) agents
 llm:
-  thinking:                      # Used for planning, review, design
-    command: claude               # CLI command to invoke the agent
-    model: opus                   # Model hint (agent-specific)
-  coding:                        # Used for implementation, checks
+  thinking:
+    command: claude
+    model: opus
+  coding:
     command: claude
     model: sonnet
 
 # Tool configuration — each key matches a check step name
 tools:
   lint:
-    name: eslint                 # Display name
-    command: npx eslint .        # Run command (for general use)
-    # check_command:             # Override for check pipeline (if different from command)
+    name: eslint
+    command: npx eslint .
 
   format:
     name: prettier
-    check_command: npx prettier --check .
+    check_command: npx prettier --check .  # check_command overrides command in the pipeline
 
   unit_test:
     name: vitest
@@ -554,27 +507,20 @@ tools:
   security:
     name: bandit                 # Or: semgrep, npm audit, or LLM fallback
     command: bandit -r .
-    # For LLM-based security review (when no dedicated tool):
-    # name: llm
-    # prompt: "Review these changed files for security vulnerabilities"
 
   dep_audit:
-    name: npm audit              # Or: pip-audit, safety, yarn audit, pnpm audit
+    name: npm audit
     check_command: npm audit --audit-level=high
 
   secrets:
-    name: gitleaks               # Or: detect-secrets, trufflehog
+    name: gitleaks
     check_command: gitleaks detect --no-git
-    # For LLM-based secret scanning (when no dedicated tool):
-    # name: llm
-    # prompt: "Review these changed files for hardcoded secrets..."
 
   best_practices:
-    name: llm                    # Always LLM-based
+    name: llm                    # LLM-based — use name: llm + prompt
     prompt: "Review these changed files for best practices violations"
 
-# Check pipeline — ordered list of steps to run
-# Each step name must match a key in `tools` above
+# Check pipeline — ordered list of steps (must match keys in tools)
 checks:
   - lint
   - format
@@ -588,76 +534,25 @@ checks:
   - best_practices
 ```
 
-### Tool Config Options
+</details>
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Display name or `"llm"` for LLM-based checks |
-| `command` | No | Shell command to run the tool |
-| `check_command` | No | Override command for the check pipeline (e.g., `prettier --check` vs `prettier --write`) |
-| `prompt` | No | Prompt text for LLM-based checks (only when `name: llm`) |
+## Problems Grimoire Solves
 
-If a tool has neither `command`, `check_command`, nor `name: llm`, the step is skipped with "not configured."
+Based on [industry research](RESEARCH.md) into the most common issues with AI coding agents:
 
-### LLM Config Options
-
-| Field | Description | Default |
-|-------|-------------|---------|
-| `llm.thinking.command` | CLI command for the thinking agent | `claude` |
-| `llm.thinking.model` | Model hint for planning/review | (none — agent default) |
-| `llm.coding.command` | CLI command for the coding agent | `claude` |
-| `llm.coding.model` | Model hint for implementation | (none — agent default) |
-
-**Backward compatibility:** The legacy flat format `llm: { command: "claude" }` is still supported and maps to both thinking and coding.
-
----
-
-## Migrating from v0.1
-
-If you initialized a project with grimoire v0.1, run `grimoire update` to get the latest skills and AGENTS.md. The only config change is the LLM format:
-
-**v0.1 format (still works):**
-```yaml
-llm:
-  command: claude
-```
-
-**v0.2 format (new features):**
-```yaml
-llm:
-  thinking:
-    command: claude
-    model: opus
-  coding:
-    command: claude
-    model: sonnet
-```
-
-The v0.1 format is automatically mapped to both thinking and coding agents. You only need to update if you want separate agents.
-
-**New check steps:** v0.2 adds `dep_audit` and `secrets` to the default check pipeline. Add them to your `checks` list in `config.yaml` if you want them:
-
-```yaml
-checks:
-  - lint
-  - format
-  - duplicates
-  - complexity
-  - unit_test
-  - bdd_test
-  - security
-  - dep_audit      # NEW — dependency vulnerability scanning
-  - secrets        # NEW — hardcoded secret detection
-  - best_practices
-```
-
-**New CLI commands:** `grimoire pr`, `grimoire test-quality`, `grimoire map --symbols`, `grimoire map --compress`.
-
-**New skill:** `/grimoire:pr` — installed by `grimoire update`.
-
-**Hooks:** Run `grimoire init` again (safe — won't overwrite existing files) to generate `.claude/hooks.json` and `.git/hooks/pre-commit`.
-
----
+| # | Problem | How Grimoire Addresses It | Rating |
+|---|---------|--------------------------|--------|
+| 1 | **Context window limits** | Area docs + data schema + symbol maps replace raw codebase exploration. Subagent-per-task prevents context bloat. | Partial |
+| 2 | **Hallucinations** | Area docs ground the AI in real file paths and function signatures. Verify + check catch consequences. | Partial |
+| 3 | **Regressions** | Red-green BDD, verify step, check pipeline, feature branches. Existing tests must keep passing. | **Strong** |
+| 4 | **Fix loops** | Max 3 attempts per task with different approaches. After 3 failures, stop and ask the user. | Partial |
+| 5 | **Style drift** | Area docs document conventions. Plan references real patterns. Check pipeline enforces linting/formatting. | **Strong** |
+| 6 | **Poor codebase navigation** | `grimoire map --symbols` + `/grimoire:discover` gives the AI a structural map without reading every file. | **Strong** |
+| 7 | **Security & quality gaps** | Check pipeline: lint → format → duplicates → complexity → tests → security → dep audit → secrets → best practices. | Partial |
+| 8 | **Productivity paradox** | Structured workflow (spec → plan → apply) reduces time spent correcting AI output. | Indirect |
+| 9 | **Non-determinism** | Specs define success criteria. If the output passes verify + check, it meets the spec regardless of how it got there. | Partial |
+| 10 | **Developer experience** | Out of scope (tool-level, not workflow-level). | — |
+| 11 | **Vibe coding debt** | Every piece of code traces to a spec, a plan, and a decision. Code nobody understands is structurally impossible. | **Strong** |
 
 ## Contributing
 
@@ -676,14 +571,8 @@ npm run dev          # Watch mode
 ```
 grimoire/
 ├── src/
-│   ├── cli/index.ts            # CLI entry point — registers all commands
+│   ├── cli/index.ts            # CLI entry point
 │   ├── commands/               # Command definitions (thin — delegate to core/)
-│   │   ├── init.ts
-│   │   ├── map.ts
-│   │   ├── check.ts
-│   │   ├── pr.ts
-│   │   ├── test-quality.ts
-│   │   └── ...
 │   ├── core/                   # Business logic
 │   │   ├── init.ts             # Project initialization + tool detection
 │   │   ├── detect.ts           # Auto-detection of linters, formatters, test frameworks
@@ -695,25 +584,12 @@ grimoire/
 │   │   ├── hooks.ts            # Claude Code + git hook generation
 │   │   └── ...
 │   └── utils/
-│       ├── config.ts           # Config types + loader (with backward compat)
+│       ├── config.ts           # Config types + loader
 │       └── paths.ts            # Project root detection
-├── skills/                     # Claude Code skill definitions
-│   ├── grimoire-draft/SKILL.md
-│   ├── grimoire-plan/SKILL.md
-│   ├── grimoire-apply/SKILL.md
-│   ├── grimoire-verify/SKILL.md
-│   ├── grimoire-review/SKILL.md
-│   ├── grimoire-pr/SKILL.md
-│   └── ...
+├── skills/                     # Claude Code skill definitions (SKILL.md per skill)
 ├── templates/                  # Files copied during grimoire init
-│   ├── decision.md             # MADR template
-│   ├── manifest.md             # Change manifest template
-│   ├── example.feature         # Example Gherkin file
-│   ├── mapignore               # Default directories to skip
-│   └── mapkeys                 # Key file definitions
 ├── AGENTS.md                   # Universal LLM instructions (installed into projects)
-├── bin/grimoire.js             # CLI entry script
-└── RESEARCH.md                 # Design notes, industry research, landscape analysis
+└── bin/grimoire.js             # CLI entry script
 ```
 
 ### Adding a New Skill
@@ -722,26 +598,24 @@ grimoire/
 2. Add `"grimoire-<name>"` to the `skillNames` array in both `src/core/init.ts` and `src/core/update.ts`
 3. Build and test: `npm run build && node bin/grimoire.js update .`
 
-Skills are pure markdown — they're instructions for the AI, not executable code. The AI reads the SKILL.md and follows the workflow. Keep them specific enough that any LLM can execute without ambiguity.
+Skills are pure markdown — instructions for the AI, not executable code. Keep them specific enough that any LLM can execute without ambiguity.
 
 ### Adding a New CLI Command
 
 1. Create `src/commands/<name>.ts` — thin wrapper that parses args and calls core
 2. Create `src/core/<name>.ts` — business logic
 3. Register in `src/cli/index.ts`
-4. Update types in `src/utils/config.ts` if the command needs new config
 
 ### Adding a New Tool Detection
 
 1. Add a `detect<Tool>` function in `src/core/detect.ts`
 2. Add it to the `checks` array in `detectTools`
 3. Add the category to `CATEGORY_LABELS` and `CATEGORY_ORDER` in `src/core/init.ts`
-4. Add LLM fallback in `buildDetectedConfig` if appropriate
 
 ### Running Tests
 
 ```bash
-npm test             # vitest (when tests are written)
+npm test             # vitest
 npm run lint         # eslint
 npm run build        # type-check via tsc
 ```
