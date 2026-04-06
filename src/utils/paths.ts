@@ -23,5 +23,19 @@ export async function findProjectRoot(): Promise<string> {
 }
 
 export function resolveChangePath(root: string, changeId: string): string {
+  if (/[/\\]/.test(changeId) || changeId === ".." || changeId.includes("..")) {
+    throw new Error(`Invalid change ID: ${changeId}`);
+  }
   return join(root, ".grimoire", "changes", changeId);
+}
+
+/**
+ * Resolve a path and verify it stays within the project root.
+ */
+export function safePath(root: string, filePath: string): string {
+  const resolved = resolve(root, filePath);
+  if (!resolved.startsWith(root + "/") && resolved !== root) {
+    throw new Error(`Path escapes project root: ${filePath}`);
+  }
+  return resolved;
 }

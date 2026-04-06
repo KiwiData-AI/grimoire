@@ -2,8 +2,9 @@ import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import chalk from "chalk";
 import { parse as parseYaml } from "yaml";
-import { findProjectRoot } from "../utils/paths.js";
+import { findProjectRoot, safePath } from "../utils/paths.js";
 import { loadConfig } from "../utils/config.js";
+import { findFiles } from "../utils/fs.js";
 
 interface DocsOptions {
   output?: string;
@@ -52,8 +53,9 @@ export async function generateDocs(options: DocsOptions): Promise<void> {
 
   const output = sections.join("\n---\n\n");
 
-  const outputPath =
-    options.output ?? join(root, ".grimoire", "docs", "OVERVIEW.md");
+  const outputPath = options.output
+    ? safePath(root, options.output)
+    : join(root, ".grimoire", "docs", "OVERVIEW.md");
   await mkdir(join(root, ".grimoire", "docs"), { recursive: true });
   await writeFile(outputPath, output);
 
@@ -581,27 +583,7 @@ async function safeRead(path: string): Promise<string | null> {
   }
 }
 
-async function findFiles(
-  dir: string,
-  ext: string
-): Promise<string[]> {
-  const results: string[] = [];
-
-  async function walk(current: string): Promise<void> {
-    const entries = await readdir(current, { withFileTypes: true });
-    for (const entry of entries) {
-      const full = join(current, entry.name);
-      if (entry.isDirectory()) {
-        await walk(full);
-      } else if (entry.name.endsWith(ext)) {
-        results.push(full);
-      }
-    }
-  }
-
-  await walk(dir);
-  return results.sort();
-}
+// findFiles imported from utils/fs.js
 
 async function detectProjectName(root: string): Promise<string> {
   // Try package.json

@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
 import { findProjectRoot } from "../utils/paths.js";
+import { fileExists } from "../utils/fs.js";
 
 interface ChangeInfo {
   id: string;
@@ -204,14 +205,7 @@ export async function listDecisions(json: boolean): Promise<void> {
   }
 }
 
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await readFile(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
+// fileExists imported from utils/fs.js
 
 async function dirHasFiles(dir: string, ext: string): Promise<boolean> {
   try {

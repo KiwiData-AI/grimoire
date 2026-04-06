@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import { parse as parseYaml } from "yaml";
-import { findProjectRoot } from "../utils/paths.js";
+import { findProjectRoot, safePath } from "../utils/paths.js";
 import { loadConfig } from "../utils/config.js";
 import { readFileOrNull, escapeRegex, findFiles } from "../utils/fs.js";
 
@@ -527,7 +527,7 @@ async function writeBadges(
   filePath: string,
   result: HealthResult
 ): Promise<void> {
-  const target = join(root, filePath);
+  const target = safePath(root, filePath);
   const marker = "<!-- GRIMOIRE:HEALTH:START -->";
   const endMarker = "<!-- GRIMOIRE:HEALTH:END -->";
 

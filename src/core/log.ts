@@ -31,8 +31,7 @@ export async function generateLog(options: LogOptions): Promise<void> {
   try {
     entries = await readArchiveEntries(archiveDir);
   } catch {
-    console.error(chalk.red("No archive found. No changes have been archived yet."));
-    process.exit(1);
+    throw new Error("No archive found. No changes have been archived yet.");
   }
 
   if (entries.length === 0) {

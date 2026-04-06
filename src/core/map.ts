@@ -177,7 +177,7 @@ export async function generateMap(options: MapOptions): Promise<void> {
 
   const snapshot: MapSnapshot = {
     generatedAt: new Date().toISOString(),
-    projectRoot: root,
+    projectRoot: ".",
     directories,
     keyFiles,
     symbols,

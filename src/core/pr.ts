@@ -1,10 +1,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, basename } from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import { loadConfig } from "../utils/config.js";
-import { findProjectRoot } from "../utils/paths.js";
+import { findProjectRoot, resolveChangePath } from "../utils/paths.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -30,11 +30,10 @@ export async function generatePr(options: PrOptions): Promise<void> {
   // Find the change
   const changeId = options.changeId ?? (await detectActiveChange(changesDir));
   if (!changeId) {
-    console.error(chalk.red("No active change found. Specify a change ID."));
-    process.exit(1);
+    throw new Error("No active change found. Specify a change ID.");
   }
 
-  const changeDir = join(changesDir, changeId);
+  const changeDir = resolveChangePath(root, changeId);
 
   // Read artifacts
   const manifest = await readFileOrEmpty(join(changeDir, "manifest.md"));
@@ -117,10 +116,7 @@ async function detectActiveChange(changesDir: string): Promise<string | null> {
       for (const c of changes) {
         console.log(`  - ${c}`);
       }
-      console.error(
-        chalk.red("Multiple active changes. Specify one: grimoire pr <change-id>")
-      );
-      process.exit(1);
+      throw new Error("Multiple active changes. Specify one: grimoire pr <change-id>");
     }
     return null;
   } catch {
@@ -339,16 +335,8 @@ Focus on:
 
 Flag issues as **blocker** or **suggestion**. Be concise.`;
 
-    const { stdout } = await execFileAsync(
-      "sh",
-      [
-        "-c",
-        `echo "${escapeShell(prompt)}" | ${llmCommand} --print 2>/dev/null || echo "${escapeShell(prompt)}" | ${llmCommand}`,
-      ],
-      { cwd: root, timeout: 120_000 }
-    );
-
-    return stdout.trim();
+    const output = await spawnWithStdin(llmCommand, ["--print"], prompt, root);
+    return output;
   } catch (err) {
     return `Review failed: ${err instanceof Error ? err.message : "unknown error"}`;
   }
@@ -396,6 +384,43 @@ async function createPr(
   );
 }
 
-function escapeShell(str: string): string {
-  return str.replace(/'/g, "'\\''").replace(/"/g, '\\"');
+/**
+ * Spawn a command with stdin piped, avoiding sh -c shell interpretation.
+ */
+function spawnWithStdin(
+  command: string,
+  args: string[],
+  input: string,
+  cwd: string
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const parts = command.split(/\s+/);
+    const proc = spawn(parts[0], [...parts.slice(1), ...args], {
+      cwd,
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 120_000,
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout.on("data", (data: Buffer) => {
+      stdout += data.toString();
+    });
+    proc.stderr.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    proc.on("error", reject);
+    proc.on("close", (code) => {
+      if (code === 0 || stdout.trim()) {
+        resolve(stdout.trim());
+      } else {
+        reject(new Error(stderr.trim() || `Command exited with code ${code}`));
+      }
+    });
+
+    proc.stdin.write(input);
+    proc.stdin.end();
+  });
 }

@@ -1,8 +1,9 @@
-import { writeFile } from "node:fs/promises";
+import { writeFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 import chalk from "chalk";
 import { loadConfig } from "../utils/config.js";
 import { findProjectRoot } from "../utils/paths.js";
@@ -220,18 +221,12 @@ async function runLlmStep(
   const fileList = files.length > 0 ? `\n\nFiles to review:\n${files.join("\n")}` : "";
   const fullPrompt = `${prompt}${fileList}\n\nRespond with PASS if no issues found, or FAIL followed by the issues.`;
 
+  const tmpFile = join(tmpdir(), `grimoire-prompt-${randomUUID()}.txt`);
   try {
-    // Write prompt to temp file to avoid shell injection
-    const tmpFile = join(tmpdir(), `grimoire-prompt-${Date.now()}.txt`);
     await writeFile(tmpFile, fullPrompt);
 
-    const { stdout } = await execFileAsync(
-      "sh",
-      ["-c", `cat "${tmpFile}" | ${llmCommand} --print 2>/dev/null || cat "${tmpFile}" | ${llmCommand}`],
-      { cwd: root, timeout: 120_000 }
-    );
+    const output = await spawnWithStdin(llmCommand, ["--print"], fullPrompt, root);
 
-    const output = stdout.trim();
     const passed = output.toUpperCase().startsWith("PASS");
 
     return {
@@ -248,6 +243,8 @@ async function runLlmStep(
       output: err instanceof Error ? err.message : String(err),
       reason: "LLM command failed",
     };
+  } finally {
+    await unlink(tmpFile).catch(() => {});
   }
 }
 
@@ -286,4 +283,45 @@ function printStepResult(result: StepResult): void {
       );
       break;
   }
+}
+
+/**
+ * Spawn a command with stdin piped, avoiding sh -c shell interpretation.
+ */
+function spawnWithStdin(
+  command: string,
+  args: string[],
+  input: string,
+  cwd: string
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const parts = command.split(/\s+/);
+    const proc = spawn(parts[0], [...parts.slice(1), ...args], {
+      cwd,
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 120_000,
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout.on("data", (data: Buffer) => {
+      stdout += data.toString();
+    });
+    proc.stderr.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    proc.on("error", reject);
+    proc.on("close", (code) => {
+      if (code === 0 || stdout.trim()) {
+        resolve(stdout.trim());
+      } else {
+        reject(new Error(stderr.trim() || `Command exited with code ${code}`));
+      }
+    });
+
+    proc.stdin.write(input);
+    proc.stdin.end();
+  });
 }

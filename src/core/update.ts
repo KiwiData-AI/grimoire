@@ -1,7 +1,8 @@
-import { readFile, writeFile, copyFile, mkdir, access } from "node:fs/promises";
+import { readFile, writeFile, copyFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
+import { fileExists, escapeRegex } from "../utils/fs.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(__dirname, "..", "..");
@@ -19,12 +20,7 @@ export async function updateProject(
 
   // Verify this is a grimoire project
   if (!(await exists(join(root, ".grimoire")))) {
-    console.error(
-      chalk.red(
-        "No .grimoire/ directory found. Run grimoire init first."
-      )
-    );
-    process.exit(1);
+    throw new Error("No .grimoire/ directory found. Run grimoire init first.");
   }
 
   console.log(chalk.bold("Updating grimoire...\n"));
@@ -102,15 +98,4 @@ async function updateSkills(root: string): Promise<void> {
   }
 }
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+const exists = fileExists;

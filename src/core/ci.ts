@@ -45,10 +45,10 @@ export async function runCi(options: CiOptions): Promise<CiResult> {
   if (isGha) {
     for (const r of validateResult.results) {
       for (const err of r.errors) {
-        console.log(`::error file=${r.file}::${err}`);
+        console.log(`::error file=${escapeGhaProp(r.file)}::${escapeGhaMsg(err)}`);
       }
       for (const warn of r.warnings) {
-        console.log(`::warning file=${r.file}::${warn}`);
+        console.log(`::warning file=${escapeGhaProp(r.file)}::${escapeGhaMsg(warn)}`);
       }
     }
   }
@@ -68,9 +68,9 @@ export async function runCi(options: CiOptions): Promise<CiResult> {
   if (isGha) {
     for (const r of checkResult.results) {
       if (r.status === "fail") {
-        console.log(`::error title=${r.step}::${r.output.split("\n")[0]}`);
+        console.log(`::error title=${escapeGhaProp(r.step)}::${escapeGhaMsg(r.output.split("\n")[0])}`);
       } else if (r.status === "error") {
-        console.log(`::error title=${r.step}::${r.reason ?? r.output}`);
+        console.log(`::error title=${escapeGhaProp(r.step)}::${escapeGhaMsg(r.reason ?? r.output)}`);
       }
     }
   }
@@ -99,7 +99,7 @@ export async function runCi(options: CiOptions): Promise<CiResult> {
       if (isGha) {
         for (const issue of report.issues) {
           const level = issue.severity === "critical" ? "error" : "warning";
-          console.log(`::${level} file=${issue.file},line=${issue.line}::${issue.message}`);
+          console.log(`::${level} file=${escapeGhaProp(issue.file)},line=${issue.line}::${escapeGhaMsg(issue.message)}`);
         }
       } else {
         if (report.issues.length === 0) {
@@ -185,4 +185,14 @@ jobs:
 
   await writeFile(workflowPath, workflow);
   console.log(chalk.green("  Created .github/workflows/grimoire.yml"));
+}
+
+/** Escape a value for GHA workflow command properties (file, title, etc.) */
+function escapeGhaProp(s: string): string {
+  return s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A").replace(/:/g, "%3A").replace(/,/g, "%2C");
+}
+
+/** Escape a value for GHA workflow command messages */
+function escapeGhaMsg(s: string): string {
+  return s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 }

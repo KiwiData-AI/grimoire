@@ -143,7 +143,7 @@ async function getCommits(
     // Format: hash|date|author|subject|trailers
     const args = [
       "log",
-      "--format=%H|%as|%an|%s|%(trailers:key=Change,valueonly,separator=%x00)",
+      "--format=%H%x1f%as%x1f%an%x1f%s%x1f%(trailers:key=Change,valueonly,separator=%x00)",
       "--follow",
     ];
 
@@ -161,12 +161,12 @@ async function getCommits(
       if (!rawLine) continue;
 
       // For -L format, git outputs diff lines too — only parse our format lines
-      const parts = rawLine.split("|");
+      const parts = rawLine.split("\x1f");
       if (parts.length < 4) continue;
       if (!/^[0-9a-f]{40}$/.test(parts[0])) continue;
 
       const [hash, date, author, subject, ...trailerParts] = parts;
-      const changeTrailer = trailerParts.join("|").trim();
+      const changeTrailer = trailerParts.join("").trim();
 
       commits.push({
         hash,

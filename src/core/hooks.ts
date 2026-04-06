@@ -87,6 +87,11 @@ async function setupGitHooks(root: string): Promise<void> {
       console.log(`  ${chalk.yellow("exists")}  .git/hooks/pre-commit (already has grimoire)`);
       return;
     }
+    // Check if existing hook has exit/exec that would prevent our code from running
+    if (/^[^#]*\b(exit\s|exec\s)/m.test(existing)) {
+      console.log(`  ${chalk.yellow("manual")}  .git/hooks/pre-commit contains exit/exec — add manually: grimoire check --changed`);
+      return;
+    }
     // Append grimoire check to existing hook
     const appended = existing.trimEnd() + "\n\n# Grimoire pre-commit checks\ngrimoire check --changed\n";
     await writeFile(preCommitPath, appended);
