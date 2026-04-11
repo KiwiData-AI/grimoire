@@ -66,7 +66,7 @@ grimoire map --symbols # Scan codebase + extract function signatures
 
 ### What `grimoire init` does
 
-Interactive setup that auto-detects your project's tools and asks preferences for commit style, doc generator, AI agents, and security tools. Creates:
+Interactive setup that auto-detects your project's tools and asks preferences for commit style, doc generator, AI agents, security tools, and compliance frameworks (OWASP, PCI-DSS, HIPAA, SOC2, GDPR, ISO 27001). Creates:
 
 - `AGENTS.md` — workflow instructions read by AI coding assistants
 - `.grimoire/config.yaml` — tool configuration and check pipeline
@@ -81,7 +81,7 @@ Interactive setup that auto-detects your project's tools and asks preferences fo
 grimoire init --no-detect
 ```
 
-Skips the interactive tool-detection prompts and writes a minimal config with `commit_style: conventional`, an empty `tools: {}` block, and LLM agents defaulting to `claude`. All 11 check steps are registered but **none have tool commands configured** — when you run `grimoire check`, unconfigured steps are skipped (not errored), so it's safe to start this way and fill in tools as you go.
+Skips the interactive tool-detection prompts and writes a minimal config with `commit_style: conventional`, an empty `tools: {}` block, and LLM agents defaulting to `claude`. All check steps are registered. Most unconfigured steps are skipped, but **security, dep_audit, secrets, and best_practices have built-in LLM fallbacks** that run automatically even without explicit tool configuration — every project gets baseline security scanning out of the box.
 
 What you'd configure manually in `.grimoire/config.yaml` under `tools:`:
 
@@ -141,7 +141,7 @@ Grimoire routes your request to the right format:
 - **"The login page is broken"** → `/grimoire:bug` (reproduce first, then fix)
 - **"A tester found a problem"** → `/grimoire:bug-report` → `/grimoire:bug-triage` → routed fix
 
-Produces `.feature` files, decision records, `data.yml` for schema changes, and a manifest tracking the change.
+Produces `.feature` files (with security tags like `@security`, `@auth`, `@pii`, `@pci-dss` when applicable), decision records, `data.yml` for schema changes, and a manifest tracking the change.
 
 ### 2. Plan — Generate concrete tasks
 
@@ -155,11 +155,11 @@ Five personas validate the change before any code is written:
 
 - **Product manager** — completeness, missing edge cases, unclear requirements
 - **Senior engineer** — simplicity, code reuse, architecture fit, task quality
-- **Security engineer** — input validation, auth boundaries, vulnerable dependencies, secrets
+- **Security engineer** — STRIDE threat analysis, OWASP Top 10 / CWE classification, compliance verification (PCI-DSS, HIPAA, GDPR, SOC2 when configured), input validation, auth boundaries, vulnerable dependencies, secrets
 - **QA engineer** — testability, negative scenarios, edge cases, observability, regression risk
 - **Data engineer** — schema design, migration safety, index coverage (when `data.yml` present)
 
-Issues flagged as **blocker** or **suggestion**. Skip for small/low-risk changes.
+Issues flagged as **blocker** or **suggestion**. Security findings tagged with OWASP category and CWE ID. Skip for small/low-risk changes.
 
 ### 4. Apply — Build with strict red-green BDD
 
@@ -181,6 +181,7 @@ For each task:
 - **Correctness** — every scenario has a step definition with real assertions
 - **Coherence** — architecture decisions are followed
 - **Test quality** — flags weak assertions (`assert True`, `toBeDefined()`), empty bodies, tautological tests
+- **Security compliance** — verifies plan-stage security patterns were followed (parameterized queries, bcrypt, no hardcoded secrets), checks review blockers were addressed, runs OWASP Top 10 surface scan on the diff, validates security-tagged scenarios (`@security`, `@auth`, `@pii`, `@pci-dss`, etc.)
 - **Dead features** — specs that exist but code no longer implements
 
 ### 6. PR & Archive
@@ -639,6 +640,9 @@ project:
   commit_style: conventional     # conventional, angular, or custom
   doc_tool: typedoc              # sphinx, mkdocs, typedoc, jsdoc, rustdoc, godoc
   comment_style: tsdoc           # google, numpy, sphinx, jsdoc, tsdoc, pep257
+  compliance:                    # Compliance frameworks (affects review, plan, verify, check)
+    - owasp                      # Options: owasp, pci-dss, hipaa, soc2, gdpr, iso27001
+    - gdpr
 
 features_dir: features           # Gherkin feature files
 decisions_dir: .grimoire/decisions  # MADR decision records
@@ -741,7 +745,7 @@ Based on [industry research](RESEARCH.md) into the most common issues with AI co
 | 4 | **Fix loops** | Max 3 attempts per task with different approaches. After 3 failures, stop and ask the user. | Partial |
 | 5 | **Style drift** | Area docs document conventions. Plan references real patterns. Check pipeline enforces linting/formatting. | **Strong** |
 | 6 | **Poor codebase navigation** | `grimoire map --symbols` + `/grimoire:discover` gives the AI a structural map without reading every file. | **Strong** |
-| 7 | **Security & quality gaps** | Check pipeline: lint → format → duplicates → complexity → tests → security → dep audit → secrets → best practices. | Partial |
+| 7 | **Security & quality gaps** | Built-in LLM security checks (OWASP/CWE-tagged), STRIDE threat modeling in review, compliance framework support, security tags on features, verification that security guidance was followed. | **Strong** |
 | 8 | **Productivity paradox** | Structured workflow (spec → plan → apply) reduces time spent correcting AI output. | Indirect |
 | 9 | **Non-determinism** | Specs define success criteria. If the output passes verify + check, it meets the spec regardless of how it got there. | Partial |
 | 10 | **Developer experience** | Out of scope (tool-level, not workflow-level). | — |

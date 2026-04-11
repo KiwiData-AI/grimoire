@@ -19,6 +19,7 @@ export interface ProjectConfig {
   doc_tool?: string;
   comment_style?: string;
   caveman?: CavemanLevel;
+  compliance?: string[];
 }
 
 export interface LlmAgentConfig {
@@ -128,6 +129,9 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     doc_tool: str(projectRaw.doc_tool ?? raw.doc_tool),
     comment_style: str(projectRaw.comment_style ?? raw.comment_style),
     caveman: str(projectRaw.caveman) as ProjectConfig["caveman"],
+    compliance: Array.isArray(projectRaw.compliance)
+      ? (projectRaw.compliance as string[]).map(String)
+      : undefined,
   };
 }
 

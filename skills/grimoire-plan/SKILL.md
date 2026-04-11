@@ -69,6 +69,20 @@ Create `.grimoire/changes/<change-id>/tasks.md`. **Every scenario must produce b
 - **State management** → Use the framework's idiomatic approach (Redux, Vuex, signals, etc.), not a hand-rolled event system.
 - **Authentication & security** → Always recommend proven security processes: OAuth2/OIDC for auth flows, bcrypt/argon2 for password hashing, CSRF protection for forms, parameterized queries for database access. Never roll custom crypto, custom auth tokens, or custom session management when a battle-tested library exists.
 
+**THE PLAN MUST RESPECT SECURITY TAGS AND COMPLIANCE.**
+Check `.grimoire/config.yaml` under `project.compliance` for active compliance frameworks. When feature scenarios have security tags (`@security`, `@auth`, `@pii`, `@input-validation`, `@secrets`, `@pci-dss`, `@hipaa`, `@gdpr`, `@soc2`), the plan must include corresponding tasks:
+
+- **`@security` / `@auth`** → Tasks must specify which auth library/framework to use, and include a negative scenario task (e.g., "attempt action without auth, assert 401/403")
+- **`@pii`** → Tasks must address: encryption at rest, access logging, data minimization. If `gdpr` is in compliance, add tasks for consent checks and erasure support
+- **`@input-validation`** → Tasks must include explicit validation/sanitization steps at the boundary, plus negative test tasks for malicious input (SQLi, XSS, path traversal as appropriate)
+- **`@secrets`** → Tasks must specify env vars or secret store — never hardcoded values. Add a task to verify no secrets in source
+- **`@pci-dss`** → Tasks must address: no card data in logs, encrypted transmission (TLS), tokenization where possible, audit trail for access to cardholder data
+- **`@hipaa`** → Tasks must address: access controls with audit logging, encryption at rest and in transit, minimum necessary access principle
+- **`@gdpr`** → Tasks must address: lawful basis for processing, consent mechanism if needed, data subject rights (access, rectify, erase, port), data retention limits
+- **`@soc2`** → Tasks must address: audit logging for all access, change management documentation, availability monitoring
+
+If no compliance frameworks are configured and no security tags are present, skip this — don't add compliance overhead to non-security features.
+
 If no established pattern applies, state that explicitly in the task and explain why.
 
 **THE PLAN MUST ENFORCE SINGLE RESPONSIBILITY.** Each file, class, and function should do one thing:

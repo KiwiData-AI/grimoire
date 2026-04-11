@@ -64,6 +64,38 @@ Before designing anything, search for well-maintained tools, libraries, or frame
   - Given/When/Then — describe WHAT, never HOW
   - No implementation details in feature files
 
+**Security tags on scenarios:**
+Apply Gherkin tags to scenarios that have security implications. These tags drive downstream behavior — the plan, review, and verify stages use them to apply stricter checks.
+
+| Tag | When to apply |
+|---|---|
+| `@security` | Any scenario involving authentication, authorization, access control, or cryptographic operations |
+| `@auth` | Scenarios that test login, logout, session management, token handling, or role-based access |
+| `@pii` | Scenarios that create, read, update, or delete personally identifiable information |
+| `@input-validation` | Scenarios that accept user input which could be malicious (forms, APIs, file uploads) |
+| `@secrets` | Scenarios involving API keys, credentials, tokens, or secret management |
+
+If the project has compliance frameworks configured (check `.grimoire/config.yaml` under `project.compliance`), also apply framework-specific tags:
+
+| Tag | When to apply |
+|---|---|
+| `@pci-dss` | Scenarios involving payment card data, cardholder data environment, or payment processing |
+| `@hipaa` | Scenarios involving protected health information (PHI), patient data, or healthcare records |
+| `@gdpr` | Scenarios involving EU personal data, consent management, data subject rights (access, erasure, portability) |
+| `@soc2` | Scenarios involving audit logging, access controls, or availability requirements |
+
+Multiple tags can apply to a single scenario. Example:
+```gherkin
+@security @auth @gdpr
+Scenario: User deletes their account and personal data
+  Given I am logged in as "user@example.com"
+  When I request account deletion
+  Then my account should be deactivated
+  And all my personal data should be queued for erasure within 30 days
+```
+
+If no compliance frameworks are configured and the scenario has no security surface, don't add tags — not every scenario needs them.
+
 **For architecture decisions:**
 - Write MADR record in `.grimoire/changes/<change-id>/decisions/`
 - Use the template from `.grimoire/decisions/template.md` or the AGENTS.md format

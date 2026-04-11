@@ -86,12 +86,17 @@ describe("runCheck", () => {
   it("passes all configured steps that succeed", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
-    expect(result.passed).toBe(3);
+    // lint, format, unit_test pass via shell; security passes via builtin LLM fallback
+    expect(result.passed).toBe(4);
     expect(result.failed).toBe(0);
-    expect(result.skipped).toBe(1);
+    expect(result.skipped).toBe(0);
   });
 
-  it("skips unconfigured steps", async () => {
+  it("skips unconfigured steps without builtin fallback", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      checks: ["lint", "format", "unit_test", "custom_step"],
+    } as any);
     vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.skipped).toBeGreaterThan(0);
@@ -137,7 +142,8 @@ describe("runCheck", () => {
   it("respects skip option", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, skip: ["lint"], json: true });
-    expect(result.passed).toBe(2);
+    // format, unit_test pass via shell; security passes via builtin LLM fallback
+    expect(result.passed).toBe(3);
   });
 
   it("runs only specified steps", async () => {

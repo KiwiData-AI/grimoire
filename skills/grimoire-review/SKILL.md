@@ -78,7 +78,23 @@ Output a short list of findings — flag issues as **blocker** or **suggestion**
 
 Adopt the perspective of a **security engineer** reviewing the design for vulnerabilities.
 
-Evaluate:
+#### 5a. STRIDE Threat Analysis
+
+For each new endpoint, data flow, or trust boundary the change introduces, evaluate using STRIDE:
+
+| Threat             | Question                                                                                     |
+|--------------------|----------------------------------------------------------------------------------------------|
+| **S**poofing       | Can an attacker impersonate a user or service? Are auth checks present at every entry point?  |
+| **T**ampering      | Can input or data in transit be modified? Is integrity validated (checksums, signatures, CSRF)?|
+| **R**epudiation    | Are security-relevant actions logged? Could an attacker act without leaving a trace?          |
+| **I**nfo Disclosure| Could error messages, logs, or responses leak sensitive data (stack traces, PII, tokens)?     |
+| **D**enial of Service| Are there unbounded operations (large uploads, expensive queries, no rate limits)?          |
+| **E**levation of Privilege| Can a user escalate to admin? Are role/permission checks at the right layer?           |
+
+Skip STRIDE categories that don't apply to the change. Don't manufacture threats.
+
+#### 5b. Detailed Security Evaluation
+
 - **Input validation**: Do the features involve user input? Are there scenarios covering malicious or malformed input?
 - **Authentication/authorization**: Does the change touch auth boundaries? Are there missing access control checks?
 - **Data handling**: Does the change introduce new data storage, transmission, or processing? Are there privacy or compliance concerns?
@@ -90,7 +106,51 @@ Evaluate:
 
 If the change has no security-relevant surface (e.g., a pure UI text change), say so briefly and move on. Not every change needs a deep security review.
 
-Output a short list of findings — flag issues as **blocker** or **suggestion**.
+#### 5c. Compliance Review
+
+Check `.grimoire/config.yaml` under `project.compliance` for active frameworks. If compliance frameworks are configured, evaluate the change against each applicable framework:
+
+- **`owasp`** → Are OWASP Top 10 risks addressed? (covered by STRIDE + 5d below)
+- **`pci-dss`** → Does the change touch payment data? Verify: no card numbers in logs, TLS for transmission, tokenization, audit trail, access controls on cardholder data environment
+- **`hipaa`** → Does the change touch PHI? Verify: access controls + audit logging, encryption at rest/transit, minimum necessary access, BAA implications for third-party services
+- **`gdpr`** → Does the change process EU personal data? Verify: lawful basis identified, consent mechanism if needed, data subject rights supported (access, rectify, erase, port), data retention limits, privacy by design
+- **`soc2`** → Verify: audit logging for access and changes, availability monitoring, change management documentation, logical access controls
+- **`iso27001`** → Verify: risk assessment documented, information classification applied, access control policy followed, incident response considered
+
+For scenarios tagged with compliance decorators (`@pci-dss`, `@hipaa`, `@gdpr`, `@soc2`), verify the tasks adequately address the framework's requirements. Missing compliance coverage on a tagged scenario is a **blocker**.
+
+If no compliance frameworks are configured, skip this section.
+
+#### 5d. OWASP / CWE Classification
+
+Tag every security finding with:
+- **OWASP Top 10 (2021)** category — e.g., `A01:2021-Broken Access Control`, `A03:2021-Injection`
+- **CWE ID** — e.g., `CWE-89` (SQL Injection), `CWE-79` (XSS), `CWE-798` (Hardcoded Credentials)
+
+This makes findings actionable, searchable, and traceable to compliance frameworks.
+
+Common mappings for quick reference:
+- Missing auth checks → A01:2021 / CWE-862
+- SQL injection, command injection → A03:2021 / CWE-89, CWE-78
+- Custom crypto, weak hashing → A02:2021 / CWE-327, CWE-328
+- Hardcoded secrets → A07:2021 / CWE-798
+- XSS → A03:2021 / CWE-79
+- SSRF → A10:2021 / CWE-918
+- Insecure deserialization → A08:2021 / CWE-502
+
+Output format:
+```markdown
+## Security Engineer
+### STRIDE Summary
+- **Spoofing**: [relevant finding or "N/A"]
+- **Tampering**: [relevant finding or "N/A"]
+- ... (only categories that apply)
+
+### Findings
+- **[blocker]** [A03:2021 / CWE-89] User search query is concatenated into SQL string in tasks — must use parameterized query
+- **[suggestion]** [A01:2021 / CWE-862] Add rate limiting scenario for login endpoint
+- No other security concerns for this change.
+```
 
 ### 6. QA Engineer Review (Optional)
 

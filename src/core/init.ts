@@ -286,7 +286,8 @@ async function buildDetectedConfig(root: string): Promise<GrimoireConfig> {
   if (!byCategory.has("security")) {
     config.tools.security = {
       name: "llm",
-      prompt: "Review these changed files for security vulnerabilities",
+      prompt:
+        "Review these changed files for security vulnerabilities. Tag each finding with OWASP Top 10 category and CWE ID. Check for: SQL injection (CWE-89), XSS (CWE-79), broken auth (CWE-287), insecure crypto (CWE-327), SSRF (CWE-918), path traversal (CWE-22), insecure deserialization (CWE-502), missing access control (CWE-862), CSRF (CWE-352), hardcoded secrets (CWE-798).",
     };
   }
 
@@ -295,7 +296,7 @@ async function buildDetectedConfig(root: string): Promise<GrimoireConfig> {
     config.tools.dep_audit = {
       name: "llm",
       prompt:
-        "Review these changed files for newly added dependencies or imports. Flag any packages that look suspicious, misspelled, or that you cannot verify as real published packages. Check for typosquatting (e.g., 'reqeusts' instead of 'requests').",
+        "Review these changed files for newly added dependencies or imports. Flag potential typosquatting (CWE-1357), packages you cannot verify as real, and packages with known security advisories. Check for misspellings (e.g., 'reqeusts' instead of 'requests').",
     };
   }
 
@@ -304,7 +305,7 @@ async function buildDetectedConfig(root: string): Promise<GrimoireConfig> {
     config.tools.secrets = {
       name: "llm",
       prompt:
-        "Review these changed files for hardcoded secrets, API keys, passwords, tokens, private keys, or credentials. Flag any string that looks like a secret value rather than a placeholder or environment variable reference.",
+        "Review these changed files for hardcoded secrets (CWE-798), API keys, passwords, tokens, private keys, or credentials (CWE-312). Flag any string that looks like a secret value rather than a placeholder or environment variable reference.",
     };
   }
 
@@ -446,7 +447,21 @@ async function askPreferences(config: GrimoireConfig): Promise<GrimoireConfig> {
       codeModelAnswer.trim() === "auto" ? undefined : codeModelAnswer.trim();
   }
 
-  console.log(chalk.bold("\n  Security tools:\n"));
+  console.log(chalk.bold("\n  Security & compliance:\n"));
+
+  // Compliance frameworks
+  console.log(chalk.dim("    Which compliance frameworks apply to this project?"));
+  console.log(chalk.dim("    Options: owasp, pci-dss, hipaa, soc2, gdpr, iso27001, or Enter to skip.\n"));
+
+  const complianceAnswer = await rl.question(
+    `    Compliance frameworks (comma-separated) [none]: `
+  );
+  if (complianceAnswer.trim() && complianceAnswer.trim().toLowerCase() !== "none") {
+    config.project.compliance = complianceAnswer
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+  }
 
   // Dependency audit tool preference
   const currentDepAudit = config.tools.dep_audit?.name ?? "auto";

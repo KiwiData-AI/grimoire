@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 import fg from "fast-glob";
-import { loadConfig, type GrimoireConfig } from "../utils/config.js";
+import { loadConfig, type GrimoireConfig, type ToolConfig } from "../utils/config.js";
 import { findProjectRoot } from "../utils/paths.js";
 import { spawnWithStdin } from "../utils/spawn.js";
 import { analyzeTestQuality, TEST_FILE_GLOBS, TEST_FILE_IGNORE } from "./test-quality.js";
@@ -103,7 +103,7 @@ async function runStep(
     return runComplexityStep(root, config);
   }
 
-  const tool = config.tools[step];
+  const tool = config.tools[step] ?? getBuiltinLlmFallback(step);
 
   if (!tool || (!tool.command && !tool.check_command && tool.name !== "llm")) {
     return { step, status: "skip", duration: 0, output: "", reason: "not configured" };
@@ -231,6 +231,51 @@ async function runLlmStep(
   } finally {
     await unlink(tmpFile).catch(() => {});
   }
+}
+
+const BUILTIN_LLM_FALLBACKS: Record<string, ToolConfig> = {
+  security: {
+    name: "llm",
+    prompt: `Review these changed files for security vulnerabilities. For each finding:
+1. Describe the vulnerability
+2. Tag it with the relevant OWASP Top 10 category (e.g., A01:2021-Broken Access Control) and CWE ID (e.g., CWE-89)
+3. Rate severity: critical / high / medium / low
+
+Check specifically for:
+- SQL injection (CWE-89) — string concatenation in queries instead of parameterized queries
+- XSS (CWE-79) — unescaped user input in HTML/template output
+- Broken authentication (CWE-287) — custom token generation, weak session management, missing auth checks
+- Insecure cryptography (CWE-327) — MD5/SHA1 for passwords, custom crypto, weak random
+- SSRF (CWE-918) — user-controlled URLs in server-side requests
+- Path traversal (CWE-22) — user input in file paths without sanitization
+- Insecure deserialization (CWE-502) — pickle.loads, yaml.load without SafeLoader, eval()
+- Missing access control (CWE-862) — endpoints without authorization checks
+- CSRF (CWE-352) — state-changing endpoints without CSRF tokens
+- Hardcoded secrets (CWE-798) — API keys, passwords, tokens in source code`,
+  },
+  dep_audit: {
+    name: "llm",
+    prompt: `Review these changed files for newly added dependencies or imports. For each finding:
+1. Verify the package name is real and correctly spelled — flag potential typosquatting (e.g., 'reqeusts' instead of 'requests', 'lodash-utils' instead of 'lodash')
+2. Flag packages you cannot verify as real published packages
+3. Flag packages with known security advisories if you are aware of them
+4. Tag supply chain risks with CWE-1357 (Reliance on Insufficiently Trustworthy Component)`,
+  },
+  secrets: {
+    name: "llm",
+    prompt: `Review these changed files for hardcoded secrets, API keys, passwords, tokens, private keys, or credentials.
+Tag findings with CWE-798 (Use of Hard-coded Credentials) or CWE-312 (Cleartext Storage of Sensitive Information).
+Flag any string that looks like a secret value rather than a placeholder or environment variable reference.
+Check for: API keys, database connection strings, JWT secrets, private keys, OAuth client secrets, webhook URLs with tokens.`,
+  },
+  best_practices: {
+    name: "llm",
+    prompt: "Review these changed files for best practices violations",
+  },
+};
+
+function getBuiltinLlmFallback(step: string): ToolConfig | undefined {
+  return BUILTIN_LLM_FALLBACKS[step];
 }
 
 function printStepResult(result: StepResult): void {
