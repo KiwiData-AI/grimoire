@@ -2,6 +2,7 @@ import { readFile, writeFile, copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
 import { fileExists, escapeRegex } from "../utils/fs.js";
+import type { CavemanLevel } from "../utils/config.js";
 
 export const GRIMOIRE_START_MARKER = "<!-- GRIMOIRE:START -->";
 export const GRIMOIRE_END_MARKER = "<!-- GRIMOIRE:END -->";
@@ -63,19 +64,63 @@ export async function upsertManagedBlock(
 }
 
 /**
+ * Build a caveman directive block for the given intensity level.
+ * Uses the upstream caveman skill format (github.com/JuliusBrussee/caveman).
+ */
+export function buildCavemanDirective(level: CavemanLevel): string {
+  if (level === "none") return "";
+
+  const lines = [
+    "## Caveman Mode",
+    "",
+    `Respond terse like smart caveman at **${level}** intensity. All technical substance stay. Only fluff die.`,
+    "",
+  ];
+
+  if (level === "lite") {
+    lines.push(
+      "Rules: No filler/hedging. Keep articles + full sentences. Professional but tight.",
+    );
+  } else if (level === "full") {
+    lines.push(
+      "Rules: Drop articles (a/an/the), filler, pleasantries, hedging. Fragments OK. Short synonyms. Technical terms exact. Code blocks unchanged.",
+    );
+  } else if (level === "ultra") {
+    lines.push(
+      "Rules: Abbreviate (DB/auth/config/req/res/fn/impl), strip conjunctions, arrows for causality (X → Y), one word when one word enough. Code blocks unchanged.",
+    );
+  }
+
+  lines.push(
+    "",
+    "Auto-clarity exception: revert to normal for security warnings, irreversible action confirmations, and multi-step sequences where fragments risk misread.",
+    "",
+    "Boundaries: code, commits, PRs written normally. Stop with \"stop caveman\" or \"normal mode\".",
+    "",
+    `<!-- caveman:${level} — based on github.com/JuliusBrussee/caveman -->`,
+    "",
+  );
+
+  return lines.join("\n");
+}
+
+/**
  * Read the package AGENTS.md and upsert its content into the project's AGENTS.md.
  */
 export async function upsertAgentsFile(
   root: string,
   packageRoot: string,
-  verb: "created" | "updated"
+  verb: "created" | "updated",
+  caveman: CavemanLevel = "none"
 ): Promise<void> {
   const agentsPath = join(root, "AGENTS.md");
   const grimoireAgents = await readFile(
     join(packageRoot, "AGENTS.md"),
     "utf-8"
   );
-  const managedBlock = buildManagedBlock(grimoireAgents);
+  const cavemanBlock = buildCavemanDirective(caveman);
+  const content = cavemanBlock ? cavemanBlock + grimoireAgents : grimoireAgents;
+  const managedBlock = buildManagedBlock(content);
   await upsertManagedBlock(agentsPath, managedBlock, verb, "AGENTS.md");
 }
 

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { stringify as yamlStringify } from "yaml";
 import chalk from "chalk";
 import { detectTools, type Detection } from "./detect.js";
-import type { GrimoireConfig, ToolConfig } from "../utils/config.js";
+import type { GrimoireConfig, ToolConfig, CavemanLevel } from "../utils/config.js";
 import { setupHooks } from "./hooks.js";
 import { fileExists } from "../utils/fs.js";
 import {
@@ -102,19 +102,25 @@ export async function initProject(
 
   // Generate config.yaml with optional tool detection
   const configPath = join(root, ".grimoire", "config.yaml");
+  let cavemanLevel: CavemanLevel = "lite";
   if (!(await fileExists(configPath))) {
     const config = options.noDetect
       ? buildMinimalConfig()
       : await buildDetectedConfig(root);
+    cavemanLevel = config.project.caveman ?? "lite";
     await writeFile(configPath, yamlStringify(config));
     console.log(`  ${chalk.green("created")} .grimoire/config.yaml`);
   } else {
     console.log(`  ${chalk.yellow("exists")}  .grimoire/config.yaml`);
+    // Read existing config to get caveman level
+    const { loadConfig } = await import("../utils/config.js");
+    const existing = await loadConfig(root);
+    cavemanLevel = existing.project.caveman ?? "none";
   }
 
   // Generate AGENTS.md (or append grimoire section)
   if (!options.skipAgents) {
-    await setupAgentsFile(root);
+    await setupAgentsFile(root, cavemanLevel);
   }
 
   // Install Claude Code skills
@@ -362,6 +368,17 @@ async function askPreferences(config: GrimoireConfig): Promise<GrimoireConfig> {
 
   console.log(chalk.bold("\n  Project preferences:\n"));
 
+  const currentCaveman = config.project.caveman ?? "lite";
+  const cavemanAnswer = await rl.question(
+    `    Token optimization (caveman)? (none/lite/full/ultra) [${currentCaveman}]: `
+  );
+  if (cavemanAnswer.trim()) {
+    const level = cavemanAnswer.trim().toLowerCase();
+    config.project.caveman = (level === "none" ? "none" : level) as CavemanLevel;
+  } else {
+    config.project.caveman = currentCaveman;
+  }
+
   const commitAnswer = await rl.question(
     `    Commit style? (conventional/angular/custom) [${config.project.commit_style}]: `
   );
@@ -506,8 +523,8 @@ function confidenceRank(c: "high" | "medium" | "low"): number {
   return c === "high" ? 3 : c === "medium" ? 2 : 1;
 }
 
-async function setupAgentsFile(root: string): Promise<void> {
-  await upsertAgentsFile(root, PACKAGE_ROOT, "created");
+async function setupAgentsFile(root: string, caveman: CavemanLevel): Promise<void> {
+  await upsertAgentsFile(root, PACKAGE_ROOT, "created", caveman);
 }
 
 async function generateAgentFiles(root: string, agents: string[]): Promise<void> {

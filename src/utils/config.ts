@@ -10,12 +10,15 @@ export interface ToolConfig {
   prompt?: string;
 }
 
+export type CavemanLevel = "none" | "lite" | "full" | "ultra";
+
 export interface ProjectConfig {
   language?: string;
   package_manager?: string;
   commit_style: string;
   doc_tool?: string;
   comment_style?: string;
+  caveman?: CavemanLevel;
 }
 
 export interface LlmAgentConfig {
@@ -103,6 +106,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     ),
     doc_tool: str(projectRaw.doc_tool ?? raw.doc_tool),
     comment_style: str(projectRaw.comment_style ?? raw.comment_style),
+    caveman: str(projectRaw.caveman) as ProjectConfig["caveman"],
   };
 }
 

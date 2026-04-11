@@ -2,6 +2,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import { fileExists } from "../utils/fs.js";
+import { loadConfig } from "../utils/config.js";
 import { upsertAgentsFile, installSkillFiles, SKILL_NAMES } from "./shared-setup.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -37,7 +38,9 @@ export async function updateProject(
 }
 
 async function updateAgentsFile(root: string): Promise<void> {
-  await upsertAgentsFile(root, PACKAGE_ROOT, "updated");
+  const config = await loadConfig(root);
+  const caveman = config.project.caveman ?? "none";
+  await upsertAgentsFile(root, PACKAGE_ROOT, "updated", caveman);
 }
 
 async function updateSkills(root: string): Promise<void> {
