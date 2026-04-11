@@ -1,6 +1,6 @@
 # Grimoire
 
-**BDD-powered AI coding assistant.** Everything you need to maintain solid, well-tested code when building with LLMs.
+**Spec-driven AI development framework.** Encodes decades of software engineering discipline — requirements, design review, TDD, change management, traceability — into AI coding workflows so they can't be skipped.
 
 ```
 Your request → Gherkin spec → Implementation plan → Red-green BDD → Verified, auditable code
@@ -11,7 +11,7 @@ Your request → Gherkin spec → Implementation plan → Red-green BDD → Veri
 
 ## Why Grimoire
 
-AI coding agents are powerful but undisciplined. Without structure, they hallucinate APIs, break existing features, write tests that prove nothing, and produce codebases nobody understands. The bigger the codebase, the worse it gets.
+The software industry spent decades learning hard lessons about building reliable systems. AI coding agents have abandoned most of these practices, hoping LLMs will magically produce correct code without discipline. They don't — AI-generated code has [1.7x more bugs](RESEARCH.md), [76% of LLM refactoring suggestions are hallucinations](RESEARCH.md), and developers using AI are [19% slower while believing they're faster](RESEARCH.md).
 
 Grimoire adds the missing discipline:
 
@@ -30,7 +30,8 @@ Works with **any AI coding agent** that reads AGENTS.md: Claude Code, Cursor, Co
 npm install -g @kiwi-data/grimoire
 ```
 
-### Install from source
+<details>
+<summary>Install from source</summary>
 
 Requires Node.js 20+ and git.
 
@@ -56,6 +57,8 @@ grimoire update       # refreshes AGENTS.md + skills to latest
 
 To unlink: `npm unlink -g @kiwi-data/grimoire`
 
+</details>
+
 ## Quick Start
 
 ```bash
@@ -63,58 +66,6 @@ cd my-project
 grimoire init          # Auto-detect tools, configure checks, install skills
 grimoire map --symbols # Scan codebase + extract function signatures
 ```
-
-### What `grimoire init` does
-
-Interactive setup that auto-detects your project's tools and asks preferences for commit style, doc generator, AI agents, security tools, and compliance frameworks (OWASP, PCI-DSS, HIPAA, SOC2, GDPR, ISO 27001). Creates:
-
-- `AGENTS.md` — workflow instructions read by AI coding assistants
-- `.grimoire/config.yaml` — tool configuration and check pipeline
-- `.grimoire/` — decisions, docs, change tracking, archive directories
-- `features/` — where Gherkin specs live
-- `.claude/skills/` — Claude Code skill definitions (ignored by other agents)
-- `.git/hooks/pre-commit` — runs `grimoire check` before commits
-
-### Skipping detection with `--no-detect`
-
-```bash
-grimoire init --no-detect
-```
-
-Skips the interactive tool-detection prompts and writes a minimal config with `commit_style: conventional`, an empty `tools: {}` block, and LLM agents defaulting to `claude`. All check steps are registered. Most unconfigured steps are skipped, but **security, dep_audit, secrets, and best_practices have built-in LLM fallbacks** that run automatically even without explicit tool configuration — every project gets baseline security scanning out of the box.
-
-What you'd configure manually in `.grimoire/config.yaml` under `tools:`:
-
-| Check step | What it does | Example tools |
-|---|---|---|
-| `lint` | Static analysis / linter | eslint, biome, ruff, flake8 |
-| `format` | Code formatting | prettier, biome, black, ruff format |
-| `unit_test` | Unit test runner | vitest, jest, pytest, go test |
-| `bdd_test` | BDD / feature test runner | cucumber-js, behave, pytest-bdd |
-| `duplicates` | Copy-paste detection | jscpd |
-| `complexity` | Cyclomatic complexity | radon, eslint-complexity |
-| `dead_code` | Unused code detection | knip, ts-prune, vulture |
-| `security` | Security scanner | bandit, semgrep, npm audit, or `name: llm` |
-| `dep_audit` | Dependency vulnerability audit | npm audit, pip-audit, safety |
-| `secrets` | Hardcoded secret detection | gitleaks, detect-secrets, trufflehog, or `name: llm` |
-| `best_practices` | General code review | `name: llm` (LLM-powered) |
-
-Example tool entry:
-
-```yaml
-tools:
-  lint:
-    name: eslint
-    command: npx eslint .
-  unit_test:
-    name: pytest
-    command: pytest
-  security:
-    name: llm
-    prompt: "Review these changed files for security vulnerabilities"
-```
-
-Any tool can use `name: llm` with a `prompt:` to get an LLM-powered review instead of a CLI tool. The interactive `grimoire init` (without `--no-detect`) sets up LLM fallbacks automatically for security, dep_audit, secrets, dead_code, and best_practices.
 
 Then talk to your AI assistant:
 
@@ -129,6 +80,22 @@ You: "Users should be able to log in with 2FA"
 → grimoire archive    Syncs to baseline, archives manifest
 → grimoire pr         Generates PR description from artifacts
 ```
+
+<details>
+<summary>What <code>grimoire init</code> creates</summary>
+
+Interactive setup that auto-detects your project's tools and asks preferences for commit style, doc generator, AI agents, security tools, and compliance frameworks (OWASP, PCI-DSS, HIPAA, SOC2, GDPR, ISO 27001). Creates:
+
+- `AGENTS.md` — workflow instructions read by AI coding assistants
+- `.grimoire/config.yaml` — tool configuration and check pipeline
+- `.grimoire/` — decisions, docs, change tracking, archive directories
+- `features/` — where Gherkin specs live
+- `.claude/skills/` — Claude Code skill definitions (ignored by other agents)
+- `.git/hooks/pre-commit` — runs `grimoire check` before commits
+
+Use `grimoire init --no-detect` to skip interactive tool detection. Most unconfigured steps are skipped, but **security, dep_audit, secrets, and best_practices have built-in LLM fallbacks** that run automatically — every project gets baseline security scanning out of the box.
+
+</details>
 
 ## Workflow
 
@@ -190,235 +157,9 @@ For each task:
 
 `grimoire archive` syncs features to baseline, accepts decisions, updates data schema, and archives the manifest.
 
-## Features
-
-### Codebase Intelligence
-
-```bash
-grimoire map --symbols      # Extract function signatures, classes, exports
-grimoire map --compress     # Also generate compressed .symbols.md
-```
-
-Extracts the API surface of your codebase — function signatures, class definitions, methods, exports, and constants across Python, TypeScript, JavaScript, Go, and Rust. No native dependencies.
-
-The symbol map feeds into area docs and the plan skill, giving the AI function-level knowledge of the codebase without reading every source file.
-
-#### Recommended: codebase-memory-mcp
-
-For richer codebase intelligence — call graphs, data flow tracing, dependency analysis, and cross-service queries — install [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp). It's a standalone MCP server that builds a knowledge graph of your codebase and integrates with Claude Code, Codex CLI, Zed, and other MCP-compatible agents.
-
-```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash
-
-# With graph visualization UI
-curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --ui
-```
-
-The installer auto-detects your coding agent and configures the MCP server. After installing, restart your agent and ask it to index the repository. Grimoire's `/grimoire:discover` skill will automatically use codebase-memory-mcp tools when available.
-
-### Area Docs
-
-`grimoire map` + `/grimoire:discover` generates docs in `.grimoire/docs/`:
-
-- Purpose and boundaries of each module
-- Key files with responsibilities
-- **Reusable code inventory** — exact function names, file paths, line numbers that MUST be reused
-- Naming conventions and structural patterns
-- Where new code of each type should go
-- Known duplicate code
-
-The plan and apply skills read these instead of exploring the raw codebase — dramatically reducing context usage and hallucinations.
-
-### Data Schema
-
-`.grimoire/docs/data/schema.yml` — your entire data layer in one file:
-
-```yaml
-users:
-  type: table
-  source: src/models/user.py:12
-  fields:
-    id: { type: integer, pk: true }
-    email: { type: varchar, unique: true, not_null: true }
-    role: { type: enum, values: [admin, member, guest] }
-
-stripe_payments:
-  type: external_api
-  schema_ref: https://stripe.com/docs/api/charges
-  client: src/integrations/stripe.py
-```
-
-Works for SQL tables, document collections, and external API contracts. The AI reads this instead of model files.
-
-### Human-Readable Docs
-
-`grimoire docs` generates `.grimoire/docs/OVERVIEW.md` — project summary, architecture, features, data model, decisions, recent changes, and active work in one browsable document.
-
-### Pre-Commit Pipeline
-
-```
-grimoire check
-
-  lint             ✓ passed   (0.8s)
-  format           ✓ passed   (0.3s)
-  duplicates       ✓ passed   (1.2s)
-  complexity       ✓ passed   (0.5s)
-  unit_test        ✓ passed   (3.4s)
-  bdd_test         ✓ passed   (2.1s)
-  security         ✓ passed   (12.1s)
-  dep_audit        ✓ passed   (1.0s)
-  secrets          ✓ passed   (0.4s)
-  best_practices   ✓ passed   (8.2s)
-
-  9 passed, 0 failed, 1 skipped
-```
-
-Tools are auto-detected during `grimoire init`. Supports linters, formatters, test frameworks, duplicate detection (jscpd), complexity analysis, security scanners, dependency auditing (npm audit, pip-audit, safety), secret detection (detect-secrets, gitleaks, trufflehog), and LLM-based reviews.
-
-`grimoire init` also sets up enforcement hooks for Claude Code (`.claude/hooks.json`) and git (`.git/hooks/pre-commit`).
-
-### Bug Workflow
-
-Grimoire provides a full bug lifecycle for teams with testers and developers:
-
-```
-Tester finds issue → /grimoire:bug-report → structured report with spec references
-                                                    ↓
-Developer picks it up → /grimoire:bug-triage → classify root cause
-                                                    ↓
-                          ┌─────────────┬───────────┼───────────────┐
-                          ↓             ↓           ↓               ↓
-                      CODE (small)  CODE (big)  INFRA/CONFIG     SECURITY
-                      /grimoire:bug  → draft    route to team    confidential fix
-                      (repro → fix   manifest   (create ticket)  (restricted workflow)
-                       → tester        stub)
-                       checklist)
-```
-
-**Bug reports** accept output from testing tools (Playwright, Cypress, Postman, k6) via MCP or pasted directly — auto-extracting failed assertions, screenshots, and reproduction steps. Reports capture frequency, regression status, workarounds, and affected user scope.
-
-**Triage** classifies issues into 8 categories — code, infrastructure, configuration, data, third-party, security, documentation, or not-a-bug — and routes to the right team. Security issues follow a restricted workflow with confidential handling. Large code issues that need architectural changes get a draft manifest stub for handoff to `/grimoire:draft`.
-
-**Bug fixes** (`/grimoire:bug`) follow reproduce-first discipline and generate a tester verification checklist after the fix — covering the original bug plus 3-5 related areas to check for regressions.
-
-**Exploratory testing** (`/grimoire:bug-explore`) operates in three modes:
-- **Tester mode** (default) — spec-only gap analysis, automation coverage mapping, negative scenarios, cross-feature risks. No code reading required.
-- **Developer mode** (`--deep`) — adds code-level analysis, anti-pattern detection, branch coverage.
-- **Onboard mode** (`--onboard`) — generates a tester's guide: feature areas ranked by risk, automation coverage per area, recent changes, open bugs, and where to start.
-
-**Testing sessions** (`/grimoire:bug-session`) provide guided exploratory testing with a charter (mission, scope, timebox, risk areas), progress tracking during the session, inline bug filing, and a structured debrief. This is the difference between "I poked around for an hour" and "I systematically explored auth for 45 minutes and here's what I found."
-
-`grimoire init` asks where bug reports live (Jira, Linear, GitHub Issues) and what testing tools your team uses, offering to install MCP servers for each:
-
-```yaml
-# .grimoire/config.yaml
-bug_trackers:
-  - name: jira
-    mcp:
-      name: atlassian
-      url: https://mcp.atlassian.com/v1/sse
-      transport: sse
-  - name: github
-    mcp:
-      name: github
-      command: npx
-      args: ["-y", "@modelcontextprotocol/server-github"]
-
-testing_tools:
-  - name: playwright
-    purpose: e2e
-    mcp:
-      name: playwright
-      command: npx
-      args: ["-y", "@playwright/mcp@latest"]
-  - name: k6
-    purpose: performance
-```
-
-### Test Quality
-
-```bash
-grimoire test-quality              # Analyze all test files
-grimoire test-quality tests/**     # Specific files
-```
-
-Static analysis that catches weak tests before they provide false confidence:
-
-- **Empty bodies** — `pass`, `...`, no-op functions that always pass
-- **Missing assertions** — test functions with no `assert`/`expect` calls
-- **Weak assertions** — `assert True`, `toBeDefined()`, `is not None`, `len() > 0`
-- **Tautological tests** — asserting a value equals itself
-
-Supports Python and JavaScript/TypeScript. Integrated into the apply skill (quality gate per task) and verify skill (test intelligence phase).
-
-### Project Health
-
-```
-grimoire health
-
-  features          100%  ██████████  12 scenarios in 5 files
-  decisions          89%  █████████░  8/9 current
-  area docs          75%  ████████░░  6/8 areas documented
-  data schema       100%  ██████████  4 models documented
-  test coverage      60%  ██████░░░░  3/5 features have step definitions
-  unit coverage      82%  █████████░  82% line coverage
-  duplicates           —              2 clones detected
-  complexity           —              no high-complexity functions
-
-  Overall            84%  █████████░
-```
-
-```bash
-grimoire health --badges README.md  # Write shields.io badges
-```
-
-### Audit Trail
-
-Every commit includes a `Change:` git trailer:
-
-```
-feat(auth): add TOTP verification
-
-Change: add-2fa-login
-Scenarios: "Login with valid TOTP code", "Login with expired TOTP code"
-```
-
-- **`grimoire trace src/auth.py:42`** — trace any line back through commits → changes → features → decisions
-- **`grimoire log`** — release notes from archived changes, filterable by date or git tag
-
-Branches follow `<type>/<change-id>`: `feat/add-2fa-login`, `fix/handle-null-pricing`.
-
-### Multi-LLM Support
-
-Grimoire works with any AI coding assistant that reads AGENTS.md:
-
-- **Claude Code** — full skill support via `.claude/skills/`, hooks via `.claude/hooks.json`
-- **OpenCode** — reads AGENTS.md natively; workflow instructions are picked up automatically
-- **Codex, Cursor, Windsurf, Cline, Aider, etc.** — read AGENTS.md for workflow instructions
-
-AGENTS.md is an [open standard](https://agents.md/) supported by 60K+ repos. Grimoire generates and manages the grimoire section within it.
-
-For non-Claude-Code agents, update the `llm:` section in `.grimoire/config.yaml` to match your agent:
-
-```yaml
-llm:
-  thinking:
-    command: opencode      # or codex, cursor, aider, etc.
-  coding:
-    command: opencode
-```
-
-You can also generate agent-specific instruction files during init:
-
-```bash
-grimoire init --agent cursor    # creates .cursor/rules/grimoire.mdc
-grimoire init --agent copilot   # creates .github/copilot-instructions.md
-```
-
 ## Walkthrough
 
-Here's a full grimoire cycle end-to-end — adding two-factor authentication to an existing login feature.
+Full grimoire cycle end-to-end — adding two-factor authentication to an existing login feature.
 
 <details>
 <summary>Expand walkthrough</summary>
@@ -573,9 +314,180 @@ The feature files move to `features/auth/login.feature` (baseline). The decision
 
 </details>
 
+## Scope & Boundaries
+
+Grimoire owns the **inner loop** — the Dev and Sec portions of DevSecOps. Ops is explicitly out of scope.
+
+### What Grimoire covers
+
+| Area | What it does | How |
+|---|---|---|
+| Requirements engineering | Gherkin specs as executable acceptance tests | Draft skill |
+| Architecture decisions | MADR records with cost-of-ownership | Draft skill |
+| Design review | Multi-persona review before code is written | Review skill |
+| Test-driven development | Strict red-green BDD enforcement | Apply skill |
+| Test quality | Static analysis for weak/empty/tautological tests | `grimoire test-quality`, verify skill |
+| Regression prevention | All existing tests must pass; regressions block completion | Apply + verify skills |
+| Change management | Manifests, task tracking, session resumption, archive | Full lifecycle |
+| Traceability | Every commit → change → feature → decision | `grimoire trace` |
+| Security review | STRIDE threat modeling, OWASP/CWE tagging at design time | Review + plan + verify skills |
+| Security tooling | SAST, SCA, secrets scanning in pre-commit pipeline | `grimoire check` |
+| Bug discipline | Reproduce-first fixes, structured triage, confidential security handling | Bug workflow skills |
+| Exploratory testing | Gap analysis, coverage mapping, charter-based sessions | Bug-explore + bug-session skills |
+| Tech debt tracking | Structured debt register with severity and formal exceptions | Refactor skill |
+| CI integration | Spec validation + checks + test quality with GHA annotations | `grimoire ci` |
+
+### What Grimoire does not cover
+
+**Ops is out of scope.** The outer loop — deploy, run, monitor, scale — requires infrastructure and environment management that a repo-local framework cannot own:
+
+- **Deployment automation** — CD pipelines, environment promotion, rollback, blue-green/canary deploys
+- **Integration and e2e testing** — need running services, realistic data, and production-like infrastructure
+- **Performance and load testing** — requires dedicated infrastructure and load generators
+- **Monitoring and observability** — APM, alerting, SLOs, incident response tooling
+- **Infrastructure as code** — Terraform, Pulumi, Kubernetes manifests
+- **Feature flags and progressive rollout**
+
+Grimoire captures environment context (`.grimoire/docs/context.yml`) so the AI understands deployment topology, and the review skill flags when changes need integration or performance testing. But orchestrating those tests is platform work, not framework work.
+
+### Security model
+
+Grimoire's security capabilities are **AI-mediated at design time**, not static analysis enforcement at build time. The review skill runs STRIDE threat modeling, the plan skill mandates proven security patterns (OAuth2, bcrypt, parameterized queries), and the verify skill checks that guidance was followed. The check pipeline runs SAST/SCA/secrets tools when configured.
+
+This means security coverage depends on: (1) configuring the right tools in your check pipeline, and (2) the AI following its own instructions. Projects that run `grimoire init` with detection get solid defaults. Projects that skip detection should configure `tools.security`, `tools.dep_audit`, and `tools.secrets` in `.grimoire/config.yaml`.
+
+Grimoire does not provide compliance framework enforcement (OWASP ASVS checklists, CWE mapping), SBOM generation, artifact signing, or DAST. These require dedicated security tooling.
+
+## Features
+
+### Codebase Intelligence
+
+```bash
+grimoire map --symbols      # Extract function signatures, classes, exports
+grimoire map --compress     # Also generate compressed .symbols.md
+```
+
+Extracts the API surface of your codebase — function signatures, class definitions, methods, exports, and constants across Python, TypeScript, JavaScript, Go, and Rust. No native dependencies. Feeds into area docs and the plan skill.
+
+For richer intelligence (call graphs, data flow tracing, dependency analysis), see [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp).
+
+### Area Docs & Data Schema
+
+`grimoire map` + `/grimoire:discover` generates docs in `.grimoire/docs/`:
+
+- Purpose and boundaries of each module
+- Key files with responsibilities
+- **Reusable code inventory** — exact function names, file paths, line numbers
+- Naming conventions, structural patterns, where new code goes
+
+`.grimoire/docs/data/schema.yml` captures your data layer — SQL tables, document collections, external API contracts — so the AI reads this instead of model files.
+
+`grimoire docs` generates a browsable `.grimoire/docs/OVERVIEW.md` project summary.
+
+### Pre-Commit Pipeline
+
+```
+grimoire check
+
+  lint             ✓ passed   (0.8s)
+  format           ✓ passed   (0.3s)
+  duplicates       ✓ passed   (1.2s)
+  complexity       ✓ passed   (0.5s)
+  unit_test        ✓ passed   (3.4s)
+  bdd_test         ✓ passed   (2.1s)
+  security         ✓ passed   (12.1s)
+  dep_audit        ✓ passed   (1.0s)
+  secrets          ✓ passed   (0.4s)
+  best_practices   ✓ passed   (8.2s)
+
+  9 passed, 0 failed, 1 skipped
+```
+
+Auto-detected during `grimoire init`. Any tool can use `name: llm` with a `prompt:` for AI-powered review. Also sets up enforcement hooks for Claude Code (`.claude/hooks.json`) and git (`.git/hooks/pre-commit`).
+
+### Test Quality
+
+```bash
+grimoire test-quality              # Analyze all test files
+grimoire test-quality tests/**     # Specific files
+```
+
+Static analysis catching weak tests: empty bodies, missing assertions, weak assertions (`assert True`, `toBeDefined()`), tautological tests. Supports Python and JS/TS. Integrated into apply (per-task gate) and verify (test intelligence).
+
+### Bug Workflow
+
+<details>
+<summary>Full bug lifecycle for teams with testers and developers</summary>
+
+```
+Tester finds issue → /grimoire:bug-report → structured report with spec references
+                                                    ↓
+Developer picks it up → /grimoire:bug-triage → classify root cause
+                                                    ↓
+                          ┌─────────────┬───────────┼───────────────┐
+                          ↓             ↓           ↓               ↓
+                      CODE (small)  CODE (big)  INFRA/CONFIG     SECURITY
+                      /grimoire:bug  → draft    route to team    confidential fix
+                      (repro → fix   manifest   (create ticket)  (restricted workflow)
+                       → tester        stub)
+                       checklist)
+```
+
+**Bug reports** accept output from testing tools (Playwright, Cypress, Postman, k6) via MCP or pasted directly — auto-extracting failed assertions, screenshots, and reproduction steps.
+
+**Triage** classifies into 8 categories (code, infrastructure, configuration, data, third-party, security, documentation, not-a-bug) and routes to the right team. Security issues follow a restricted workflow with confidential handling.
+
+**Bug fixes** (`/grimoire:bug`) follow reproduce-first discipline and generate a tester verification checklist.
+
+**Exploratory testing** (`/grimoire:bug-explore`) operates in tester mode (spec-only gap analysis), developer mode (code-level analysis), and onboard mode (tester's guide).
+
+**Testing sessions** (`/grimoire:bug-session`) provide charter-based exploratory testing with progress tracking, inline bug filing, and structured debrief.
+
+</details>
+
+### Audit Trail
+
+Every commit includes a `Change:` git trailer linking code → commit → change → feature → decision.
+
+```bash
+grimoire trace src/auth.py:42   # What requirement introduced this line?
+grimoire log --from v1.0        # Release notes from archived changes
+```
+
+### Project Health
+
+```
+grimoire health
+
+  features          100%  ██████████  12 scenarios in 5 files
+  decisions          89%  █████████░  8/9 current
+  area docs          75%  ████████░░  6/8 areas documented
+  data schema       100%  ██████████  4 models documented
+  test coverage      60%  ██████░░░░  3/5 features have step definitions
+  unit coverage      82%  █████████░  82% line coverage
+  duplicates           —              2 clones detected
+  complexity           —              no high-complexity functions
+
+  Overall            84%  █████████░
+```
+
+### Multi-LLM Support
+
+Grimoire works with any AI coding assistant that reads [AGENTS.md](https://agents.md/) (open standard, 60K+ repos):
+
+- **Claude Code** — full skill support via `.claude/skills/`, hooks via `.claude/hooks.json`
+- **OpenCode** — reads AGENTS.md natively
+- **Codex, Cursor, Windsurf, Cline, Aider, etc.** — read AGENTS.md for workflow instructions
+
+```bash
+grimoire init --agent cursor    # creates .cursor/rules/grimoire.mdc
+grimoire init --agent copilot   # creates .github/copilot-instructions.md
+```
+
 ## Reference
 
-### Skills
+<details>
+<summary>Skills</summary>
 
 | Skill | Purpose |
 |-------|---------|
@@ -587,15 +499,19 @@ The feature files move to `features/auth/login.feature` (baseline). The decision
 | `/grimoire:audit` | Discover undocumented features and decisions |
 | `/grimoire:remove` | Tracked feature removal with impact assessment |
 | `/grimoire:discover` | Generate area docs and data schema from codebase |
+| `/grimoire:refactor` | Find, prioritize, and track tech debt |
 | `/grimoire:bug` | Disciplined bug fix with reproduction test first |
-| `/grimoire:bug-report` | Structured bug reporting for testers (accepts test tool output) |
-| `/grimoire:bug-triage` | Classify, route, and respond to bug reports (code/infra/config/data/security) |
-| `/grimoire:bug-explore` | AI-guided exploratory testing — gap analysis, automation coverage, tester/dev modes, onboarding |
-| `/grimoire:bug-session` | Guided exploratory testing sessions — charter, progress tracking, timebox, debrief |
+| `/grimoire:bug-report` | Structured bug reporting (accepts test tool output) |
+| `/grimoire:bug-triage` | Classify and route bug reports |
+| `/grimoire:bug-explore` | AI-guided exploratory testing and gap analysis |
+| `/grimoire:bug-session` | Charter-based exploratory testing sessions |
 | `/grimoire:commit` | Contextual commit messages with change trailers |
 | `/grimoire:pr` | Generate PR description + optional diff review |
 
-### CLI
+</details>
+
+<details>
+<summary>CLI commands</summary>
 
 | Command | Description |
 |---------|-------------|
@@ -613,6 +529,7 @@ The feature files move to `features/auth/login.feature` (baseline). The decision
 | `grimoire map --duplicates` | Run jscpd duplicate detection |
 | `grimoire map --refresh` | Diff against existing docs, show gaps |
 | `grimoire check [steps...]` | Run pre-commit pipeline |
+| `grimoire ci [--setup]` | Run CI pipeline / generate GitHub Actions workflow |
 | `grimoire pr [id]` | Generate PR description from change artifacts |
 | `grimoire pr --create` | Create PR via gh/glab |
 | `grimoire pr --review` | Run post-implementation LLM review of diff |
@@ -624,9 +541,26 @@ The feature files move to `features/auth/login.feature` (baseline). The decision
 
 Most commands support `--json` for machine-readable output.
 
-### Configuration
+</details>
 
-`grimoire init` generates `.grimoire/config.yaml` with auto-detected tools.
+<details>
+<summary>Check pipeline tools</summary>
+
+| Check step | What it does | Example tools |
+|---|---|---|
+| `lint` | Static analysis / linter | eslint, biome, ruff, flake8 |
+| `format` | Code formatting | prettier, biome, black, ruff format |
+| `unit_test` | Unit test runner | vitest, jest, pytest, go test |
+| `bdd_test` | BDD / feature test runner | cucumber-js, behave, pytest-bdd |
+| `duplicates` | Copy-paste detection | jscpd |
+| `complexity` | Cyclomatic complexity | radon, eslint-complexity |
+| `dead_code` | Unused code detection | knip, ts-prune, vulture |
+| `security` | Security scanner | bandit, semgrep, npm audit, or `name: llm` |
+| `dep_audit` | Dependency vulnerability audit | npm audit, pip-audit, safety |
+| `secrets` | Hardcoded secret detection | gitleaks, detect-secrets, trufflehog, or `name: llm` |
+| `best_practices` | General code review | `name: llm` (LLM-powered) |
+
+</details>
 
 <details>
 <summary>Full config schema</summary>
@@ -661,42 +595,18 @@ tools:
   lint:
     name: eslint
     command: npx eslint .
-
   format:
     name: prettier
-    check_command: npx prettier --check .  # check_command overrides command in the pipeline
-
+    check_command: npx prettier --check .
   unit_test:
     name: vitest
     command: npx vitest run
-
   bdd_test:
     name: cucumber-js
     command: npx cucumber-js
-
-  complexity:
-    name: eslint-complexity
-    command: "npx eslint --rule 'complexity: [warn, 10]' ."
-
-  duplicates:
-    name: jscpd
-    command: npx jscpd --reporters console
-
   security:
-    name: bandit                 # Or: semgrep, npm audit, or LLM fallback
-    command: bandit -r .
-
-  dep_audit:
-    name: npm audit
-    check_command: npm audit --audit-level=high
-
-  secrets:
-    name: gitleaks
-    check_command: gitleaks detect --no-git
-
-  best_practices:
-    name: llm                    # LLM-based — use name: llm + prompt
-    prompt: "Review these changed files for best practices violations"
+    name: llm
+    prompt: "Review these changed files for security vulnerabilities"
 
 # Check pipeline — ordered list of steps (must match keys in tools)
 checks:
@@ -711,47 +621,29 @@ checks:
   - secrets
   - best_practices
 
-# Bug tracking — where bug reports are filed (supports multiple)
+# Bug tracking and testing tools
 bug_trackers:
-  - name: jira                     # jira, linear, github, or custom
-    mcp:                           # Optional MCP server for ticket integration
+  - name: jira
+    mcp:
       name: atlassian
       url: https://mcp.atlassian.com/v1/sse
       transport: sse
 
-# Testing tools — what testers use (supports multiple with different purposes)
 testing_tools:
   - name: playwright
-    purpose: e2e                   # e2e, integration, performance, api, general
-    mcp:                           # Optional MCP server for pulling test results
+    purpose: e2e
+    mcp:
       name: playwright
       command: npx
       args: ["-y", "@playwright/mcp@latest"]
-  - name: k6
-    purpose: performance
 ```
 
 </details>
 
-## Problems Grimoire Solves
-
-Based on [industry research](RESEARCH.md) into the most common issues with AI coding agents:
-
-| # | Problem | How Grimoire Addresses It | Rating |
-|---|---------|--------------------------|--------|
-| 1 | **Context window limits** | Area docs + data schema + symbol maps replace raw codebase exploration. Subagent-per-task prevents context bloat. | Partial |
-| 2 | **Hallucinations** | Area docs ground the AI in real file paths and function signatures. Verify + check catch consequences. | Partial |
-| 3 | **Regressions** | Red-green BDD, verify step, check pipeline, feature branches. Existing tests must keep passing. | **Strong** |
-| 4 | **Fix loops** | Max 3 attempts per task with different approaches. After 3 failures, stop and ask the user. | Partial |
-| 5 | **Style drift** | Area docs document conventions. Plan references real patterns. Check pipeline enforces linting/formatting. | **Strong** |
-| 6 | **Poor codebase navigation** | `grimoire map --symbols` + `/grimoire:discover` gives the AI a structural map without reading every file. | **Strong** |
-| 7 | **Security & quality gaps** | Built-in LLM security checks (OWASP/CWE-tagged), STRIDE threat modeling in review, compliance framework support, security tags on features, verification that security guidance was followed. | **Strong** |
-| 8 | **Productivity paradox** | Structured workflow (spec → plan → apply) reduces time spent correcting AI output. | Indirect |
-| 9 | **Non-determinism** | Specs define success criteria. If the output passes verify + check, it meets the spec regardless of how it got there. | Partial |
-| 10 | **Developer experience** | Out of scope (tool-level, not workflow-level). | — |
-| 11 | **Vibe coding debt** | Every piece of code traces to a spec, a plan, and a decision. Code nobody understands is structurally impossible. | **Strong** |
-
 ## Contributing
+
+<details>
+<summary>Development setup and project structure</summary>
 
 ### Development Setup
 
@@ -761,6 +653,8 @@ cd grimoire
 npm install
 npm run build        # Compile TypeScript
 npm run dev          # Watch mode
+npm test             # vitest
+npm run lint         # eslint
 ```
 
 ### Project Structure
@@ -771,18 +665,7 @@ grimoire/
 │   ├── cli/index.ts            # CLI entry point
 │   ├── commands/               # Command definitions (thin — delegate to core/)
 │   ├── core/                   # Business logic
-│   │   ├── init.ts             # Project initialization + tool detection
-│   │   ├── detect.ts           # Auto-detection of linters, formatters, test frameworks
-│   │   ├── map.ts              # Codebase scanning + snapshot generation
-│   │   ├── symbols.ts          # Symbol extraction (functions, classes, exports)
-│   │   ├── check.ts            # Pre-commit pipeline runner
-│   │   ├── pr.ts               # PR description generation
-│   │   ├── test-quality.ts     # Test quality static analysis
-│   │   ├── hooks.ts            # Claude Code + git hook generation
-│   │   └── ...
-│   └── utils/
-│       ├── config.ts           # Config types + loader
-│       └── paths.ts            # Project root detection
+│   └── utils/                  # Config, path resolution, helpers
 ├── skills/                     # Claude Code skill definitions (SKILL.md per skill)
 ├── templates/                  # Files copied during grimoire init
 ├── AGENTS.md                   # Universal LLM instructions (installed into projects)
@@ -795,7 +678,7 @@ grimoire/
 2. Add `"grimoire-<name>"` to the `skillNames` array in both `src/core/init.ts` and `src/core/update.ts`
 3. Build and test: `npm run build && node bin/grimoire.js update .`
 
-Skills are pure markdown — instructions for the AI, not executable code. Keep them specific enough that any LLM can execute without ambiguity.
+Skills are pure markdown — instructions for the AI, not executable code.
 
 ### Adding a New CLI Command
 
@@ -809,13 +692,7 @@ Skills are pure markdown — instructions for the AI, not executable code. Keep 
 2. Add it to the `checks` array in `detectTools`
 3. Add the category to `CATEGORY_LABELS` and `CATEGORY_ORDER` in `src/core/init.ts`
 
-### Running Tests
-
-```bash
-npm test             # vitest
-npm run lint         # eslint
-npm run build        # type-check via tsc
-```
+</details>
 
 ## Philosophy
 
