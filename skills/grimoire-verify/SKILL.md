@@ -1,3 +1,12 @@
+---
+name: grimoire-verify
+description: Verify that implementation matches feature specs and decision records. Use after apply is complete, before archiving the change.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-verify
 
 Verify that implementation matches the feature specs and decision records. Run after apply, before archive.

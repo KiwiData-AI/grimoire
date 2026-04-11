@@ -1,3 +1,12 @@
+---
+name: grimoire-audit
+description: Audit an existing codebase to discover undocumented features and architecture decisions. Use when onboarding an existing project to grimoire.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-audit
 
 Audit an existing codebase to discover undocumented features and architecture decisions. Interview the user to collaboratively build out the grimoire baseline.

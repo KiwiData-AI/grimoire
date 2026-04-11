@@ -1,3 +1,12 @@
+---
+name: grimoire-pr
+description: Generate a pull request description from grimoire change artifacts with optional post-implementation LLM review. Use when the user is ready to create a PR.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-pr
 
 Generate a pull request description from grimoire change artifacts and optionally run a post-implementation review.

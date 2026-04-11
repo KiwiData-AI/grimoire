@@ -1,3 +1,12 @@
+---
+name: grimoire-discover
+description: Generate area docs and data schema from a codebase snapshot. Use when initializing grimoire on an existing project or when codebase structure has changed significantly.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-discover
 
 Generate a structured project map in `.grimoire/docs/` from a codebase snapshot. This map helps LLMs understand the codebase layout, find reusable code, and follow existing patterns — preventing duplicate code and misplaced files.

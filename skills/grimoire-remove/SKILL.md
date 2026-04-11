@@ -1,3 +1,12 @@
+---
+name: grimoire-remove
+description: Remove a feature or deprecate a decision through a tracked, deliberate change. Use when the user wants to decommission functionality with full impact assessment.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-remove
 
 Remove a feature or deprecate a decision through a tracked, deliberate change.

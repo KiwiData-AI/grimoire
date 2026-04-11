@@ -1,3 +1,12 @@
+---
+name: grimoire-apply
+description: Implement tasks from a planned grimoire change with strict red-green BDD. Use when tasks.md exists and is ready for implementation.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-apply
 
 Implement tasks from a planned grimoire change. Write production code AND tests. A task is not complete until its scenarios pass.

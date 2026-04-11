@@ -1,3 +1,12 @@
+---
+name: grimoire-draft
+description: Draft or update Gherkin features and MADR architecture decisions collaboratively with the user. Use when the user describes new functionality, requirements, or architecture choices.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-draft
 
 Draft or update Gherkin features and MADR architecture decisions collaboratively with the user.

@@ -1,3 +1,12 @@
+---
+name: grimoire-bug
+description: Disciplined bug fix workflow with reproduction-first methodology. Use when the user reports a bug or defect that needs fixing.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-bug
 
 Disciplined bug fix workflow: reproduce first, then fix. Every bug gets a failing test before any code changes.

@@ -1,3 +1,12 @@
+---
+name: grimoire-review
+description: Multi-perspective design review before coding begins. Expert personas validate the change for completeness, feasibility, security, and data integrity. Use after draft/plan, before apply.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-review
 
 Multi-perspective LLM review of a completed design before coding begins. Expert personas validate the change for completeness, feasibility, security, and data integrity.

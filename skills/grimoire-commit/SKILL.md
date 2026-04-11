@@ -1,3 +1,12 @@
+---
+name: grimoire-commit
+description: Write a contextual commit message from staged changes and active grimoire change context. Use when the user asks to commit or after completing a task.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-commit
 
 Write a commit message from staged changes and active grimoire context. Never auto-commit — always present for approval.

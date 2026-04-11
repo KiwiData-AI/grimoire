@@ -1,3 +1,12 @@
+---
+name: grimoire-refactor
+description: Systematically find, prioritize, and plan tech debt reduction. Use when the user wants to identify and address code quality issues, complexity, or duplication.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-refactor
 
 Systematically find, prioritize, and plan tech debt reduction. Combines automated scanning with LLM analysis to produce a prioritized debt register, then feeds approved items into the standard grimoire pipeline (draft → plan → apply).

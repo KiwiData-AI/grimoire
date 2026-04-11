@@ -30,6 +30,32 @@ Works with **any AI coding agent** that reads AGENTS.md: Claude Code, Cursor, Co
 npm install -g @kiwi-data/grimoire
 ```
 
+### Install from source
+
+Requires Node.js 20+ and git.
+
+```bash
+git clone https://github.com/kiwi-data/grimoire.git
+cd grimoire
+npm install
+npm run build
+npm link              # makes `grimoire` available globally
+grimoire --version    # should print 0.1.0
+```
+
+To update after pulling new changes:
+
+```bash
+cd /path/to/grimoire
+git pull
+npm run build
+
+cd /path/to/your-project
+grimoire update       # refreshes AGENTS.md + skills to latest
+```
+
+To unlink: `npm unlink -g @kiwi-data/grimoire`
+
 ## Quick Start
 
 ```bash
@@ -37,6 +63,58 @@ cd my-project
 grimoire init          # Auto-detect tools, configure checks, install skills
 grimoire map --symbols # Scan codebase + extract function signatures
 ```
+
+### What `grimoire init` does
+
+Interactive setup that auto-detects your project's tools and asks preferences for commit style, doc generator, AI agents, and security tools. Creates:
+
+- `AGENTS.md` — workflow instructions read by AI coding assistants
+- `.grimoire/config.yaml` — tool configuration and check pipeline
+- `.grimoire/` — decisions, docs, change tracking, archive directories
+- `features/` — where Gherkin specs live
+- `.claude/skills/` — Claude Code skill definitions (ignored by other agents)
+- `.git/hooks/pre-commit` — runs `grimoire check` before commits
+
+### Skipping detection with `--no-detect`
+
+```bash
+grimoire init --no-detect
+```
+
+Skips the interactive tool-detection prompts and writes a minimal config with `commit_style: conventional`, an empty `tools: {}` block, and LLM agents defaulting to `claude`. All 11 check steps are registered but **none have tool commands configured** — when you run `grimoire check`, unconfigured steps are skipped (not errored), so it's safe to start this way and fill in tools as you go.
+
+What you'd configure manually in `.grimoire/config.yaml` under `tools:`:
+
+| Check step | What it does | Example tools |
+|---|---|---|
+| `lint` | Static analysis / linter | eslint, biome, ruff, flake8 |
+| `format` | Code formatting | prettier, biome, black, ruff format |
+| `unit_test` | Unit test runner | vitest, jest, pytest, go test |
+| `bdd_test` | BDD / feature test runner | cucumber-js, behave, pytest-bdd |
+| `duplicates` | Copy-paste detection | jscpd |
+| `complexity` | Cyclomatic complexity | radon, eslint-complexity |
+| `dead_code` | Unused code detection | knip, ts-prune, vulture |
+| `security` | Security scanner | bandit, semgrep, npm audit, or `name: llm` |
+| `dep_audit` | Dependency vulnerability audit | npm audit, pip-audit, safety |
+| `secrets` | Hardcoded secret detection | gitleaks, detect-secrets, trufflehog, or `name: llm` |
+| `best_practices` | General code review | `name: llm` (LLM-powered) |
+
+Example tool entry:
+
+```yaml
+tools:
+  lint:
+    name: eslint
+    command: npx eslint .
+  unit_test:
+    name: pytest
+    command: pytest
+  security:
+    name: llm
+    prompt: "Review these changed files for security vulnerabilities"
+```
+
+Any tool can use `name: llm` with a `prompt:` to get an LLM-powered review instead of a CLI tool. The interactive `grimoire init` (without `--no-detect`) sets up LLM fallbacks automatically for security, dep_audit, secrets, dead_code, and best_practices.
 
 Then talk to your AI assistant:
 
@@ -121,6 +199,20 @@ grimoire map --compress     # Also generate compressed .symbols.md
 Extracts the API surface of your codebase — function signatures, class definitions, methods, exports, and constants across Python, TypeScript, JavaScript, Go, and Rust. No native dependencies.
 
 The symbol map feeds into area docs and the plan skill, giving the AI function-level knowledge of the codebase without reading every source file.
+
+#### Recommended: codebase-memory-mcp
+
+For richer codebase intelligence — call graphs, data flow tracing, dependency analysis, and cross-service queries — install [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp). It's a standalone MCP server that builds a knowledge graph of your codebase and integrates with Claude Code, Codex CLI, Zed, and other MCP-compatible agents.
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash
+
+# With graph visualization UI
+curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --ui
+```
+
+The installer auto-detects your coding agent and configures the MCP server. After installing, restart your agent and ask it to index the repository. Grimoire's `/grimoire:discover` skill will automatically use codebase-memory-mcp tools when available.
 
 ### Area Docs
 
@@ -241,9 +333,27 @@ Branches follow `<type>/<change-id>`: `feat/add-2fa-login`, `fix/handle-null-pri
 Grimoire works with any AI coding assistant that reads AGENTS.md:
 
 - **Claude Code** — full skill support via `.claude/skills/`, hooks via `.claude/hooks.json`
+- **OpenCode** — reads AGENTS.md natively; workflow instructions are picked up automatically
 - **Codex, Cursor, Windsurf, Cline, Aider, etc.** — read AGENTS.md for workflow instructions
 
 AGENTS.md is an [open standard](https://agents.md/) supported by 60K+ repos. Grimoire generates and manages the grimoire section within it.
+
+For non-Claude-Code agents, update the `llm:` section in `.grimoire/config.yaml` to match your agent:
+
+```yaml
+llm:
+  thinking:
+    command: opencode      # or codex, cursor, aider, etc.
+  coding:
+    command: opencode
+```
+
+You can also generate agent-specific instruction files during init:
+
+```bash
+grimoire init --agent cursor    # creates .cursor/rules/grimoire.mdc
+grimoire init --agent copilot   # creates .github/copilot-instructions.md
+```
 
 ## Walkthrough
 

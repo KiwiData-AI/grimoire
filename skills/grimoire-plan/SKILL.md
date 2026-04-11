@@ -1,3 +1,12 @@
+---
+name: grimoire-plan
+description: Derive implementation tasks from approved Gherkin features and MADR decisions. Use when features are approved and ready for task breakdown.
+compatibility: Designed for Claude Code (or similar products)
+metadata:
+  author: kiwi-data
+  version: "0.1"
+---
+
 # grimoire-plan
 
 Derive implementation tasks from approved Gherkin features and MADR decisions. The output must be detailed enough that any LLM can execute the tasks without further planning.
