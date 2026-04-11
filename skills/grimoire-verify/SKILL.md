@@ -90,6 +90,10 @@ For each step definition:
    - Test creates a mock and then asserts against the mock's return value (circular) → CRITICAL
    - Try/except that swallows assertion errors → CRITICAL
    - Step definition has no `assert`/`expect` at all → CRITICAL (for Then steps)
+   - Test mocks the client wrapper instead of the HTTP boundary → WARNING (tests wiring, not contract compliance)
+   - Test mocks internal code that lives in the same repo → WARNING (hides integration bugs)
+   - Contract test uses a fixture that doesn't match `schema.yml` → CRITICAL (fictional contract)
+   - Test mocks so aggressively that removing production code still passes → CRITICAL
 
 4. **Report format:** Include test quality findings alongside correctness findings:
    ```
@@ -164,7 +168,43 @@ A security-tagged scenario with no corresponding security verification in the te
 
 If no security tags exist and the change has no security-relevant surface, state so briefly and move on.
 
-### 5. Dead Feature Detection
+### 5. Contract Test Coverage
+
+Verify that every external API integration has contract tests that match the documented contract.
+
+**A. Inventory external APIs:**
+
+Read `.grimoire/docs/data/schema.yml` and list every entry with `type: external_api`. For each:
+
+1. **Contract documented?** Check that the entry has `endpoints` with `request`, `response`, and `error_response` shapes. Missing contract documentation → WARNING (the contract is implicit and untested)
+
+2. **Contract test exists?** Search the test suite for tests that validate the client against the documented response shape. Look for:
+   - Tests that assert specific response fields match expected types/values
+   - Tests that use fixture/recorded responses matching the `schema.yml` shape
+   - Tests that verify error handling matches the documented `error_response`
+   - Missing contract test for a documented API → CRITICAL
+
+3. **Contract test matches schema?** Compare the fixture/recorded response used in tests against the `schema.yml` contract:
+   - Fixture has fields not in `schema.yml` → WARNING (undocumented dependency)
+   - `schema.yml` has `required: true` fields not asserted in tests → WARNING (untested contract guarantee)
+   - Client reads fields not in `schema.yml` → CRITICAL (invisible contract dependency)
+
+4. **Contract drift?** If this is a change verification (not baseline), compare `data.yml` against `schema.yml`:
+   - Any field changes on external APIs without corresponding test updates → CRITICAL
+   - New endpoints without contract tests → CRITICAL
+
+**Report format:**
+```markdown
+## Contract Coverage
+- [x] `stripe_api` — 3 endpoints, all with contract tests in `tests/integrations/test_stripe.py`
+- [ ] **[critical]** `github_api.get_user` — no contract test found for response shape
+- [ ] **[warning]** `sendgrid_api` — contract documented but `error_response` shape missing
+- [ ] **[critical]** `payments_api` — client reads `transaction.metadata.source` not in schema.yml (undocumented field dependency)
+```
+
+If no external APIs exist in `schema.yml`, skip this section.
+
+### 6. Dead Feature Detection
 Check for features that exist in specs but may no longer be implemented:
 - Feature files with no corresponding step definitions anywhere
 - Step definitions that import modules/functions that no longer exist

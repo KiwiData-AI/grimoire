@@ -143,10 +143,24 @@ github_api:
     get_user:
       method: GET
       path: /users/{username}
-      response:
-        login: { type: string }
-        avatar_url: { type: string }
+      request:                       # document what you send
+        headers:
+          Authorization: "Bearer {token}"
+      response:                      # document what you expect back
+        login: { type: string, required: true }
+        avatar_url: { type: string, required: true }
+        name: { type: string, nullable: true }
+      error_response:                # document known error shapes
+        message: { type: string }
+        status: { type: integer }
 ```
+
+**Contract documentation is mandatory for external APIs.** Every endpoint entry must include:
+- **`request`**: headers, query params, or body fields your client sends
+- **`response`**: fields your client reads, with types and `required: true` for fields your code depends on
+- **`error_response`**: the error shape your client handles
+
+This is the contract. Downstream skills (plan, review, verify) use it to generate contract tests and detect breaking changes. If you don't know the exact shape, reference the `schema_ref` and document what your client actually uses — that subset is the contract.
 
 - If the change has no data impact, skip `data.yml` entirely — don't create an empty one
 

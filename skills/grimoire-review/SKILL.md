@@ -68,6 +68,7 @@ Evaluate:
 - **Task quality**: Are the tasks specific enough to execute without re-planning? Do they reference real files, real patterns, real conventions from the codebase?
 - **Dependencies**: Are tasks ordered correctly? Are there missing dependencies or implicit assumptions between tasks?
 - **Integration**: How does this change interact with existing code? Are there areas that will break or need updating that the tasks don't cover?
+- **Contract compatibility**: Does this change alter the request/response shape for any external API documented in `schema.yml`? If fields are added, removed, renamed, or re-typed in `data.yml`, flag it — the client code and any downstream consumers need contract tests updated. A contract change without updated contract tests is a **blocker**.
 - **Reuse**: Are there existing utilities, patterns, or modules that should be used instead of writing new code? Check `.grimoire/docs/` area docs if available. The goal is less new code, not more.
 - **Surface area**: Does the change introduce new public APIs, exports, or interfaces beyond what's needed? Fewer public functions with fewer parameters is better.
 - **Testing**: Is the test strategy sound? Are there gaps between what the features describe and what the step definitions will actually verify?
@@ -185,6 +186,7 @@ Evaluate:
 - **Naming**: Do new fields/models follow the existing naming conventions in schema.yml?
 - **Backwards compatibility**: Will the schema change break existing API consumers, queries, or reports? Are there downstream dependencies?
 - **External APIs**: If adding a new external API dependency, is the `schema_ref` pointing to a stable spec? Is there a fallback if the API is unavailable? Is the client wrapper in the right place?
+- **Contract breaking changes**: Compare `data.yml` against `schema.yml` for any external API with `action: modify`. If the change removes a required response field, changes a field type, renames a field, or adds a new required request field — it's a **breaking contract change**. Flag as **blocker** unless the change documents a migration path (versioned endpoint, fallback handling, or coordinated deployment). Adding optional response fields is safe. Adding optional request fields is safe if the API has a default.
 - **Data integrity**: Are there edge cases where data could end up in an inconsistent state? Should any changes be wrapped in a transaction?
 
 Output a short list of findings — flag issues as **blocker** or **suggestion**.

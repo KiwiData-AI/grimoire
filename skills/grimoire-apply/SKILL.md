@@ -256,7 +256,7 @@ Present a brief summary:
 
 **Step definition rules:**
 - Every assertion must be specific: assert the exact expected value, status, state, or side effect
-- Use real data, not mocks, when testing behavior (mock external services only)
+- Use real data, not mocks, when testing behavior. Only mock at the HTTP boundary for external services — never mock internal code or your own client wrappers
 - If a step def has no `assert` statement, it's suspicious — it should either assert something or set up state that a later Then step asserts
 
 ## Verify Before Using
@@ -276,6 +276,25 @@ Before importing a module, calling a function, or adding a dependency — confir
 **APIs and endpoints:**
 - Check `schema.yml` for external API contracts before calling them — it has the real endpoints, methods, and field names
 - For internal APIs, read the area doc or the actual route file — don't assume endpoint paths
+
+**Contract tests:**
+- When a task includes a contract validation test, the test must assert against the contract documented in `schema.yml` — not against a live API call
+- Use a fixture/recorded response that matches the documented response shape. The fixture IS the contract — if the fixture doesn't match `schema.yml`, fix the fixture
+- The red-green cycle applies: the contract test must fail first (e.g., assert a required field exists before the client code reads it)
+- If the client code reads fields not documented in `schema.yml`, update `schema.yml` first — undocumented fields are invisible contract dependencies that will break silently
+
+**Mocking external services:**
+- **Mock at the HTTP boundary**, not at the client level. Use the project's HTTP mocking library (e.g., `responses`, `httpx_mock`, `nock`, `msw`) to intercept outgoing requests and return fixture responses. This tests your client wrapper against a realistic response — mocking the client wrapper itself tests nothing.
+- **Never mock internal code.** If both the caller and the callee are in this repo, use the real code. Mocking internal modules hides integration bugs that only surface in production.
+- **Fixtures must match `schema.yml`.** The fixture file is a concrete instance of the contract. If the response shape in the fixture doesn't match the documented contract, the fixture is wrong — not the contract.
+- **Include error fixtures.** Every external API contract test needs at least one error response fixture matching the `error_response` shape in `schema.yml`. Your client's error path is part of the contract.
+- **Keep fixtures alongside tests** (e.g., `tests/fixtures/stripe_create_charge.json`). One fixture per endpoint. Name it after the endpoint, not the test.
+
+**Mocking anti-patterns to avoid:**
+- Mocking your own client wrapper and asserting it was called — this tests wiring, not behavior
+- Using `unittest.mock.patch` on the function under test — you're replacing the thing you're supposed to be testing
+- Fixture responses that don't match any documented contract — these are fictional and prove nothing
+- Mocking so much that the test can't fail — if removing the production code still passes the test, you've mocked too aggressively
 
 **If something doesn't exist that a task says should:** Flag it to the user. The task may reference a utility that was renamed, a package that was removed, or an API that changed. Don't invent a replacement — the plan may need updating.
 

@@ -146,8 +146,29 @@ Good task (specific enough to execute):
 - Each modified field → migration task (specify: is it safe to run live? nullable? default?)
 - Each removed field → migration task with data cleanup if needed
 - Each new external API → client wrapper task referencing `schema_ref` for the full contract
+- Each new or modified external API → **contract validation test task** that asserts the client's request/response shapes match the contract documented in `data.yml` / `schema.yml`. The test should:
+  - Validate that every `required: true` response field is read and typed correctly in the client
+  - Validate that request payloads match the documented shape (required fields present, types correct)
+  - Validate error response handling matches the documented `error_response` shape
+  - Use a recorded/fixture response (not a live call) so the test runs locally without network access
+- Each modified external API client (existing API, changed usage) → **contract regression test** that catches if the client drifts from the documented contract. If the client starts reading a new field or stops sending a required field, the test must fail.
 - Data tasks come BEFORE feature implementation tasks — the models must exist before code that uses them
-- Order: schema/model changes → migrations → seed data (if any) → then feature code
+- Order: schema/model changes → migrations → contract tests → seed data (if any) → then feature code
+
+**Mocking strategy for external services:**
+
+When tasks involve external APIs, the plan must specify how the service boundary is mocked. The rule is simple: **mock at the HTTP boundary, not at the client level.**
+
+- **DO mock**: the HTTP transport layer (e.g., `responses`, `httpx_mock`, `nock`, `msw`, `wiremock`). The fixture response must match the contract shape in `schema.yml`. This tests your client code end-to-end against a realistic response.
+- **DON'T mock**: your own client wrapper. If you mock `stripe_client.create_charge()`, you're testing that your code calls a function — not that your code handles the real response shape. The client wrapper is the code under test, not a dependency to stub out.
+- **DON'T mock**: internal services within the same repo. Use the real code. Mocks between internal modules hide integration bugs.
+- **Fixture management**: contract test fixtures live alongside the tests (e.g., `tests/fixtures/stripe_create_charge_response.json`). Each fixture corresponds to one endpoint in `schema.yml`. When the contract changes, the fixture must change — a stale fixture is a false-positive contract test.
+- **Error fixtures**: include at least one error response fixture per external API (matching the `error_response` shape in `schema.yml`). The client's error handling is part of the contract.
+
+Each contract test task in the plan must specify:
+1. Which HTTP mocking library to use (check existing tests or `.grimoire/config.yaml` for the project's convention)
+2. Which fixture file to create or update
+3. What the fixture contains (derived from `schema.yml` contract)
 
 **From manifest Assumptions:**
 - Each unvalidated assumption on the critical path → a verification task (spike, proof-of-concept, or integration test that confirms the assumption holds)
