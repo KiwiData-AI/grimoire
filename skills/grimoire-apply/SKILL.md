@@ -11,9 +11,15 @@ metadata:
 
 Implement tasks from a planned grimoire change. Write production code AND tests. A task is not complete until its scenarios pass.
 
-## CRITICAL: Do Not Re-Plan
+## CRITICAL: Two Rules That Must Not Be Broken
+
+### 1. Do Not Re-Plan
 
 **`tasks.md` IS the plan. Do not enter plan mode. Do not create your own plan. Do not reorganize, re-derive, or "think through" the tasks before starting.**
+
+### 2. Do Not Implement All Tasks In One Context
+
+**Spawn a fresh subagent (or start a fresh session) for each task section.** The parent/orchestrator reads `tasks.md` and delegates — it does NOT write code itself. Context degrades after 3-4 tasks and the LLM starts making mistakes based on stale file contents. See "Session Management" below for the exact workflow.
 
 The plan was already created in the plan stage, reviewed by the user, and approved. Your job is to EXECUTE it, not to re-evaluate it. Read `tasks.md`, find the first unchecked task, and start working.
 
@@ -91,29 +97,63 @@ If the user doesn't specify, default to review mode.
 
 **Never silently retry the same approach.** If your implementation produced error X and you're about to write code that will produce error X again, stop and think about why. If you can't identify what would change the outcome, stop and ask.
 
-### Session Management
+### Session Management — MANDATORY Fresh Context Per Section
 
-Context accumulates across tasks and degrades output quality. Use the per-task context blocks in `tasks.md` to keep sessions focused.
+**Do NOT implement all tasks in a single conversation context.** Context accumulates across tasks and degrades output quality — the LLM starts hallucinating based on stale file contents it read 5 tasks ago. This is not a suggestion. Fresh context per task section is required.
 
-**Each task section in `tasks.md` has a `<!-- context: ... -->` block** listing the exact files needed for that section. This is your loading list — read those files and no others when starting a section.
+Each task section in `tasks.md` has a `<!-- context: ... -->` block listing the exact files needed. This is the loading list for that section's fresh context.
 
-**Recommended approach (Claude Code):** Use a subagent per task section. The parent agent reads `tasks.md`, identifies the next unchecked section, spawns a subagent with the files from that section's context block, and the subagent executes, marks tasks complete, and exits. The parent then spawns the next subagent.
+#### Claude Code: Subagent Per Section
 
-**For other agents (Codex, Cursor, etc.):** Start a fresh session for each task section. The context block tells you exactly what to load. The resume mechanism via `tasks.md` makes this seamless — the next session reads `tasks.md`, finds the first `- [ ]`, reads the context block for that section, and continues.
+The parent agent is the **orchestrator only** — it does NOT implement tasks itself. The workflow is:
 
-**Handoff blocks:** When ending a session (or before spawning a new subagent), write a handoff note in `tasks.md` under the last completed task:
+1. Parent reads `tasks.md`, finds the first unchecked section
+2. Parent spawns a **subagent** (Agent tool) with this prompt:
+   ```
+   You are implementing grimoire tasks. Read `.grimoire/changes/<change-id>/tasks.md`,
+   find section <N>, and implement all unchecked tasks in that section.
+   Follow the red-green BDD cycle for each task. Mark tasks [x] when done.
+   When the section is complete, write a <!-- SESSION: ... --> handoff note
+   under the last task and exit.
+   ```
+3. Subagent reads `tasks.md` and the context files for that section
+4. Subagent implements, marks tasks `[x]`, writes handoff note, exits
+5. Parent reads updated `tasks.md`, spawns next subagent for next section
+6. Repeat until all sections complete
+
+**The parent agent MUST NOT write production code or test code.** Its only jobs are: read `tasks.md`, spawn subagents, and check completion between sections. If the parent starts implementing tasks directly, context will degrade by section 3-4 and output quality will drop.
+
+#### Other Agents (Codex, Cursor, Windsurf, etc.)
+
+Start a **fresh session** for each task section. The resume mechanism via `tasks.md` checkboxes makes this seamless:
+
+1. Open a new session
+2. Tell the agent: "Run `/grimoire:apply` on change `<change-id>`"
+3. The agent reads `tasks.md`, finds the first `- [ ]`, reads that section's context block
+4. When the section is complete, end the session
+5. Start a new session for the next section
+
+This is the same pattern as the [Ralph Wiggum loop](https://ralph-wiggum.ai) — progress lives in files (`tasks.md` + git), not in the context window. Each session gets a clean slate and reads current file state.
+
+#### Handoff Notes
+
+Before exiting (subagent exit or session end), write a handoff note in `tasks.md`:
 
 ```markdown
 - [x] 1.3 Implement TOTP verification
-<!-- SESSION: completed 1.1-1.3. auth middleware moved to middleware/auth.ts. pyotp added to requirements. -->
+<!-- SESSION: completed 1.1-1.3. auth middleware moved to middleware/auth.ts. pyotp added to requirements. Next section needs the new middleware import. -->
 ```
 
-This gives the next session critical context without requiring it to re-read everything.
+This gives the next session critical context (architectural decisions made, files created/moved, gotchas discovered) without requiring it to re-read everything.
 
-**When to break sessions:**
-- After completing a task section (the natural boundary — each section has its own context block)
-- When you notice your outputs degrading (repeating yourself, forgetting earlier context, making mistakes)
-- After a stuck detection recovery (you needed 3 attempts on a task)
+#### When to Force a Fresh Context Mid-Section
+
+Even within a section, break early if:
+- You needed 3 attempts on a task (stuck detection recovery)
+- You notice degraded output (repeating yourself, forgetting earlier context, making mistakes on things you got right earlier)
+- The section has more than 5 tasks
+
+Write a handoff note at the break point and start fresh.
 
 **Check `.grimoire/config.yaml`** for the configured coding agent — use `llm.coding.command` and `llm.coding.model` for implementation work.
 
