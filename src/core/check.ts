@@ -6,9 +6,12 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
-import { loadConfig } from "../utils/config.js";
+import fg from "fast-glob";
+import { loadConfig, type GrimoireConfig } from "../utils/config.js";
 import { findProjectRoot } from "../utils/paths.js";
 import { spawnWithStdin } from "../utils/spawn.js";
+import { analyzeTestQuality, TEST_FILE_GLOBS, TEST_FILE_IGNORE } from "./test-quality.js";
+import { checkDocStyle } from "./doc-style.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -48,57 +51,16 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
   }
 
   const results: StepResult[] = [];
-  let stopped = false;
 
   if (!options.json) {
     console.log(chalk.bold("\ngrimoire check\n"));
   }
 
   for (const step of steps) {
-    const tool = config.tools[step];
-
-    if (!tool || (!tool.command && !tool.check_command && tool.name !== "llm")) {
-      const result: StepResult = {
-        step,
-        status: "skip",
-        duration: 0,
-        output: "",
-        reason: "not configured",
-      };
-      results.push(result);
-      if (!options.json) {
-        printStepResult(result);
-      }
-      continue;
-    }
-
-    // LLM steps
-    if (tool.name === "llm") {
-      const result = await runLlmStep(step, tool.prompt ?? "", config.llm.coding.command, root, options.changed);
-      results.push(result);
-      if (!options.json) {
-        printStepResult(result);
-      }
-      if (result.status === "fail" && !options.continueOnFail) {
-        stopped = true;
-        break;
-      }
-      continue;
-    }
-
-    // Regular tool steps
-    const command = tool.check_command ?? tool.command!;
-    const result = await runShellStep(step, command, root);
+    const result = await runStep(step, root, config, options);
     results.push(result);
-
-    if (!options.json) {
-      printStepResult(result);
-    }
-
-    if (result.status === "fail" && !options.continueOnFail) {
-      stopped = true;
-      break;
-    }
+    if (!options.json) printStepResult(result);
+    if (result.status === "fail" && !options.continueOnFail) break;
   }
 
   // Summary
@@ -125,6 +87,34 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
   }
 
   return { results, passed, failed: failedCount, skipped, errored };
+}
+
+async function runStep(
+  step: string,
+  root: string,
+  config: GrimoireConfig,
+  options: CheckOptions,
+): Promise<StepResult> {
+  if (step === "test_quality") return runTestQualityStep(root);
+  if (step === "doc_style") return runDocStyleStep(root, config);
+
+  // Complexity: use built-in auto-detect unless an explicit tool is configured
+  if (step === "complexity" && !config.tools[step]?.command && !config.tools[step]?.check_command) {
+    return runComplexityStep(root, config);
+  }
+
+  const tool = config.tools[step];
+
+  if (!tool || (!tool.command && !tool.check_command && tool.name !== "llm")) {
+    return { step, status: "skip", duration: 0, output: "", reason: "not configured" };
+  }
+
+  if (tool.name === "llm") {
+    return runLlmStep(step, tool.prompt ?? "", config.llm.coding.command, root, options.changed);
+  }
+
+  const command = tool.check_command ?? tool.command!;
+  return runShellStep(step, command, root);
 }
 
 async function runShellStep(
@@ -278,5 +268,144 @@ function printStepResult(result: StepResult): void {
       );
       break;
   }
+}
+
+async function runTestQualityStep(root: string): Promise<StepResult> {
+  const start = Date.now();
+  try {
+    const filePaths = await fg(TEST_FILE_GLOBS, {
+      cwd: root,
+      absolute: true,
+      ignore: TEST_FILE_IGNORE,
+    });
+
+    if (filePaths.length === 0) {
+      return { step: "test_quality", status: "pass", duration: Date.now() - start, output: "No test files found." };
+    }
+
+    const report = await analyzeTestQuality(filePaths);
+    const output = report.issues.length === 0
+      ? `${report.functions} test functions analyzed — no issues found.`
+      : report.issues.map(i => `${i.file}:${i.line} [${i.rule}] ${i.message}`).join("\n");
+
+    return {
+      step: "test_quality",
+      status: report.summary.critical > 0 ? "fail" : "pass",
+      duration: Date.now() - start,
+      output,
+    };
+  } catch (err) {
+    return {
+      step: "test_quality",
+      status: "error",
+      duration: Date.now() - start,
+      output: err instanceof Error ? err.message : String(err),
+      reason: "test quality analysis failed",
+    };
+  }
+}
+
+async function runDocStyleStep(root: string, config: GrimoireConfig): Promise<StepResult> {
+  const start = Date.now();
+  const style = config.project.comment_style;
+
+  if (!style) {
+    return {
+      step: "doc_style",
+      status: "skip",
+      duration: Date.now() - start,
+      output: "",
+      reason: "no comment_style configured",
+    };
+  }
+
+  try {
+    const report = await checkDocStyle(root, style, config.project.language);
+    const output = report.issues.length === 0
+      ? `${report.filesChecked} files checked — all match ${style} style.`
+      : report.issues.map(i => `${i.file}:${i.line} ${i.message}`).join("\n");
+
+    return {
+      step: "doc_style",
+      status: report.issues.some(i => i.severity === "critical") ? "fail" : "pass",
+      duration: Date.now() - start,
+      output,
+    };
+  } catch (err) {
+    return {
+      step: "doc_style",
+      status: "error",
+      duration: Date.now() - start,
+      output: err instanceof Error ? err.message : String(err),
+      reason: "doc style check failed",
+    };
+  }
+}
+
+async function tryRadon(root: string): Promise<{ output: string; hasHighComplexity: boolean } | null> {
+  try {
+    await execFileAsync("which", ["radon"]);
+    const { stdout, stderr } = await execFileAsync("sh", [
+      "-c",
+      "radon cc . -a -nc --exclude 'node_modules,.venv,dist,migrations' 2>&1 || true",
+    ], { cwd: root, timeout: 60_000 });
+    const output = (stdout + stderr).trim();
+    const hasHighComplexity = /\b[C-F]\s+\(\d+\)/.test(output) || /\b[C-F]\b/.test(output);
+    return { output, hasHighComplexity };
+  } catch {
+    return null;
+  }
+}
+
+async function tryEslintComplexity(root: string): Promise<{ output: string; hasWarnings: boolean } | null> {
+  try {
+    await execFileAsync("which", ["npx"]);
+    const { stdout, stderr } = await execFileAsync("sh", [
+      "-c",
+      "npx eslint --no-eslintrc --rule 'complexity: [warn, 10]' --ext .ts,.tsx,.js,.jsx src/ 2>&1 || true",
+    ], { cwd: root, timeout: 60_000 });
+    const output = (stdout + stderr).trim();
+    const hasWarnings = output.includes("warning") || output.includes("error");
+    return { output, hasWarnings };
+  } catch {
+    return null;
+  }
+}
+
+async function runComplexityStep(root: string, config: GrimoireConfig): Promise<StepResult> {
+  const start = Date.now();
+  const lang = config.project.language;
+
+  if (!lang || lang === "python") {
+    const radon = await tryRadon(root);
+    if (radon) {
+      return {
+        step: "complexity",
+        status: radon.hasHighComplexity ? "fail" : "pass",
+        duration: Date.now() - start,
+        output: radon.output || "No high-complexity functions found.",
+      };
+    }
+  }
+
+  if (!lang || ["typescript", "javascript"].includes(lang ?? "")) {
+    const eslint = await tryEslintComplexity(root);
+    if (eslint) {
+      return {
+        step: "complexity",
+        status: eslint.hasWarnings ? "fail" : "pass",
+        duration: Date.now() - start,
+        output: eslint.output || "No high-complexity functions found.",
+      };
+    }
+  }
+
+  return {
+    step: "complexity",
+    status: "skip",
+    duration: Date.now() - start,
+    output: "",
+    reason: "no complexity tool found (install radon for Python or eslint for JS/TS)",
+  };
 }
 

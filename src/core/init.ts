@@ -4,9 +4,16 @@ import { fileURLToPath } from "node:url";
 import { stringify as yamlStringify } from "yaml";
 import chalk from "chalk";
 import { detectTools, type Detection } from "./detect.js";
-import type { GrimoireConfig, ToolConfig, LlmConfig } from "../utils/config.js";
+import type { GrimoireConfig, ToolConfig } from "../utils/config.js";
 import { setupHooks } from "./hooks.js";
-import { fileExists, escapeRegex } from "../utils/fs.js";
+import { fileExists } from "../utils/fs.js";
+import {
+  upsertAgentsFile,
+  installSkillFiles,
+  upsertManagedBlock,
+  buildManagedBlock,
+  SKILL_NAMES,
+} from "./shared-setup.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(__dirname, "..", "..");
@@ -500,41 +507,12 @@ function confidenceRank(c: "high" | "medium" | "low"): number {
 }
 
 async function setupAgentsFile(root: string): Promise<void> {
-  const agentsPath = join(root, "AGENTS.md");
-  const grimoireAgents = await readFile(
-    join(PACKAGE_ROOT, "AGENTS.md"),
-    "utf-8"
-  );
-
-  const marker = "<!-- GRIMOIRE:START -->";
-  const endMarker = "<!-- GRIMOIRE:END -->";
-  const managedBlock = `${marker}\n${grimoireAgents}\n${endMarker}`;
-
-  if (await fileExists(agentsPath)) {
-    const existing = await readFile(agentsPath, "utf-8");
-
-    if (existing.includes(marker)) {
-      const updated = existing.replace(
-        new RegExp(`${escapeRegex(marker)}[\\s\\S]*?${escapeRegex(endMarker)}`),
-        managedBlock
-      );
-      await writeFile(agentsPath, updated);
-      console.log(`  ${chalk.blue("updated")} AGENTS.md (grimoire section)`);
-    } else {
-      await writeFile(agentsPath, existing + "\n\n" + managedBlock + "\n");
-      console.log(`  ${chalk.blue("appended")} AGENTS.md (grimoire section)`);
-    }
-  } else {
-    await writeFile(agentsPath, managedBlock + "\n");
-    console.log(`  ${chalk.green("created")} AGENTS.md`);
-  }
+  await upsertAgentsFile(root, PACKAGE_ROOT, "created");
 }
 
 async function generateAgentFiles(root: string, agents: string[]): Promise<void> {
   const grimoireAgents = await readFile(join(PACKAGE_ROOT, "AGENTS.md"), "utf-8");
-  const marker = "<!-- GRIMOIRE:START -->";
-  const endMarker = "<!-- GRIMOIRE:END -->";
-  const managedBlock = `${marker}\n${grimoireAgents}\n${endMarker}`;
+  const managedBlock = buildManagedBlock(grimoireAgents);
 
   for (const agent of agents) {
     switch (agent) {
@@ -551,23 +529,7 @@ async function generateAgentFiles(root: string, agents: string[]): Promise<void>
         const ghDir = join(root, ".github");
         await mkdir(ghDir, { recursive: true });
         const instructionsPath = join(ghDir, "copilot-instructions.md");
-        if (await fileExists(instructionsPath)) {
-          const existing = await readFile(instructionsPath, "utf-8");
-          if (existing.includes(marker)) {
-            const updated = existing.replace(
-              new RegExp(`${escapeRegex(marker)}[\\s\\S]*?${escapeRegex(endMarker)}`),
-              managedBlock
-            );
-            await writeFile(instructionsPath, updated);
-            console.log(`  ${chalk.blue("updated")} .github/copilot-instructions.md`);
-          } else {
-            await writeFile(instructionsPath, existing + "\n\n" + managedBlock + "\n");
-            console.log(`  ${chalk.blue("appended")} .github/copilot-instructions.md`);
-          }
-        } else {
-          await writeFile(instructionsPath, managedBlock + "\n");
-          console.log(`  ${chalk.green("created")} .github/copilot-instructions.md`);
-        }
+        await upsertManagedBlock(instructionsPath, managedBlock, "created", ".github/copilot-instructions.md");
         break;
       }
       default:
@@ -577,32 +539,6 @@ async function generateAgentFiles(root: string, agents: string[]): Promise<void>
 }
 
 async function installSkills(root: string): Promise<void> {
-  const skillsDir = join(root, ".claude", "skills");
-  const sourceSkillsDir = join(PACKAGE_ROOT, "skills");
-
-  const skillNames = [
-    "grimoire-draft",
-    "grimoire-plan",
-    "grimoire-apply",
-    "grimoire-verify",
-    "grimoire-audit",
-    "grimoire-remove",
-    "grimoire-discover",
-    "grimoire-review",
-    "grimoire-bug",
-    "grimoire-commit",
-    "grimoire-pr",
-    "grimoire-refactor",
-  ];
-
-  for (const skill of skillNames) {
-    const destDir = join(skillsDir, skill);
-    await mkdir(destDir, { recursive: true });
-
-    const src = join(sourceSkillsDir, skill, "SKILL.md");
-    const dest = join(destDir, "SKILL.md");
-    await copyFile(src, dest);
-    console.log(`  ${chalk.green("created")} .claude/skills/${skill}/SKILL.md`);
-  }
+  await installSkillFiles(root, PACKAGE_ROOT, SKILL_NAMES, "created");
 }
 

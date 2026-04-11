@@ -9,6 +9,25 @@ vi.mock("../utils/config.js", () => ({
   loadConfig: vi.fn(),
 }));
 
+vi.mock("fast-glob", () => ({
+  default: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("./test-quality.js", () => ({
+  analyzeTestQuality: vi.fn().mockResolvedValue({
+    files: 0, functions: 0, issues: [],
+    summary: { critical: 0, warning: 0, suggestion: 0 },
+  }),
+  TEST_FILE_GLOBS: ["**/*.test.ts"],
+  TEST_FILE_IGNORE: ["**/node_modules/**"],
+}));
+
+vi.mock("./doc-style.js", () => ({
+  checkDocStyle: vi.fn().mockResolvedValue({
+    filesChecked: 0, issues: [],
+  }),
+}));
+
 vi.mock("node:child_process", async () => {
   const { promisify } = await import("node:util");
   const fn = vi.fn((...args: any[]) => {
@@ -32,6 +51,13 @@ vi.mock("../utils/spawn.js", () => ({
 import { loadConfig } from "../utils/config.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import fg from "fast-glob";
+import { analyzeTestQuality } from "./test-quality.js";
+import { checkDocStyle } from "./doc-style.js";
+
+const mockFg = vi.mocked(fg);
+const mockAnalyze = vi.mocked(analyzeTestQuality);
+const mockCheckDocStyle = vi.mocked(checkDocStyle);
 
 const mockLoadConfig = vi.mocked(loadConfig);
 const mockExecFileAsync = () => (execFile as any)[promisify.custom] as ReturnType<typeof vi.fn>;
@@ -209,6 +235,139 @@ describe("runCheck", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: true, json: true });
+    expect(result.passed).toBe(1);
+  });
+
+  // --- Built-in test_quality step ---
+
+  it("runs test_quality as built-in step and passes when clean", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      tools: {},
+      checks: ["test_quality"],
+    } as any);
+    mockFg.mockResolvedValue(["/fake/test_app.py"] as any);
+    mockAnalyze.mockResolvedValue({
+      files: 1, functions: 3, issues: [],
+      summary: { critical: 0, warning: 0, suggestion: 0 },
+    });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.passed).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(result.skipped).toBe(0);
+  });
+
+  it("fails test_quality step when critical issues found", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      tools: {},
+      checks: ["test_quality"],
+    } as any);
+    mockFg.mockResolvedValue(["/fake/test_app.py"] as any);
+    mockAnalyze.mockResolvedValue({
+      files: 1, functions: 2, issues: [
+        { file: "/fake/test_app.py", line: 5, severity: "critical", rule: "empty-body", message: "empty" },
+      ],
+      summary: { critical: 1, warning: 0, suggestion: 0 },
+    });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.failed).toBe(1);
+  });
+
+  it("passes test_quality when no test files found", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      tools: {},
+      checks: ["test_quality"],
+    } as any);
+    mockFg.mockResolvedValue([] as any);
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.passed).toBe(1);
+    expect(result.skipped).toBe(0);
+  });
+
+  // --- Built-in doc_style step ---
+
+  it("skips doc_style when no comment_style configured", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      tools: {},
+      checks: ["doc_style"],
+    } as any);
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.skipped).toBe(1);
+  });
+
+  it("runs doc_style and passes when no issues", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      project: { ...baseConfig.project, comment_style: "google" },
+      tools: {},
+      checks: ["doc_style"],
+    } as any);
+    mockCheckDocStyle.mockResolvedValue({ filesChecked: 10, issues: [] });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.passed).toBe(1);
+  });
+
+  it("fails doc_style when critical issues found", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      project: { ...baseConfig.project, comment_style: "google" },
+      tools: {},
+      checks: ["doc_style"],
+    } as any);
+    mockCheckDocStyle.mockResolvedValue({
+      filesChecked: 5,
+      issues: [{ file: "src/app.py", line: 10, severity: "critical" as const, message: "wrong style" }],
+    });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.failed).toBe(1);
+  });
+
+  // --- Built-in complexity step ---
+
+  it("skips complexity when no tool found", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      project: { ...baseConfig.project, language: "go" },
+      tools: {},
+      checks: ["complexity"],
+    } as any);
+
+    // Make `which` fail for both radon and npx
+    mockExecFileAsync().mockImplementation(async (cmd: any) => {
+      if (cmd === "which") throw new Error("not found");
+      return { stdout: "OK", stderr: "" };
+    });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.skipped).toBe(1);
+  });
+
+  it("uses configured complexity tool over built-in", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      tools: { complexity: { name: "radon", command: "radon cc . -a" } },
+      checks: ["complexity"],
+    } as any);
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    // Should use the configured tool (which our mock makes succeed)
     expect(result.passed).toBe(1);
   });
 });

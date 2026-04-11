@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import fg from "fast-glob";
-import { analyzeTestQuality, printReport } from "../core/test-quality.js";
+import { analyzeTestQuality, printReport, TEST_FILE_GLOBS, TEST_FILE_IGNORE } from "../core/test-quality.js";
 import { findProjectRoot } from "../utils/paths.js";
 
 export const testQualityCommand = new Command("test-quality")
@@ -14,30 +14,11 @@ export const testQualityCommand = new Command("test-quality")
     if (files.length > 0) {
       filePaths = files;
     } else {
-      // Auto-detect test files
-      filePaths = await fg(
-        [
-          "**/test_*.py",
-          "**/*_test.py",
-          "**/test_*.ts",
-          "**/*.test.ts",
-          "**/*.test.js",
-          "**/*.spec.ts",
-          "**/*.spec.js",
-          "**/*_steps.py",
-          "**/*.steps.ts",
-          "**/*.steps.js",
-          "**/steps/**/*.py",
-          "**/step_definitions/**/*.ts",
-          "**/step_definitions/**/*.js",
-          "**/step_defs/**/*.py",
-        ],
-        {
-          cwd: root,
-          absolute: true,
-          ignore: ["**/node_modules/**", "**/.venv/**", "**/dist/**"],
-        }
-      );
+      filePaths = await fg(TEST_FILE_GLOBS, {
+        cwd: root,
+        absolute: true,
+        ignore: TEST_FILE_IGNORE,
+      });
     }
 
     if (filePaths.length === 0) {

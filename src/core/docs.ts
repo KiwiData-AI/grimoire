@@ -293,94 +293,130 @@ async function buildDataModelSection(
     }
   }
 
-  // Internal models
   if (internal.length > 0) {
     lines.push("### Internal Data\n");
-
-    for (const [name, def] of internal) {
-      const type = String(def.type ?? "table");
-      const source = def.source ? ` — \`${def.source}\`` : "";
-      const note = def.note ? ` — ${def.note}` : "";
-      lines.push(`#### ${name} (${type})${source}${note}\n`);
-
-      const fields = def.fields as
-        | Record<string, Record<string, unknown>>
-        | undefined;
-      if (fields && typeof fields === "object") {
-        lines.push("| Field | Type | Constraints |");
-        lines.push("|-------|------|-------------|");
-        for (const [fname, fdef] of Object.entries(fields)) {
-          if (!fdef || typeof fdef !== "object") continue;
-          const ftype = String(fdef.type ?? "unknown");
-          const constraints: string[] = [];
-          if (fdef.pk) constraints.push("PK");
-          if (fdef.unique) constraints.push("unique");
-          if (fdef.not_null) constraints.push("not null");
-          if (fdef.default !== undefined)
-            constraints.push(`default: ${fdef.default}`);
-          if (fdef.ref) constraints.push(`→ ${fdef.ref}`);
-          if (fdef.note) constraints.push(String(fdef.note));
-          lines.push(
-            `| ${fname} | ${ftype} | ${constraints.join(", ") || "—"} |`
-          );
-        }
-        lines.push("");
-      }
-
-      const relationships = def.relationships as
-        | Array<Record<string, string>>
-        | undefined;
-      if (relationships && Array.isArray(relationships)) {
-        for (const rel of relationships) {
-          lines.push(
-            `- ${rel.type} → **${rel.target}** (via \`${rel.foreign_key ?? "?"}\`)`
-          );
-        }
-        lines.push("");
-      }
-    }
+    lines.push(...renderInternalModels(internal));
   }
 
-  // External APIs
   if (external.length > 0) {
     lines.push("### External APIs\n");
-
-    for (const [name, def] of external) {
-      const provider = def.provider ? ` (${def.provider})` : "";
-      lines.push(`#### ${name}${provider}\n`);
-
-      if (def.schema_ref) {
-        lines.push(`- **Schema**: ${def.schema_ref}`);
-      }
-      if (def.client) {
-        lines.push(`- **Client**: \`${def.client}\``);
-      }
-      if (def.auth) {
-        lines.push(`- **Auth**: ${def.auth}`);
-      }
-      if (def.note) {
-        lines.push(`- ${def.note}`);
-      }
-
-      const endpoints = def.endpoints as
-        | Record<string, Record<string, unknown>>
-        | undefined;
-      if (endpoints && typeof endpoints === "object") {
-        lines.push("");
-        lines.push("| Endpoint | Method | Path |");
-        lines.push("|----------|--------|------|");
-        for (const [ename, edef] of Object.entries(endpoints)) {
-          if (!edef || typeof edef !== "object") continue;
-          const method = String(edef.method ?? edef.type ?? "—");
-          const path = edef.path ? String(edef.path) : "—";
-          lines.push(`| ${ename} | ${method} | \`${path}\` |`);
-        }
-      }
-      lines.push("");
-    }
+    lines.push(...renderExternalApis(external));
   }
 
   return lines.join("\n");
+}
+
+function renderInternalModels(
+  models: [string, Record<string, unknown>][]
+): string[] {
+  const lines: string[] = [];
+
+  for (const [name, def] of models) {
+    const type = String(def.type ?? "table");
+    const source = def.source ? ` — \`${def.source}\`` : "";
+    const note = def.note ? ` — ${def.note}` : "";
+    lines.push(`#### ${name} (${type})${source}${note}\n`);
+
+    const fields = def.fields as
+      | Record<string, Record<string, unknown>>
+      | undefined;
+    if (fields && typeof fields === "object") {
+      lines.push(...renderFieldsTable(fields));
+    }
+
+    const relationships = def.relationships as
+      | Array<Record<string, string>>
+      | undefined;
+    if (relationships && Array.isArray(relationships)) {
+      lines.push(...renderRelationships(relationships));
+    }
+  }
+
+  return lines;
+}
+
+function renderExternalApis(
+  apis: [string, Record<string, unknown>][]
+): string[] {
+  const lines: string[] = [];
+
+  for (const [name, def] of apis) {
+    const provider = def.provider ? ` (${def.provider})` : "";
+    lines.push(`#### ${name}${provider}\n`);
+
+    if (def.schema_ref) {
+      lines.push(`- **Schema**: ${def.schema_ref}`);
+    }
+    if (def.client) {
+      lines.push(`- **Client**: \`${def.client}\``);
+    }
+    if (def.auth) {
+      lines.push(`- **Auth**: ${def.auth}`);
+    }
+    if (def.note) {
+      lines.push(`- ${def.note}`);
+    }
+
+    const endpoints = def.endpoints as
+      | Record<string, Record<string, unknown>>
+      | undefined;
+    if (endpoints && typeof endpoints === "object") {
+      lines.push("");
+      lines.push("| Endpoint | Method | Path |");
+      lines.push("|----------|--------|------|");
+      for (const [ename, edef] of Object.entries(endpoints)) {
+        if (!edef || typeof edef !== "object") continue;
+        const method = String(edef.method ?? edef.type ?? "—");
+        const path = edef.path ? String(edef.path) : "—";
+        lines.push(`| ${ename} | ${method} | \`${path}\` |`);
+      }
+    }
+    lines.push("");
+  }
+
+  return lines;
+}
+
+function renderFieldsTable(
+  fields: Record<string, Record<string, unknown>>
+): string[] {
+  const lines: string[] = [];
+
+  lines.push("| Field | Type | Constraints |");
+  lines.push("|-------|------|-------------|");
+  for (const [fname, fdef] of Object.entries(fields)) {
+    if (!fdef || typeof fdef !== "object") continue;
+    const ftype = String(fdef.type ?? "unknown");
+    const constraints: string[] = [];
+    if (fdef.pk) constraints.push("PK");
+    if (fdef.unique) constraints.push("unique");
+    if (fdef.not_null) constraints.push("not null");
+    if (fdef.default !== undefined)
+      constraints.push(`default: ${fdef.default}`);
+    if (fdef.ref) constraints.push(`→ ${fdef.ref}`);
+    if (fdef.note) constraints.push(String(fdef.note));
+    lines.push(
+      `| ${fname} | ${ftype} | ${constraints.join(", ") || "—"} |`
+    );
+  }
+  lines.push("");
+
+  return lines;
+}
+
+function renderRelationships(
+  relationships: Array<Record<string, string>>
+): string[] {
+  const lines: string[] = [];
+
+  for (const rel of relationships) {
+    lines.push(
+      `- ${rel.type} → **${rel.target}** (via \`${rel.foreign_key ?? "?"}\`)`
+    );
+  }
+  lines.push("");
+
+  return lines;
 }
 
 // --- Decisions ---

@@ -22,10 +22,35 @@ export interface TestQualityReport {
   };
 }
 
+/** Glob patterns for discovering test files. */
+export const TEST_FILE_GLOBS = [
+  "**/test_*.py",
+  "**/*_test.py",
+  "**/test_*.ts",
+  "**/*.test.ts",
+  "**/*.test.js",
+  "**/*.spec.ts",
+  "**/*.spec.js",
+  "**/*_steps.py",
+  "**/*.steps.ts",
+  "**/*.steps.js",
+  "**/steps/**/*.py",
+  "**/step_definitions/**/*.ts",
+  "**/step_definitions/**/*.js",
+  "**/step_defs/**/*.py",
+];
+
+/** Directories to ignore when discovering test files. */
+export const TEST_FILE_IGNORE = [
+  "**/node_modules/**",
+  "**/.venv/**",
+  "**/dist/**",
+];
+
 /**
  * Analyze test files for quality issues.
  * Language-aware via file extension. Detects weak/missing assertions,
- * empty test bodies, and tautological tests.
+ * empty test bodies, tautological tests, and swallowed errors.
  */
 export async function analyzeTestQuality(
   filePaths: string[]
@@ -125,27 +150,135 @@ function extractPythonTestFunctions(lines: string[]): TestFunction[] {
   return functions;
 }
 
-function analyzePythonFunction(
-  fn: TestFunction,
+// --- Shared check helpers ---
+
+interface WeakPattern {
+  pattern: RegExp;
+  msg: string;
+}
+
+const PYTHON_WEAK_PATTERNS: WeakPattern[] = [
+  { pattern: /assert\s+True\b/, msg: "`assert True` is always true" },
+  { pattern: /assert\s+not\s+None/, msg: "`assert not None` is trivially true for most return values" },
+  { pattern: /assert\s+\w+\s+is\s+not\s+None/, msg: "Asserting `is not None` doesn't verify behavior — check the actual value" },
+  { pattern: /assert\s+len\(\w+\)\s*>\s*0/, msg: "Asserting length > 0 doesn't verify the actual content" },
+  { pattern: /assert\s+isinstance\(/, msg: "Type-only assertions don't verify behavior — check the actual value" },
+];
+
+const JS_WEAK_PATTERNS: WeakPattern[] = [
+  { pattern: /expect\(.+\)\.toBeDefined\(\)/, msg: "`toBeDefined()` doesn't verify the actual value" },
+  { pattern: /expect\(.+\)\.toBeTruthy\(\)/, msg: "`toBeTruthy()` is too broad — check the actual value" },
+  { pattern: /expect\(.+\)\.not\.toBeNull\(\)/, msg: "`not.toBeNull()` doesn't verify the actual value" },
+  { pattern: /expect\(true\)\.toBe\(true\)/, msg: "`expect(true).toBe(true)` is always true" },
+  { pattern: /expect\(.+\.length\)\.toBeGreaterThan\(0\)/, msg: "Asserting length > 0 doesn't verify content" },
+];
+
+function checkWeakAssertions(
+  body: string,
+  fnName: string,
   file: string,
-  _lines: string[]
+  line: number,
+  lang: "python" | "js"
 ): TestIssue[] {
   const issues: TestIssue[] = [];
-  const body = fn.body;
+  const patterns = lang === "python" ? PYTHON_WEAK_PATTERNS : JS_WEAK_PATTERNS;
+  const quote = lang === "python" ? "`" : '"';
+  const suffix = lang === "python" ? "Strengthen with a specific expected value." : "Use a specific expected value.";
 
-  // Empty body
-  if (!body || body === "pass" || body === "..." || body === '"""..."""') {
-    issues.push({
-      file,
-      line: fn.startLine + 1,
-      severity: "critical",
-      rule: "empty-body",
-      message: `Test function \`${fn.name}\` has an empty body — it always passes and tests nothing.`,
-    });
-    return issues;
+  for (const { pattern, msg } of patterns) {
+    if (pattern.test(body)) {
+      issues.push({
+        file,
+        line,
+        severity: "warning",
+        rule: "weak-assertion",
+        message: `${quote}${fnName}${quote}: ${msg}. ${suffix}`,
+      });
+    }
   }
 
-  // No assertions
+  return issues;
+}
+
+function checkPythonSwallowedErrors(
+  body: string,
+  fnName: string,
+  file: string,
+  line: number
+): TestIssue[] {
+  const exceptPattern = /except(?:\s+(?:Exception|BaseException|\w*Error))?(?:\s+as\s+\w+)?:/g;
+  let exceptMatch;
+  while ((exceptMatch = exceptPattern.exec(body)) !== null) {
+    const rest = body.slice(exceptMatch.index + exceptMatch[0].length);
+    const blockEnd = rest.search(/\n(?:except |else:|finally:)/);
+    const block = blockEnd === -1 ? rest : rest.slice(0, blockEnd);
+    if (!block.includes("raise") && !block.includes("assert") && !block.includes("pytest.raises")) {
+      return [{
+        file,
+        line,
+        severity: "critical",
+        rule: "swallowed-error",
+        message: `\`${fnName}\` has an except block that doesn't re-raise — this can silently swallow assertion errors.`,
+      }];
+    }
+  }
+  return [];
+}
+
+function checkJsSwallowedErrors(
+  body: string,
+  fnName: string,
+  file: string,
+  line: number
+): TestIssue[] {
+  const catchPattern = /catch\s*\([^)]*\)\s*\{/g;
+  let catchMatch;
+  while ((catchMatch = catchPattern.exec(body)) !== null) {
+    let depth = 1;
+    let pos = catchMatch.index + catchMatch[0].length;
+    while (pos < body.length && depth > 0) {
+      if (body[pos] === "{") depth++;
+      if (body[pos] === "}") depth--;
+      pos++;
+    }
+    const catchBody = body.slice(catchMatch.index + catchMatch[0].length, pos - 1);
+    if (!catchBody.includes("throw") && !catchBody.includes("expect(") && !catchBody.includes("assert")) {
+      return [{
+        file,
+        line,
+        severity: "critical",
+        rule: "swallowed-error",
+        message: `"${fnName}" has a catch block that doesn't re-throw — this can silently swallow assertion errors.`,
+      }];
+    }
+  }
+  return [];
+}
+
+function checkPythonEmptyBody(
+  body: string,
+  fnName: string,
+  file: string,
+  line: number
+): TestIssue | null {
+  if (!body || body === "pass" || body === "..." || body === '"""..."""') {
+    return {
+      file,
+      line,
+      severity: "critical",
+      rule: "empty-body",
+      message: `Test function \`${fnName}\` has an empty body — it always passes and tests nothing.`,
+    };
+  }
+  return null;
+}
+
+function checkPythonMissingAssertions(
+  body: string,
+  fnName: string,
+  file: string,
+  line: number
+): TestIssue | null {
   const hasAssert =
     body.includes("assert ") ||
     body.includes("assert(") ||
@@ -156,58 +289,68 @@ function analyzePythonFunction(
     body.includes(".should") ||
     body.includes("expect(");
 
-  if (!hasAssert && fn.name !== "given" && fn.name !== "when") {
-    // Given/When steps may legitimately set up state without asserting
-    if (fn.name === "then" || fn.name.startsWith("test_")) {
-      issues.push({
+  if (!hasAssert && fnName !== "given" && fnName !== "when") {
+    if (fnName === "then" || fnName.startsWith("test_")) {
+      return {
         file,
-        line: fn.startLine + 1,
+        line,
         severity: "critical",
         rule: "no-assertion",
-        message: `Test function \`${fn.name}\` has no assertions — it will pass regardless of behavior.`,
-      });
-    } else if (fn.name === "step_impl") {
-      issues.push({
+        message: `Test function \`${fnName}\` has no assertions — it will pass regardless of behavior.`,
+      };
+    } else if (fnName === "step_impl") {
+      return {
         file,
-        line: fn.startLine + 1,
+        line,
         severity: "warning",
         rule: "no-assertion",
-        message: `Step \`${fn.name}\` has no assertions — verify it sets up state that a later Then step asserts.`,
-      });
+        message: `Step \`${fnName}\` has no assertions — verify it sets up state that a later Then step asserts.`,
+      };
     }
   }
+  return null;
+}
 
-  // Weak assertions
-  const weakPatterns = [
-    { pattern: /assert\s+True\b/, msg: "`assert True` is always true" },
-    { pattern: /assert\s+not\s+None/, msg: "`assert not None` is trivially true for most return values" },
-    { pattern: /assert\s+\w+\s+is\s+not\s+None/, msg: "Asserting `is not None` doesn't verify behavior — check the actual value" },
-    { pattern: /assert\s+len\(\w+\)\s*>\s*0/, msg: "Asserting length > 0 doesn't verify the actual content" },
-    { pattern: /assert\s+isinstance\(/, msg: "Type-only assertions don't verify behavior — check the actual value" },
-  ];
-
-  for (const { pattern, msg } of weakPatterns) {
-    if (pattern.test(body)) {
-      issues.push({
-        file,
-        line: fn.startLine + 1,
-        severity: "warning",
-        rule: "weak-assertion",
-        message: `\`${fn.name}\`: ${msg}. Strengthen with a specific expected value.`,
-      });
-    }
-  }
-
-  // Tautological: asserting against self
+function checkPythonTautological(
+  body: string,
+  fnName: string,
+  file: string,
+  line: number
+): TestIssue | null {
   if (/assert\s+(\w+)\s*==\s*\1\b/.test(body)) {
-    issues.push({
+    return {
       file,
-      line: fn.startLine + 1,
+      line,
       severity: "critical",
       rule: "tautological",
-      message: `\`${fn.name}\` asserts a value equals itself — this always passes.`,
-    });
+      message: `\`${fnName}\` asserts a value equals itself — this always passes.`,
+    };
   }
+  return null;
+}
+
+function analyzePythonFunction(
+  fn: TestFunction,
+  file: string,
+  _lines: string[]
+): TestIssue[] {
+  const { body, name: fnName } = fn;
+  const line = fn.startLine + 1;
+
+  const emptyBody = checkPythonEmptyBody(body, fnName, file, line);
+  if (emptyBody) return [emptyBody];
+
+  const issues: TestIssue[] = [];
+
+  const missingAssertion = checkPythonMissingAssertions(body, fnName, file, line);
+  if (missingAssertion) issues.push(missingAssertion);
+
+  issues.push(...checkWeakAssertions(body, fnName, file, line, "python"));
+
+  const tautological = checkPythonTautological(body, fnName, file, line);
+  if (tautological) issues.push(tautological);
+
+  issues.push(...checkPythonSwallowedErrors(body, fnName, file, line));
 
   return issues;
 }
@@ -265,32 +408,35 @@ function extractJsTestFunctions(lines: string[]): TestFunction[] {
   return functions;
 }
 
-function analyzeJsFunction(
-  fn: TestFunction,
+function checkJsEmptyBody(
+  body: string,
+  fnName: string,
   file: string,
-  _lines: string[]
-): TestIssue[] {
-  const issues: TestIssue[] = [];
-  const body = fn.body;
-
-  // Empty body (just the it/test wrapper with no real content)
+  line: number
+): TestIssue | null {
   const stripped = body
     .replace(/(?:it|test)\s*\([^{]*\{/, "")
     .replace(/\}\s*\)\s*;?\s*$/, "")
     .trim();
 
   if (!stripped) {
-    issues.push({
+    return {
       file,
-      line: fn.startLine + 1,
+      line,
       severity: "critical",
       rule: "empty-body",
-      message: `Test "${fn.name}" has an empty body — it always passes and tests nothing.`,
-    });
-    return issues;
+      message: `Test "${fnName}" has an empty body — it always passes and tests nothing.`,
+    };
   }
+  return null;
+}
 
-  // No assertions
+function checkJsMissingAssertions(
+  body: string,
+  fnName: string,
+  file: string,
+  line: number
+): TestIssue | null {
   const hasExpect =
     body.includes("expect(") ||
     body.includes("assert(") ||
@@ -302,35 +448,35 @@ function analyzeJsFunction(
     body.includes("toThrow");
 
   if (!hasExpect) {
-    issues.push({
+    return {
       file,
-      line: fn.startLine + 1,
+      line,
       severity: "critical",
       rule: "no-assertion",
-      message: `Test "${fn.name}" has no expect/assert calls — it will pass regardless of behavior.`,
-    });
+      message: `Test "${fnName}" has no expect/assert calls — it will pass regardless of behavior.`,
+    };
   }
+  return null;
+}
 
-  // Weak assertions
-  const weakPatterns = [
-    { pattern: /expect\(.+\)\.toBeDefined\(\)/, msg: "`toBeDefined()` doesn't verify the actual value" },
-    { pattern: /expect\(.+\)\.toBeTruthy\(\)/, msg: "`toBeTruthy()` is too broad — check the actual value" },
-    { pattern: /expect\(.+\)\.not\.toBeNull\(\)/, msg: "`not.toBeNull()` doesn't verify the actual value" },
-    { pattern: /expect\(true\)\.toBe\(true\)/, msg: "`expect(true).toBe(true)` is always true" },
-    { pattern: /expect\(.+\.length\)\.toBeGreaterThan\(0\)/, msg: "Asserting length > 0 doesn't verify content" },
-  ];
+function analyzeJsFunction(
+  fn: TestFunction,
+  file: string,
+  _lines: string[]
+): TestIssue[] {
+  const { body, name: fnName } = fn;
+  const line = fn.startLine + 1;
 
-  for (const { pattern, msg } of weakPatterns) {
-    if (pattern.test(body)) {
-      issues.push({
-        file,
-        line: fn.startLine + 1,
-        severity: "warning",
-        rule: "weak-assertion",
-        message: `"${fn.name}": ${msg}. Use a specific expected value.`,
-      });
-    }
-  }
+  const emptyBody = checkJsEmptyBody(body, fnName, file, line);
+  if (emptyBody) return [emptyBody];
+
+  const issues: TestIssue[] = [];
+
+  const missingAssertion = checkJsMissingAssertions(body, fnName, file, line);
+  if (missingAssertion) issues.push(missingAssertion);
+
+  issues.push(...checkWeakAssertions(body, fnName, file, line, "js"));
+  issues.push(...checkJsSwallowedErrors(body, fnName, file, line));
 
   return issues;
 }

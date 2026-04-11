@@ -145,6 +145,70 @@ def test_addition():
     expect(report.issues).toHaveLength(0);
   });
 
+  it("detects swallowed errors in python try/except", async () => {
+    mockReadFile.mockResolvedValue(`
+def test_api_call():
+    try:
+        response = client.get("/api/data")
+        assert response.status_code == 200
+    except Exception:
+        pass
+`);
+    const report = await analyzeTestQuality(["/fake/test_api.py"]);
+    const swallowed = report.issues.find(i => i.rule === "swallowed-error");
+    expect(swallowed).toBeDefined();
+    expect(swallowed!.severity).toBe("critical");
+  });
+
+  it("allows python except blocks that re-raise", async () => {
+    mockReadFile.mockResolvedValue(`
+def test_with_reraise():
+    try:
+        do_something()
+    except ValueError:
+        raise
+`);
+    const report = await analyzeTestQuality(["/fake/test_reraise.py"]);
+    const swallowed = report.issues.find(i => i.rule === "swallowed-error");
+    expect(swallowed).toBeUndefined();
+  });
+
+  it("detects swallowed errors in JS try/catch", async () => {
+    mockReadFile.mockResolvedValue(`
+describe("api", () => {
+  it("fetches data", () => {
+    try {
+      const res = fetchData();
+      expect(res.status).toBe(200);
+    } catch (e) {
+      console.log(e);
+    }
+  });
+});
+`);
+    const report = await analyzeTestQuality(["/fake/api.test.ts"]);
+    const swallowed = report.issues.find(i => i.rule === "swallowed-error");
+    expect(swallowed).toBeDefined();
+    expect(swallowed!.severity).toBe("critical");
+  });
+
+  it("allows JS catch blocks that assert on the error", async () => {
+    mockReadFile.mockResolvedValue(`
+describe("errors", () => {
+  it("catches expected error", () => {
+    try {
+      dangerousOp();
+    } catch (e) {
+      expect(e.message).toBe("expected failure");
+    }
+  });
+});
+`);
+    const report = await analyzeTestQuality(["/fake/error.test.ts"]);
+    const swallowed = report.issues.find(i => i.rule === "swallowed-error");
+    expect(swallowed).toBeUndefined();
+  });
+
   it("returns correct summary counts", async () => {
     mockReadFile.mockResolvedValue(`
 def test_empty():

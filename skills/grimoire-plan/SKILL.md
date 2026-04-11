@@ -103,6 +103,11 @@ Good task (specific enough to execute):
 - Each modified scenario → update step def + update implementation
 - Group by capability/feature file
 - Step definitions come BEFORE production code (red-green BDD cycle)
+- **Use the project's configured BDD tool** — check `.grimoire/config.yaml` under `tools.bdd_test` for the test runner (e.g., `behave`, `pytest-bdd`, `cucumber-js`, `cucumber`). Step definitions must follow that tool's conventions:
+  - **behave** (Python): step defs in `features/steps/`, use `@given`, `@when`, `@then` decorators from `behave`
+  - **pytest-bdd** (Python): step defs alongside tests, use `@scenario`, `@given`, `@when`, `@then` from `pytest_bdd`
+  - **cucumber-js** (JS/TS): step defs in `features/step_definitions/`, use `Given`, `When`, `Then` from `@cucumber/cucumber`
+  - If no BDD tool is configured, check the existing test directory structure and imports to infer which framework is in use
 
 **From decisions:**
 - Each decision → implementation task(s) with specific files and changes

@@ -41,6 +41,8 @@ export interface GrimoireConfig {
 const DEFAULT_CHECKS = [
   "lint",
   "format",
+  "test_quality",
+  "doc_style",
   "duplicates",
   "complexity",
   "dead_code",
@@ -67,29 +69,7 @@ const DEFAULT_CONFIG: GrimoireConfig = {
   llm: DEFAULT_LLM,
 };
 
-export async function loadConfig(root?: string): Promise<GrimoireConfig> {
-  const projectRoot = root ?? (await findProjectRoot());
-  const configPath = join(projectRoot, ".grimoire", "config.yaml");
-
-  let raw: Record<string, unknown> = {};
-  let content: string;
-  try {
-    content = await readFile(configPath, "utf-8");
-  } catch {
-    // Config file doesn't exist — use defaults
-    return structuredClone(DEFAULT_CONFIG);
-  }
-
-  try {
-    raw = (parseYaml(content) as Record<string, unknown>) ?? {};
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `Warning: failed to parse ${configPath}: ${msg}\nFalling back to default config.`
-    );
-    return structuredClone(DEFAULT_CONFIG);
-  }
-
+function parseTools(raw: Record<string, unknown>): Record<string, ToolConfig> {
   const tools: Record<string, ToolConfig> = {};
   if (raw.tools && typeof raw.tools === "object") {
     for (const [key, val] of Object.entries(
@@ -106,23 +86,16 @@ export async function loadConfig(root?: string): Promise<GrimoireConfig> {
       }
     }
   }
+  return tools;
+}
 
-  const checks = Array.isArray(raw.checks)
-    ? (raw.checks as string[])
-    : DEFAULT_CHECKS;
-
-  const llmRaw =
-    raw.llm && typeof raw.llm === "object"
-      ? (raw.llm as Record<string, unknown>)
-      : {};
-
-  // Parse project section (supports both flat legacy and nested)
+function parseProject(raw: Record<string, unknown>): ProjectConfig {
   const projectRaw =
     raw.project && typeof raw.project === "object"
       ? (raw.project as Record<string, unknown>)
       : {};
 
-  const project: ProjectConfig = {
+  return {
     language: str(projectRaw.language ?? raw.language),
     package_manager: str(projectRaw.package_manager),
     commit_style: String(
@@ -131,16 +104,21 @@ export async function loadConfig(root?: string): Promise<GrimoireConfig> {
     doc_tool: str(projectRaw.doc_tool ?? raw.doc_tool),
     comment_style: str(projectRaw.comment_style ?? raw.comment_style),
   };
+}
 
-  // Parse llm section — support both flat legacy and nested format
-  let llm: LlmConfig;
+function parseLlm(raw: Record<string, unknown>): LlmConfig {
+  const llmRaw =
+    raw.llm && typeof raw.llm === "object"
+      ? (raw.llm as Record<string, unknown>)
+      : {};
+
   if (llmRaw.thinking && typeof llmRaw.thinking === "object") {
     // New nested format: llm.thinking + llm.coding
     const thinkRaw = llmRaw.thinking as Record<string, unknown>;
     const codeRaw = (llmRaw.coding && typeof llmRaw.coding === "object")
       ? (llmRaw.coding as Record<string, unknown>)
       : thinkRaw;
-    llm = {
+    return {
       thinking: {
         command: String(thinkRaw.command ?? DEFAULT_LLM.thinking.command),
         model: str(thinkRaw.model),
@@ -150,23 +128,47 @@ export async function loadConfig(root?: string): Promise<GrimoireConfig> {
         model: str(codeRaw.model),
       },
     };
-  } else {
-    // Legacy flat format: llm.command applies to both
-    const cmd = String(llmRaw.command ?? DEFAULT_LLM.thinking.command);
-    llm = {
-      thinking: { command: cmd },
-      coding: { command: cmd },
-    };
+  }
+
+  // Legacy flat format: llm.command applies to both
+  const cmd = String(llmRaw.command ?? DEFAULT_LLM.thinking.command);
+  return {
+    thinking: { command: cmd },
+    coding: { command: cmd },
+  };
+}
+
+export async function loadConfig(root?: string): Promise<GrimoireConfig> {
+  const projectRoot = root ?? (await findProjectRoot());
+  const configPath = join(projectRoot, ".grimoire", "config.yaml");
+
+  let content: string;
+  try {
+    content = await readFile(configPath, "utf-8");
+  } catch {
+    // Config file doesn't exist — use defaults
+    return structuredClone(DEFAULT_CONFIG);
+  }
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = (parseYaml(content) as Record<string, unknown>) ?? {};
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `Warning: failed to parse ${configPath}: ${msg}\nFalling back to default config.`
+    );
+    return structuredClone(DEFAULT_CONFIG);
   }
 
   return {
     version: Number(raw.version ?? 1),
-    project,
+    project: parseProject(raw),
     features_dir: String(raw.features_dir ?? DEFAULT_CONFIG.features_dir),
     decisions_dir: String(raw.decisions_dir ?? DEFAULT_CONFIG.decisions_dir),
-    tools,
-    checks,
-    llm,
+    tools: parseTools(raw),
+    checks: Array.isArray(raw.checks) ? (raw.checks as string[]) : DEFAULT_CHECKS,
+    llm: parseLlm(raw),
   };
 }
 
