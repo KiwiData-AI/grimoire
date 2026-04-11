@@ -62,6 +62,29 @@ Walk the reporter through a structured interview for anything not already captur
 - **minor** — feature works but behaves incorrectly in an edge case
 - **cosmetic** — visual or text issue, no functional impact
 
+**How often does it happen?**
+- **always** — reproduces every time
+- **intermittent** — reproduces sometimes (ask: roughly what percentage? any pattern?)
+- **rare** — happened once or twice, hard to reproduce
+- Intermittent and rare bugs need different investigation strategies — capturing frequency early saves time later.
+
+**Is this a regression?**
+- **yes** — "this used to work" (ask: when did it last work? what changed?)
+- **no** — never worked, or new feature
+- **unknown** — not sure
+
+If yes, this changes priority — regressions mean something broke that was previously working, which usually points to a specific change.
+
+**Is there a workaround?**
+- If the reporter has found a way to accomplish their goal despite the bug, capture it explicitly — this unblocks the team while the fix is pending.
+- Example: "I can export as PDF instead of CSV" or "clearing the cache fixes it temporarily."
+
+**How many users are affected?**
+- **one user** — specific account or configuration
+- **some users** — a subset (ask: what do affected users have in common?)
+- **all users** — everyone hitting this flow
+- This is a severity multiplier — a minor bug affecting all users may outrank a major bug affecting one.
+
 If the reporter provides screenshots, logs, error messages, or network traces — capture those references. Don't require them, but note what's available.
 
 ### 1c. Security Screening
@@ -112,8 +135,11 @@ Create `.grimoire/bugs/<bug-id>/report.md`:
 id: <bug-id>
 status: reported
 severity: <critical|major|minor|cosmetic>
+frequency: <always|intermittent|rare>
+regression: <yes|no|unknown>
 security: <true|false>
 environment: <dev|qa|staging|production>
+affected-users: <one|some|all>
 reported-by: <name or role>
 date: <YYYY-MM-DD>
 area: <feature area>
@@ -157,8 +183,12 @@ ticket: <external ticket URL or ID, if created>
 - **Assertion**: <what the test expected vs what it got>
 - **Artifacts**: <paths to screenshots, traces, HAR files, recordings>
 
+## Workaround
+<!-- Omit if none. Capture any way the reporter can accomplish their goal despite the bug. -->
+<workaround or "None known">
+
 ## Reporter Notes
-<!-- Anything else the reporter mentioned — workarounds, frequency, related issues -->
+<!-- Anything else the reporter mentioned — related issues, context -->
 <notes>
 ```
 

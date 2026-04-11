@@ -286,18 +286,27 @@ Tester finds issue → /grimoire:bug-report → structured report with spec refe
                                                     ↓
 Developer picks it up → /grimoire:bug-triage → classify root cause
                                                     ↓
-                                    ┌───────────────┼───────────────┐
-                                    ↓               ↓               ↓
-                                CODE            INFRA/CONFIG     SECURITY
-                            /grimoire:bug      route to team    confidential fix
-                          (repro test → fix)   (create ticket)  (restricted workflow)
+                          ┌─────────────┬───────────┼───────────────┐
+                          ↓             ↓           ↓               ↓
+                      CODE (small)  CODE (big)  INFRA/CONFIG     SECURITY
+                      /grimoire:bug  → draft    route to team    confidential fix
+                      (repro → fix   manifest   (create ticket)  (restricted workflow)
+                       → tester        stub)
+                       checklist)
 ```
 
-**Bug reports** accept output from testing tools (Playwright, Cypress, Postman, k6) via MCP or pasted directly — auto-extracting failed assertions, screenshots, and reproduction steps.
+**Bug reports** accept output from testing tools (Playwright, Cypress, Postman, k6) via MCP or pasted directly — auto-extracting failed assertions, screenshots, and reproduction steps. Reports capture frequency, regression status, workarounds, and affected user scope.
 
-**Triage** classifies issues into 7 categories — code, infrastructure, configuration, data, third-party, security, or documentation — and routes to the right team. Security issues follow a restricted workflow with confidential handling.
+**Triage** classifies issues into 8 categories — code, infrastructure, configuration, data, third-party, security, documentation, or not-a-bug — and routes to the right team. Security issues follow a restricted workflow with confidential handling. Large code issues that need architectural changes get a draft manifest stub for handoff to `/grimoire:draft`.
 
-**Exploratory testing** (`/grimoire:bug-explore`) analyzes feature specs for missing negative scenarios, boundary conditions, and cross-feature interaction risks.
+**Bug fixes** (`/grimoire:bug`) follow reproduce-first discipline and generate a tester verification checklist after the fix — covering the original bug plus 3-5 related areas to check for regressions.
+
+**Exploratory testing** (`/grimoire:bug-explore`) operates in three modes:
+- **Tester mode** (default) — spec-only gap analysis, automation coverage mapping, negative scenarios, cross-feature risks. No code reading required.
+- **Developer mode** (`--deep`) — adds code-level analysis, anti-pattern detection, branch coverage.
+- **Onboard mode** (`--onboard`) — generates a tester's guide: feature areas ranked by risk, automation coverage per area, recent changes, open bugs, and where to start.
+
+**Testing sessions** (`/grimoire:bug-session`) provide guided exploratory testing with a charter (mission, scope, timebox, risk areas), progress tracking during the session, inline bug filing, and a structured debrief. This is the difference between "I poked around for an hour" and "I systematically explored auth for 45 minutes and here's what I found."
 
 `grimoire init` asks where bug reports live (Jira, Linear, GitHub Issues) and what testing tools your team uses, offering to install MCP servers for each:
 
@@ -580,7 +589,8 @@ The feature files move to `features/auth/login.feature` (baseline). The decision
 | `/grimoire:bug` | Disciplined bug fix with reproduction test first |
 | `/grimoire:bug-report` | Structured bug reporting for testers (accepts test tool output) |
 | `/grimoire:bug-triage` | Classify, route, and respond to bug reports (code/infra/config/data/security) |
-| `/grimoire:bug-explore` | AI-guided exploratory testing — find gaps and edge cases |
+| `/grimoire:bug-explore` | AI-guided exploratory testing — gap analysis, automation coverage, tester/dev modes, onboarding |
+| `/grimoire:bug-session` | Guided exploratory testing sessions — charter, progress tracking, timebox, debrief |
 | `/grimoire:commit` | Contextual commit messages with change trailers |
 | `/grimoire:pr` | Generate PR description + optional diff review |
 

@@ -20,6 +20,7 @@ export const SKILL_NAMES = [
   "grimoire-bug-report",
   "grimoire-bug-triage",
   "grimoire-bug-explore",
+  "grimoire-bug-session",
   "grimoire-commit",
   "grimoire-pr",
   "grimoire-refactor",

@@ -15,10 +15,20 @@ AI-guided exploratory testing. Systematically analyze feature specs and code to 
 - User wants to find gaps in test coverage
 - User says "what are we missing?", "explore for bugs", "what could break?"
 - Loose match: "exploratory testing", "edge cases", "negative scenarios", "what's untested", "find gaps"
+- User says "onboard", "where do I start testing?", "what's risky?" → onboard mode
 
 ## Prerequisites
 - A grimoire project with feature files in `features/`
-- Code exists to analyze (not just specs)
+- For developer mode: code exists to analyze (not just specs)
+- For tester/onboard mode: feature files are sufficient
+
+## Modes
+
+This skill operates in three modes:
+
+- **Tester mode** (default) — Spec-only analysis. Gap analysis, negative scenarios, cross-feature risks, and existing automation coverage. No code reading required. Suitable for testers who don't read source code.
+- **Developer mode** — activated by `--deep`, or when the user is a developer. Adds code-level analysis (Step 3) on top of everything in tester mode.
+- **Onboard mode** — activated by `--onboard` or when a tester is new to the project. Generates a tester's guide: feature areas ranked by risk, what's automated vs manual, recent changes, and open bugs.
 
 ## Workflow
 
@@ -58,7 +68,43 @@ Missing negatives:
   - Login after too many failed attempts
 ```
 
-### 3. Analyze Implementation
+### 2b. Map Automation Coverage
+
+Help the tester understand what's already automated and what requires manual testing.
+
+For each feature file in scope:
+1. **Find step definitions** — search the test codebase for step definitions that implement each scenario
+2. **Classify each scenario:**
+   - **Automated** — has step definitions with real assertions (not `pass` or `assert True`)
+   - **Partially automated** — has step definitions but some steps are stubs or have weak assertions
+   - **Not automated** — no step definitions found, or all steps are stubs
+3. **Identify automation gaps** — scenarios that exist in specs but have no test automation. These are the things that must be tested manually today.
+4. **Identify manual-only areas** — behaviors that are hard to automate (visual layout, UX feel, accessibility, real-device behavior). Flag these as intentionally manual.
+
+Present this as a coverage map:
+```markdown
+## Automation Coverage: <area>
+
+### Automated (N scenarios)
+- ✅ "Scenario name" — `test_file.py:42` (strong assertions)
+
+### Partially Automated (N scenarios)
+- ⚠️ "Scenario name" — `test_file.py:58` (weak: only checks `is not None`)
+  - Manual check needed: verify the actual values match expected behavior
+
+### Not Automated (N scenarios)
+- ❌ "Scenario name" — needs manual testing
+  - Suggested manual test: <brief description of what to check>
+
+### Intentionally Manual
+- 🖐 Visual/UX checks, accessibility, cross-device behavior
+```
+
+This map tells the tester: "Here's what the robots check for you. Here's what only you can catch."
+
+### 3. Analyze Implementation (Developer Mode Only)
+
+> **Skip this step in tester mode.** This requires reading source code.
 
 Read the code that implements the features in scope:
 
@@ -135,6 +181,48 @@ If a Playwright MCP server or browser automation tool is available:
 4. Capture any unexpected behavior as findings
 
 This is optional and only available if the project has browser testing infrastructure configured. Don't suggest it if there's no way to run it.
+
+### 8. Onboard Mode (--onboard)
+
+When a tester is new to the project, generate a tester's orientation guide instead of a gap analysis.
+
+1. **Inventory feature areas** — read all feature files and group by area/directory. For each area, summarize what it covers in one sentence.
+
+2. **Rank by risk** — assign a risk level to each area based on:
+   - **Recent changes** — `git log --since="2 weeks ago"` the feature area's implementation files. Recently changed = higher risk.
+   - **Open bugs** — check `.grimoire/bugs/` for unresolved reports in each area.
+   - **Sparse coverage** — areas with few scenarios relative to their complexity (e.g., 2 scenarios covering an entire payment flow).
+   - **No automation** — areas where scenarios have no step definitions (from step 2b).
+
+3. **Map automation coverage** — for each area, run step 2b and summarize: "Auth: 12 scenarios, 10 automated, 2 manual. Payments: 8 scenarios, 3 automated, 5 manual."
+
+4. **Highlight recent changes** — list files changed in the last 2 weeks with their feature area. These are where regressions most likely live.
+
+5. **Generate the guide:**
+```markdown
+# Tester's Guide: <project name>
+Generated: <YYYY-MM-DD>
+
+## Feature Areas (ranked by risk)
+
+### 🔴 High Risk
+- **<area>** — <summary>. <N> scenarios (<N> automated, <N> manual). <reason for high risk>.
+
+### 🟡 Medium Risk
+- **<area>** — <summary>. <N> scenarios (<N> automated, <N> manual). <reason>.
+
+### 🟢 Low Risk
+- **<area>** — <summary>. <N> scenarios (<N> automated, <N> manual).
+
+## Recent Changes (last 2 weeks)
+- <area>: <what changed> (<commit date>)
+
+## Open Bugs
+- <bug-id>: <title> (<area>, <severity>)
+
+## Where to Start
+<Recommend the tester start with the highest-risk area that has the least automation — that's where manual testing adds the most value.>
+```
 
 ## Important
 - **This is exploration, not audit.** The goal is to find what's missing, not to grade coverage. Frame findings as opportunities, not failures.

@@ -1,5 +1,5 @@
 # Skills
-> Last updated: 2026-04-05
+> Last updated: 2026-04-11
 
 ## Purpose
 Claude Code skill definitions that provide the AI-driven workflow. Each skill is a `SKILL.md` file that Claude Code loads as a slash command (e.g., `/grimoire:draft`). Skills are the primary interface between users and the grimoire workflow.
@@ -20,7 +20,11 @@ Claude Code skill definitions that provide the AI-driven workflow. Each skill is
 | `skills/grimoire-audit/SKILL.md` | Discover undocumented features and decisions in existing codebase |
 | `skills/grimoire-discover/SKILL.md` | Generate area docs and data schema from codebase snapshot |
 | `skills/grimoire-remove/SKILL.md` | Tracked feature/decision removal with impact assessment |
-| `skills/grimoire-bug/SKILL.md` | Disciplined bug fix — reproduce first, classify, fix |
+| `skills/grimoire-bug/SKILL.md` | Disciplined bug fix — reproduce first, classify, fix, generate tester verification checklist |
+| `skills/grimoire-bug-report/SKILL.md` | Structured bug reporting for testers — interview-style, test tool input, spec linking |
+| `skills/grimoire-bug-triage/SKILL.md` | Triage bug reports — 8-way root cause classification, routing, security handling |
+| `skills/grimoire-bug-explore/SKILL.md` | Exploratory testing — gap analysis, automation coverage mapping, tester/developer modes, onboarding |
+| `skills/grimoire-bug-session/SKILL.md` | Guided exploratory testing sessions — charter, progress tracking, timebox, debrief |
 | `skills/grimoire-commit/SKILL.md` | Generate contextual commit messages with change trailers |
 | `skills/grimoire-pr/SKILL.md` | Generate PR descriptions from grimoire artifacts |
 

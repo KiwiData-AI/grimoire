@@ -98,12 +98,43 @@ Now — and only now — modify production code:
 - All existing unit/integration tests still pass
 - If a new scenario was added in step 2, it passes with the fix
 
-### 8. Summary
+### 8. Tester Verification Checklist
+
+After the fix, generate a checklist for testers to verify the fix and check for regressions. This bridges the gap between "developer says it's fixed" and "tester confirms it's fixed."
+
+1. **Confirm the original bug** — restate the exact reproduction steps from the report and what the tester should now see instead.
+
+2. **Check related areas** — identify 3-5 areas that could have been affected by the fix:
+   - Other scenarios in the same feature file
+   - Features that share the same code path or data (check what the fix touched)
+   - Edge cases near the fix — if you fixed a null check, what about empty strings? If you fixed one role, what about other roles?
+
+3. **Generate the checklist:**
+```markdown
+## Verification Checklist: <bug-id>
+Fix branch: `fix/<name>`
+
+### Original Bug
+- [ ] Reproduce the original steps: <steps>
+- [ ] Confirm expected behavior: <what should happen now>
+
+### Regression Checks
+- [ ] <related scenario or area>: <what to verify>
+- [ ] <related scenario or area>: <what to verify>
+- [ ] <related scenario or area>: <what to verify>
+```
+
+4. **Include in bug report** — append the checklist to `.grimoire/bugs/<bug-id>/report.md` (or the triage file if it exists) so the tester can find it.
+
+5. If an external ticket exists, post the checklist as a comment so the tester doesn't need to look at local files.
+
+### 9. Summary
 Report to the user:
 - What the bug was (root cause, not symptoms)
 - What was changed (files and what specifically)
 - Whether a new scenario was added to cover the gap
 - Test results
+- The verification checklist for testers (from step 8)
 
 ## When NOT to Use This Skill
 - **Feature requests disguised as bugs** — "it's broken because it doesn't do X" when X was never specified. Route to `grimoire-draft`.

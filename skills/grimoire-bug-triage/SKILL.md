@@ -321,12 +321,50 @@ Include in the triage response:
 
 Depends on classification:
 
-**Code defect** → `grimoire-bug` takes over:
+**Code defect (small fix)** → `grimoire-bug` takes over:
 1. The triage response becomes context for the fix
 2. The developer already has root cause understanding from investigation
 3. `grimoire-bug` runs: write repro test → fix → verify
 4. When complete, update bug report status to `fixed` and reference the fix commit
 5. If an external ticket exists, update it (add fix commit, transition to resolved)
+
+**Code defect (needs architectural changes)** → `grimoire-draft` takes over:
+
+If the fix requires significant structural changes (new abstractions, schema changes, cross-cutting modifications), it's not a bug fix — it's a change that needs proper design. Generate a draft manifest stub to hand off context:
+
+1. Create `.grimoire/changes/<change-id>/manifest.md` with:
+   ```markdown
+   ---
+   id: <change-id>
+   type: bug-driven-change
+   source-bug: <bug-id>
+   status: proposed
+   date: <YYYY-MM-DD>
+   ---
+
+   # <short description of the change needed>
+
+   ## Origin
+   Bug report: `.grimoire/bugs/<bug-id>/report.md`
+   Triage: `.grimoire/bugs/<bug-id>/triage.md`
+
+   ## Problem
+   <root cause summary from triage — why a simple fix isn't enough>
+
+   ## Violated Specs
+   <copy from bug report — which feature scenarios describe the expected behavior>
+
+   ## Scope
+   <what needs to change architecturally — from the triage investigation>
+
+   ## Context for Draft
+   <!-- grimoire-draft should pick up from here -->
+   - The bug report has the user-facing symptoms
+   - The triage has the root cause analysis and investigation evidence
+   - The violated specs define what "correct" looks like
+   ```
+2. Update the bug report status to `routed-to-draft`
+3. Tell the user: "This needs a proper design change. I've created a draft stub at `<path>` with the bug context. Run `grimoire-draft` to continue."
 
 **Infrastructure / Configuration / Data** → the fix happens outside grimoire:
 1. Ensure a ticket exists for the responsible team with all the triage evidence
