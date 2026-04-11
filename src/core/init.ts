@@ -4,7 +4,13 @@ import { fileURLToPath } from "node:url";
 import { stringify as yamlStringify } from "yaml";
 import chalk from "chalk";
 import { detectTools, type Detection } from "./detect.js";
-import type { GrimoireConfig, ToolConfig, CavemanLevel } from "../utils/config.js";
+import type {
+  GrimoireConfig,
+  ToolConfig,
+  CavemanLevel,
+  BugTrackerConfig,
+  TestingToolConfig,
+} from "../utils/config.js";
 import { setupHooks } from "./hooks.js";
 import { fileExists } from "../utils/fs.js";
 import {
@@ -72,6 +78,7 @@ export async function initProject(
     ".grimoire/docs",
     ".grimoire/changes",
     ".grimoire/archive",
+    ".grimoire/bugs",
   ];
 
   for (const dir of dirs) {
@@ -514,9 +521,134 @@ async function askPreferences(config: GrimoireConfig): Promise<GrimoireConfig> {
     }
   }
 
+  // Bug tracking & testing tools
+  console.log(chalk.bold("\n  Bug tracking & testing:\n"));
+
+  config.bug_trackers = await askBugTrackers(rl);
+  config.testing_tools = await askTestingTools(rl);
+
   rl.close();
   console.log();
   return config;
+}
+
+const BUG_TRACKER_MCP: Record<string, { display: string; command?: string; args?: string[]; url?: string; transport?: "stdio" | "sse" | "http" }> = {
+  jira: {
+    display: "Atlassian (Jira + Confluence)",
+    url: "https://mcp.atlassian.com/v1/sse",
+    transport: "sse",
+  },
+  linear: {
+    display: "Linear",
+    url: "https://mcp.linear.app/mcp",
+    transport: "http",
+  },
+  github: {
+    display: "GitHub Issues",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-github"],
+  },
+};
+
+const TESTING_TOOL_MCP: Record<string, { display: string; command: string; args: string[] }> = {
+  playwright: {
+    display: "Playwright",
+    command: "npx",
+    args: ["-y", "@playwright/mcp@latest"],
+  },
+};
+
+async function askBugTrackers(
+  rl: import("node:readline/promises").Interface
+): Promise<BugTrackerConfig[]> {
+  const trackers: BugTrackerConfig[] = [];
+
+  console.log(chalk.dim("    Where do bug reports live? Add one or more trackers."));
+  console.log(chalk.dim("    Options: jira, linear, github, other, or press Enter to skip.\n"));
+
+  let adding = true;
+  while (adding) {
+    const answer = await rl.question(
+      `    Bug tracker${trackers.length > 0 ? " (another, or Enter to finish)" : ""}? `
+    );
+    const trimmed = answer.trim().toLowerCase();
+
+    if (!trimmed) {
+      adding = false;
+      continue;
+    }
+
+    const known = BUG_TRACKER_MCP[trimmed];
+    const tracker: BugTrackerConfig = { name: trimmed };
+
+    if (known) {
+      const installAnswer = await rl.question(
+        `    Install ${known.display} MCP server? (Y/n) `
+      );
+      if (installAnswer.trim().toLowerCase() !== "n") {
+        tracker.mcp = {
+          name: known.display.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          command: known.command,
+          args: known.args,
+          url: known.url,
+          transport: known.transport,
+        };
+        console.log(chalk.green(`    ✓ ${known.display} MCP configured`));
+      }
+    }
+
+    trackers.push(tracker);
+  }
+
+  return trackers;
+}
+
+async function askTestingTools(
+  rl: import("node:readline/promises").Interface
+): Promise<TestingToolConfig[]> {
+  const tools: TestingToolConfig[] = [];
+
+  console.log(chalk.dim("\n    What testing tools do your testers use? Add one or more."));
+  console.log(chalk.dim("    Options: playwright, cypress, selenium, postman, other, or Enter to skip.\n"));
+
+  let adding = true;
+  while (adding) {
+    const answer = await rl.question(
+      `    Testing tool${tools.length > 0 ? " (another, or Enter to finish)" : ""}? `
+    );
+    const trimmed = answer.trim().toLowerCase();
+
+    if (!trimmed) {
+      adding = false;
+      continue;
+    }
+
+    const purposeAnswer = await rl.question(
+      `    Purpose? (e2e/integration/performance/api/general) [general]: `
+    );
+    const purpose = purposeAnswer.trim().toLowerCase() || "general";
+
+    const tool: TestingToolConfig = { name: trimmed, purpose };
+    const known = TESTING_TOOL_MCP[trimmed];
+
+    if (known) {
+      const installAnswer = await rl.question(
+        `    Install ${known.display} MCP server? (Y/n) `
+      );
+      if (installAnswer.trim().toLowerCase() !== "n") {
+        tool.mcp = {
+          name: trimmed,
+          command: known.command,
+          args: known.args,
+        };
+        console.log(chalk.green(`    ✓ ${known.display} MCP configured`));
+      }
+    }
+
+    tools.push(tool);
+  }
+
+  return tools;
 }
 
 function confidenceRank(c: "high" | "medium" | "low"): number {

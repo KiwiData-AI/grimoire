@@ -92,7 +92,23 @@ If the change has no security-relevant surface (e.g., a pure UI text change), sa
 
 Output a short list of findings — flag issues as **blocker** or **suggestion**.
 
-### 6. Data Engineer Review (Optional)
+### 6. QA Engineer Review (Optional)
+
+**Skip this review if the change is purely internal (no user-facing behavior, no new inputs, no observable state changes).**
+
+If the change has user-facing behavior, adopt the perspective of a **QA engineer** focused on testability and real-world failure modes.
+
+Evaluate:
+- **Testability**: Can every scenario be verified automatically? Are there behaviors that require manual testing — and if so, is that documented? Are the Given/When/Then steps specific enough to implement as real tests?
+- **Edge cases**: What inputs, states, or timing conditions are not covered by the current scenarios? Think about empty states, concurrent users, interruptions, and boundary values.
+- **Negative scenarios**: For every happy path, is there at least one scenario covering what happens when things go wrong? Missing error scenarios are the #1 source of bug reports.
+- **Observability**: When this feature breaks in production, how will anyone know? Are there logs, metrics, or alerts? Can a tester distinguish between "feature is broken" and "feature is slow"?
+- **Regression risk**: What existing behavior could this change break? Are there integration points with other features that need cross-feature testing?
+- **Accessibility**: Does the change introduce new UI? If so, are there scenarios covering keyboard navigation, screen readers, or contrast requirements?
+
+Output a short list of findings — flag issues as **blocker** or **suggestion**.
+
+### 7. Data Engineer Review (Optional)
 
 **Skip this review if the change has no `data.yml` and doesn't touch data models, schemas, migrations, or external API integrations.**
 
@@ -113,9 +129,9 @@ Evaluate:
 
 Output a short list of findings — flag issues as **blocker** or **suggestion**.
 
-### 7. Present Findings
+### 8. Present Findings
 
-Compile all three reviews into a single summary:
+Compile all reviews into a single summary:
 
 ```markdown
 # Design Review: <change-id>
@@ -132,6 +148,11 @@ Compile all three reviews into a single summary:
 - **[suggestion]** Add rate limiting scenario for login attempts
 - No other security concerns for this change.
 
+## QA Engineer
+- **[blocker]** No negative scenario for expired TOTP codes — testers can't verify error handling
+- **[suggestion]** Add scenario for what happens when 2FA service is unreachable
+(or: "No user-facing behavior changes — skipped.")
+
 ## Data Engineer
 - **[blocker]** Missing index on `profiles.user_id` — will cause full table scans on join queries
 - **[suggestion]** `avatar_url` should have a max_length constraint
@@ -144,7 +165,7 @@ Compile all three reviews into a single summary:
 Recommendation: Fix blockers, then proceed to apply.
 ```
 
-### 8. Iterate
+### 9. Iterate
 - If there are **blockers**, tell the user which artifacts need updating (features, decisions, or tasks) and offer to help fix them
 - If only **suggestions**, present them and let the user decide which to address
 - If **no issues**, confirm the design is ready and suggest proceeding to `grimoire-apply`

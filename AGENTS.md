@@ -45,9 +45,19 @@ Use grimoire when the user's request involves:
 User has a request
 │
 ├─ "Something is broken / not working right"
-│  → Bug fix (`/grimoire:bug`). Reproduce first: find or write a failing test,
-│    then fix. If no scenario covers the behavior, add one — the bug revealed
-│    a spec gap.
+│  │
+│  ├─ Reporter is a tester / non-developer?
+│  │  → /grimoire:bug-report → structured bug report with spec references
+│  │
+│  ├─ Developer picking up a bug report?
+│  │  → /grimoire:bug-triage → validate, reject with evidence, or request info
+│  │    If validated → /grimoire:bug for the fix (repro test first)
+│  │
+│  └─ Developer found it themselves?
+│     → /grimoire:bug → reproduce first, write failing test, then fix
+│
+├─ "What could break? What are we missing?"
+│  → /grimoire:bug-explore → exploratory testing, gap analysis, edge cases
 │
 ├─ "I want to add / change / remove functionality"
 │  │
@@ -90,7 +100,7 @@ This is the end-to-end flow for the most common operation — adding or modifyin
 1. **User describes what they want**
 2. **Draft** (`/grimoire:draft`): Qualify the request. Draft `.feature` files and/or ADRs. Write manifest. Collaborate until the user approves. Update manifest status to `approved`.
 3. **Plan** (`/grimoire:plan`): Read approved artifacts. Generate `tasks.md` with red-green test pairs for each scenario. Review with user.
-4. **Review** (`/grimoire:review`): *Optional.* Three-persona design review — product manager (completeness), senior engineer (simplicity and feasibility), security engineer (vulnerabilities). Fix blockers before coding.
+4. **Review** (`/grimoire:review`): *Optional.* Multi-persona design review — product manager (completeness), senior engineer (simplicity and feasibility), security engineer (vulnerabilities), QA engineer (testability and edge cases). Fix blockers before coding.
 5. **Apply** (`/grimoire:apply`): Work through tasks. For each: write test (must fail), write code (must pass), mark done. Update manifest status to `implementing`.
 6. **Verify** (`/grimoire:verify`): Confirm all scenarios pass, no regressions, decisions followed. Generate report.
 7. **Archive** (`grimoire archive <id>`): Sync features/decisions to baseline. Archive manifest. Update manifest status to `complete`.

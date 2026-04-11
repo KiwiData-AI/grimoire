@@ -31,6 +31,25 @@ export interface LlmConfig {
   coding: LlmAgentConfig;
 }
 
+export interface McpServer {
+  name: string;
+  command?: string;
+  args?: string[];
+  url?: string;
+  transport?: "stdio" | "sse" | "http";
+}
+
+export interface BugTrackerConfig {
+  name: string;
+  mcp?: McpServer;
+}
+
+export interface TestingToolConfig {
+  name: string;
+  purpose?: string;
+  mcp?: McpServer;
+}
+
 export interface GrimoireConfig {
   version: number;
   project: ProjectConfig;
@@ -39,6 +58,8 @@ export interface GrimoireConfig {
   tools: Record<string, ToolConfig>;
   checks: string[];
   llm: LlmConfig;
+  bug_trackers?: BugTrackerConfig[];
+  testing_tools?: TestingToolConfig[];
 }
 
 const DEFAULT_CHECKS = [
@@ -165,7 +186,7 @@ export async function loadConfig(root?: string): Promise<GrimoireConfig> {
     return structuredClone(DEFAULT_CONFIG);
   }
 
-  return {
+  const config: GrimoireConfig = {
     version: Number(raw.version ?? 1),
     project: parseProject(raw),
     features_dir: String(raw.features_dir ?? DEFAULT_CONFIG.features_dir),
@@ -174,6 +195,46 @@ export async function loadConfig(root?: string): Promise<GrimoireConfig> {
     checks: Array.isArray(raw.checks) ? (raw.checks as string[]) : DEFAULT_CHECKS,
     llm: parseLlm(raw),
   };
+
+  if (raw.bug_trackers && Array.isArray(raw.bug_trackers)) {
+    config.bug_trackers = parseBugTrackers(raw.bug_trackers);
+  }
+  if (raw.testing_tools && Array.isArray(raw.testing_tools)) {
+    config.testing_tools = parseTestingTools(raw.testing_tools);
+  }
+
+  return config;
+}
+
+function parseMcpServer(raw: Record<string, unknown>): McpServer | undefined {
+  if (!raw.mcp || typeof raw.mcp !== "object") return undefined;
+  const m = raw.mcp as Record<string, unknown>;
+  return {
+    name: String(m.name ?? ""),
+    command: str(m.command),
+    args: Array.isArray(m.args) ? m.args.map(String) : undefined,
+    url: str(m.url),
+    transport: str(m.transport) as McpServer["transport"],
+  };
+}
+
+function parseBugTrackers(raw: unknown[]): BugTrackerConfig[] {
+  return raw
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => ({
+      name: String(item.name ?? ""),
+      mcp: parseMcpServer(item),
+    }));
+}
+
+function parseTestingTools(raw: unknown[]): TestingToolConfig[] {
+  return raw
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+    .map((item) => ({
+      name: String(item.name ?? ""),
+      purpose: str(item.purpose),
+      mcp: parseMcpServer(item),
+    }));
 }
 
 function str(val: unknown): string | undefined {
