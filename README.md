@@ -471,6 +471,34 @@ grimoire health
   Overall            84%  █████████░
 ```
 
+### Contract Testing
+
+The plan, apply, and verify skills enforce a contract-first approach for external APIs:
+
+- **Mock at the HTTP boundary only** — never mock internal code or client wrappers
+- **Fixtures must match `schema.yml`** — test data mirrors the documented API contract
+- **Contract drift detection** — verify flags when external API changes don't have matching test updates
+- **Client code reads only documented fields** — prevents coupling to undocumented API behavior
+
+### Caveman Mode
+
+Token optimization for context-constrained agents. Set `project.caveman` in `.grimoire/config.yaml`:
+
+| Level | Effect |
+|-------|--------|
+| `none` | Full AGENTS.md instructions (default) |
+| `lite` | Trimmed explanations, same workflow |
+| `full` | Minimal instructions, experienced users |
+| `ultra` | Bare-minimum workflow skeleton |
+
+### Conflict Detection
+
+`grimoire list` detects when multiple active changes modify the same feature file and flags the conflict.
+
+### Debt Register
+
+The refactor skill maintains `.grimoire/debt-register.yml` — a persistent record of tech debt items with severity, Fowler quadrant classification (deliberate/inadvertent × prudent/reckless), fingerprint-based dedup, and aging signals. Formal exceptions live in `.grimoire/debt-exceptions.yml` with optional expiry dates.
+
 ### Multi-LLM Support
 
 Grimoire works with any AI coding assistant that reads [AGENTS.md](https://agents.md/) (open standard, 60K+ repos):
@@ -536,10 +564,11 @@ grimoire init --agent copilot   # creates .github/copilot-instructions.md
 | `grimoire test-quality [files]` | Analyze test files for quality issues |
 | `grimoire log [--from] [--to]` | Generate change log / release notes |
 | `grimoire trace <file[:line]>` | Trace file to originating grimoire change |
+| `grimoire diff <id>` | Compare proposed change specs against the baseline |
 | `grimoire docs` | Generate human-readable project overview |
 | `grimoire health [--badges]` | Project health score with optional badges |
 
-Most commands support `--json` for machine-readable output.
+Most commands support `--json` for machine-readable output. `grimoire check` also supports `--changed` (only changed files), `--continue-on-fail`, and `--skip <steps>`.
 
 </details>
 
@@ -555,6 +584,7 @@ Most commands support `--json` for machine-readable output.
 | `duplicates` | Copy-paste detection | jscpd |
 | `complexity` | Cyclomatic complexity | radon, eslint-complexity |
 | `dead_code` | Unused code detection | knip, ts-prune, vulture |
+| `doc_style` | Docstring/comment style compliance | Built-in (Google, NumPy, Sphinx, JSDoc, TSDoc) |
 | `security` | Security scanner | bandit, semgrep, npm audit, or `name: llm` |
 | `dep_audit` | Dependency vulnerability audit | npm audit, pip-audit, safety |
 | `secrets` | Hardcoded secret detection | gitleaks, detect-secrets, trufflehog, or `name: llm` |
@@ -574,6 +604,7 @@ project:
   commit_style: conventional     # conventional, angular, or custom
   doc_tool: typedoc              # sphinx, mkdocs, typedoc, jsdoc, rustdoc, godoc
   comment_style: tsdoc           # google, numpy, sphinx, jsdoc, tsdoc, pep257
+  caveman: none                  # Token optimization: none, lite, full, ultra
   compliance:                    # Compliance frameworks (affects review, plan, verify, check)
     - owasp                      # Options: owasp, pci-dss, hipaa, soc2, gdpr, iso27001
     - gdpr
