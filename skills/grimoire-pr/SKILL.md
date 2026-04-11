@@ -93,27 +93,7 @@ If the user wants a review, run a quick automated pass on the actual diff:
 > - Files changed that aren't covered by the task list (scope creep)
 > - Test quality: are step definitions making real assertions?
 >
-> **Security review** (apply to all changed files):
-> - SQL injection: string concatenation in queries instead of parameterized queries
-> - XSS: unescaped user input in HTML/template output
-> - Broken auth: custom token generation, missing auth checks on new endpoints
-> - Hardcoded secrets: API keys, passwords, tokens in source
-> - Insecure crypto: MD5/SHA1 for passwords, custom crypto
-> - Missing input validation at boundaries
-> - Tag each security finding with OWASP Top 10 category and CWE ID
->
-> **Security tag verification** (if feature files have security tags):
-> - For each `@security`/`@auth` scenario: confirm auth checks exist, negative test covers unauthorized access
-> - For each `@pii` scenario: confirm no PII in logs, encryption at rest addressed
-> - For each `@input-validation` scenario: confirm validation at boundary, negative tests for malicious input
-> - For each `@secrets` scenario: confirm values from env/secret store, not hardcoded
->
-> **Compliance verification** (if compliance frameworks are configured):
-> - For each `@pci-dss` scenario: no card data in logs, TLS, audit trail
-> - For each `@hipaa` scenario: access controls, audit logging, encryption
-> - For each `@gdpr` scenario: consent mechanism, erasure support, data retention
-> - For each `@soc2` scenario: audit logging, access controls
->
+> **Security review** — scan changed files per `../references/security-compliance.md`: OWASP surface scan, security tag verification, compliance verification. Tag findings with OWASP/CWE.
 > Flag issues as **blocker** or **suggestion**. Be concise.
 
 4. Present findings alongside the PR description.

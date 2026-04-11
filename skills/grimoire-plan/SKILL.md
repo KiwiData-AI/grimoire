@@ -70,18 +70,9 @@ Create `.grimoire/changes/<change-id>/tasks.md`. **Every scenario must produce b
 - **Authentication & security** → Always recommend proven security processes: OAuth2/OIDC for auth flows, bcrypt/argon2 for password hashing, CSRF protection for forms, parameterized queries for database access. Never roll custom crypto, custom auth tokens, or custom session management when a battle-tested library exists.
 
 **THE PLAN MUST RESPECT SECURITY TAGS AND COMPLIANCE.**
-Check `.grimoire/config.yaml` under `project.compliance` for active compliance frameworks. When feature scenarios have security tags (`@security`, `@auth`, `@pii`, `@input-validation`, `@secrets`, `@pci-dss`, `@hipaa`, `@gdpr`, `@soc2`), the plan must include corresponding tasks:
+Check `.grimoire/config.yaml` under `project.compliance`. When scenarios have security tags, the plan must include corresponding tasks per `../references/security-compliance.md` (section "What Each Tag Requires — In planning").
 
-- **`@security` / `@auth`** → Tasks must specify which auth library/framework to use, and include a negative scenario task (e.g., "attempt action without auth, assert 401/403")
-- **`@pii`** → Tasks must address: encryption at rest, access logging, data minimization. If `gdpr` is in compliance, add tasks for consent checks and erasure support
-- **`@input-validation`** → Tasks must include explicit validation/sanitization steps at the boundary, plus negative test tasks for malicious input (SQLi, XSS, path traversal as appropriate)
-- **`@secrets`** → Tasks must specify env vars or secret store — never hardcoded values. Add a task to verify no secrets in source
-- **`@pci-dss`** → Tasks must address: no card data in logs, encrypted transmission (TLS), tokenization where possible, audit trail for access to cardholder data
-- **`@hipaa`** → Tasks must address: access controls with audit logging, encryption at rest and in transit, minimum necessary access principle
-- **`@gdpr`** → Tasks must address: lawful basis for processing, consent mechanism if needed, data subject rights (access, rectify, erase, port), data retention limits
-- **`@soc2`** → Tasks must address: audit logging for all access, change management documentation, availability monitoring
-
-If no compliance frameworks are configured and no security tags are present, skip this — don't add compliance overhead to non-security features.
+If no compliance frameworks are configured and no security tags are present, skip this.
 
 If no established pattern applies, state that explicitly in the task and explain why.
 
@@ -156,19 +147,7 @@ Good task (specific enough to execute):
 - Order: schema/model changes → migrations → contract tests → seed data (if any) → then feature code
 
 **Mocking strategy for external services:**
-
-When tasks involve external APIs, the plan must specify how the service boundary is mocked. The rule is simple: **mock at the HTTP boundary, not at the client level.**
-
-- **DO mock**: the HTTP transport layer (e.g., `responses`, `httpx_mock`, `nock`, `msw`, `wiremock`). The fixture response must match the contract shape in `schema.yml`. This tests your client code end-to-end against a realistic response.
-- **DON'T mock**: your own client wrapper. If you mock `stripe_client.create_charge()`, you're testing that your code calls a function — not that your code handles the real response shape. The client wrapper is the code under test, not a dependency to stub out.
-- **DON'T mock**: internal services within the same repo. Use the real code. Mocks between internal modules hide integration bugs.
-- **Fixture management**: contract test fixtures live alongside the tests (e.g., `tests/fixtures/stripe_create_charge_response.json`). Each fixture corresponds to one endpoint in `schema.yml`. When the contract changes, the fixture must change — a stale fixture is a false-positive contract test.
-- **Error fixtures**: include at least one error response fixture per external API (matching the `error_response` shape in `schema.yml`). The client's error handling is part of the contract.
-
-Each contract test task in the plan must specify:
-1. Which HTTP mocking library to use (check existing tests or `.grimoire/config.yaml` for the project's convention)
-2. Which fixture file to create or update
-3. What the fixture contains (derived from `schema.yml` contract)
+Follow the rules in `../references/testing-contracts.md`. Key points: mock at HTTP boundary (not client), fixtures must match `schema.yml`, include error fixtures. Each contract test task must specify: (1) which HTTP mocking library, (2) which fixture file, (3) what the fixture contains (from `schema.yml`).
 
 **From manifest Assumptions:**
 - Each unvalidated assumption on the critical path → a verification task (spike, proof-of-concept, or integration test that confirms the assumption holds)

@@ -73,7 +73,7 @@ Missing negatives:
 Help the tester understand what's already automated and what requires manual testing.
 
 For each feature file in scope:
-1. **Find step definitions** — search the test codebase for step definitions that implement each scenario
+1. **Find step definitions** — grep the test directory for step text patterns from each scenario (e.g., `grep -rn 'valid credentials' tests/` for a step `Given I have entered valid credentials`)
 2. **Classify each scenario:**
    - **Automated** — has step definitions with real assertions (not `pass` or `assert True`)
    - **Partially automated** — has step definitions but some steps are stubs or have weak assertions

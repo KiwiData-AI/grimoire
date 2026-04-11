@@ -28,7 +28,7 @@ If the user's report is vague, ask one clarifying question. Don't start fixing u
 
 ### 2. Classify the Bug
 
-**Check existing feature files** in `features/` for a scenario that already describes the expected behavior.
+**Check existing feature files** — `grep -rn '<keyword from bug>' features/` to find scenarios describing the expected behavior.
 
 **Scenario exists** → The spec is right, the code is wrong. This is a pure implementation bug. Skip to step 3.
 
@@ -93,9 +93,9 @@ Now — and only now — modify production code:
 4. If the fix is more than a few lines, pause and consider whether the approach is the simplest one
 
 ### 7. Verify
-- Reproduction test passes
-- All existing feature scenarios still pass
-- All existing unit/integration tests still pass
+- Reproduction test passes (`config.tools.bdd_test`)
+- All existing feature scenarios pass (`config.tools.bdd_test`)
+- All existing unit/integration tests pass (`config.tools.unit_test`)
 - If a new scenario was added in step 2, it passes with the fix
 
 ### 8. Tester Verification Checklist

@@ -183,7 +183,7 @@ This links the git history to the grimoire change — `grimoire trace` and `grim
 2. Summarize progress in `tasks.md` (mark completed tasks, add handoff note)
 3. Tell the user: "Context is getting large. I've updated tasks.md with progress. A fresh session can resume from here."
 
-### 4. Implement Tasks
+### 5. Implement Tasks
 Work through `tasks.md` sequentially. **Every task follows the same cycle: code → test → green → next.**
 
 **For each task:**
@@ -220,18 +220,18 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: code 
 - Implement consequences noted in the ADR
 - If the ADR has a Confirmation section, write a test or check that validates it
 
-### 4. Verify
+### 6. Verify
 When all implementation tasks are complete:
-- Run ALL feature files (not just the new ones) — existing behavior must not break
+- Run the BDD test suite (command from `config.tools.bdd_test`) — existing behavior must not break
 - All scenarios should pass — new AND existing
 - If new scenarios fail, fix the implementation (not the feature file — the feature is the spec)
 - If existing scenarios break, you've introduced a regression — fix it before proceeding
 - Check ADR confirmation criteria if applicable
-- Run the project's full test suite if one exists — grimoire tests don't replace existing tests
+- Run the project's full test suite (`config.tools.unit_test`) if configured — grimoire tests don't replace existing tests
 
 **The verify step is not optional. Do not proceed to finalize with failing tests.**
 
-### 5. Finalize
+### 7. Finalize
 When all tests are green:
 1. Copy proposed `.feature` files from `.grimoire/changes/<change-id>/features/` to `features/` (replacing baseline)
 2. Move new decision records to `.grimoire/decisions/` with proper sequential numbering
@@ -240,101 +240,16 @@ When all tests are green:
 5. Move `manifest.md` to `.grimoire/archive/YYYY-MM-DD-<change-id>/`
 6. Remove the change directory from `.grimoire/changes/`
 
-### 6. Summary
+### 8. Summary
 Present a brief summary:
 - What was implemented
 - Which features now pass (with test counts if available)
 - Which decisions were accepted
 - Any follow-up items
 
-**Step definition anti-patterns to avoid:**
-- `def step_impl(): pass` — empty body, always passes, tests nothing
-- Asserting against the return value of the function you just wrote (circular)
-- `assert True` or `assert response is not None` — trivially true
-- Mocking the thing you're supposed to be testing
-- Catching exceptions in the step def so it never fails
+## References
 
-**Step definition rules:**
-- Every assertion must be specific: assert the exact expected value, status, state, or side effect
-- Use real data, not mocks, when testing behavior. Only mock at the HTTP boundary for external services — never mock internal code or your own client wrappers
-- If a step def has no `assert` statement, it's suspicious — it should either assert something or set up state that a later Then step asserts
-
-## Verify Before Using
-
-Before importing a module, calling a function, or adding a dependency — confirm it exists. Hallucinated imports are one of the most common LLM coding failures.
-
-**Imports and functions:**
-- Check area docs' Reusable Code table first — these are confirmed to exist with exact paths and line numbers
-- If you're importing from a file you haven't read, read it first (or at minimum check the area doc that covers it)
-- If an import fails when you run tests, don't guess at the correct path — read the actual module to find the real export name
-
-**Dependencies and packages:**
-- Only add packages that are already in `package.json`, `requirements.txt`, `pyproject.toml`, or equivalent
-- If a task requires a new package, check that it exists (it should be specified in the task from the plan stage)
-- Never guess at a package name — `pip-audit` won't catch a hallucinated package, but installing malware will catch you
-
-**APIs and endpoints:**
-- Check `schema.yml` for external API contracts before calling them — it has the real endpoints, methods, and field names
-- For internal APIs, read the area doc or the actual route file — don't assume endpoint paths
-
-**Contract tests:**
-- When a task includes a contract validation test, the test must assert against the contract documented in `schema.yml` — not against a live API call
-- Use a fixture/recorded response that matches the documented response shape. The fixture IS the contract — if the fixture doesn't match `schema.yml`, fix the fixture
-- The red-green cycle applies: the contract test must fail first (e.g., assert a required field exists before the client code reads it)
-- If the client code reads fields not documented in `schema.yml`, update `schema.yml` first — undocumented fields are invisible contract dependencies that will break silently
-
-**Mocking external services:**
-- **Mock at the HTTP boundary**, not at the client level. Use the project's HTTP mocking library (e.g., `responses`, `httpx_mock`, `nock`, `msw`) to intercept outgoing requests and return fixture responses. This tests your client wrapper against a realistic response — mocking the client wrapper itself tests nothing.
-- **Never mock internal code.** If both the caller and the callee are in this repo, use the real code. Mocking internal modules hides integration bugs that only surface in production.
-- **Fixtures must match `schema.yml`.** The fixture file is a concrete instance of the contract. If the response shape in the fixture doesn't match the documented contract, the fixture is wrong — not the contract.
-- **Include error fixtures.** Every external API contract test needs at least one error response fixture matching the `error_response` shape in `schema.yml`. Your client's error path is part of the contract.
-- **Keep fixtures alongside tests** (e.g., `tests/fixtures/stripe_create_charge.json`). One fixture per endpoint. Name it after the endpoint, not the test.
-
-**Mocking anti-patterns to avoid:**
-- Mocking your own client wrapper and asserting it was called — this tests wiring, not behavior
-- Using `unittest.mock.patch` on the function under test — you're replacing the thing you're supposed to be testing
-- Fixture responses that don't match any documented contract — these are fictional and prove nothing
-- Mocking so much that the test can't fail — if removing the production code still passes the test, you've mocked too aggressively
-
-**If something doesn't exist that a task says should:** Flag it to the user. The task may reference a utility that was renamed, a package that was removed, or an API that changed. Don't invent a replacement — the plan may need updating.
-
-## Implementation Principles
-- **Write the minimum code that makes the test green.** Don't add error handling for cases that can't happen, parameters nobody passes, or flexibility nobody asked for. The feature file defines what "done" looks like — satisfy it and stop.
-- **Prefer modifying existing files over creating new ones.** A new file needs a strong reason: a genuinely new domain concept, a boundary the architecture requires. Adding a function to an existing module is almost always better than a new file with one function.
-- **Inline over abstraction.** If a piece of logic is used once, keep it inline. Extract a helper only when you see the same logic repeated in the current change AND it has a clear, stable interface. Don't extract "for readability" — clear variable names and short functions are readable without indirection.
-- **Use what the codebase already has.** Before writing a utility, check if one exists. Before adding a dependency, check if the standard library covers it. Before creating a pattern, check if the codebase has an established way to do this.
-- **No speculative code.** Don't add TODO comments for future work, don't stub out interfaces for planned features, don't add configuration for things that have one value. Build what's needed now.
-
-### Single Responsibility
-Every function, class, and file you write must have one job. If you catch yourself writing a function that does two things, split it. Symptoms of violation:
-- A function name contains "and" (`fetchAndRender`, `validateAndSave`) — split it
-- A function is longer than ~30 lines — it's probably doing more than one thing
-- A class has methods that don't use the same instance state — it's two classes merged into one
-- A file mixes concerns (route handler + business logic + data access in one file) — separate the layers
-
-### Use Proven Patterns
-Follow established patterns that the plan specifies. Do not invent bespoke architectures:
-- If the plan says ETL, keep extract/transform/load as distinct, named stages — don't merge them into a monolith function
-- If the framework has a convention (Django views, Express middleware, React hooks), follow it. Don't create a parallel system
-- For security: use parameterized queries (never string concatenation for SQL), use the framework's CSRF protection, hash passwords with bcrypt/argon2 (never MD5/SHA for passwords), validate and sanitize all user input at the boundary. If you're implementing auth, use the framework's auth system or a proven library (passport, django.contrib.auth, next-auth) — never roll your own token generation or session management
-
-### Naming Conventions
-Names are documentation. Every name you write should make the code readable without comments:
-- **Functions**: verb + noun describing what it does — `calculate_total`, `send_notification`, `validate_email`
-- **Booleans**: prefix with `is_`, `has_`, `can_`, `should_` — `is_active`, `has_permission`
-- **Collections**: use plurals — `users`, `order_items`, `pending_tasks`
-- **Constants**: UPPER_SNAKE_CASE with descriptive names — `MAX_RETRY_ATTEMPTS`, not `MAX` or `N`
-- **Files**: name after the single thing the file does — `invoice_calculator.py`, not `utils2.py`
-- No single-letter variables except in trivial loops (`for i in range`). No abbreviations unless they're domain-standard (`url`, `http`, `id`)
-
-### Avoid Deep Nesting
-Code with more than 3 levels of indentation is hard to read and usually a sign of mixed concerns. When you find yourself nesting deeply:
-- **Use guard clauses / early returns** — check error conditions first and return early, keeping the happy path un-indented
-- **Extract inner blocks into named functions** — if a nested block has a clear purpose, give it a name
-- **Use pipeline/chain patterns** — instead of nested `if`s processing data, use `map`/`filter`/`reduce` or equivalent
-- **Flatten with `continue`/`break`** — in loops, handle skip conditions at the top of the loop body
-
-If the task's logic inherently requires deep nesting, that's a signal to restructure: either the task is doing too much (split it) or the approach needs rethinking (use a lookup table, strategy pattern, or state machine instead of nested conditionals).
+**Before writing code**, read `../references/testing-contracts.md` — covers: verify-before-using rules (imports, packages, APIs), mocking strategy (HTTP boundary not client), fixture management, contract tests, and step definition quality checks.
 
 ## Important
 - **Tests are not optional.** Every task produces both production code and passing step definitions. No exceptions.

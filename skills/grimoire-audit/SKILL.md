@@ -83,11 +83,11 @@ Group related items into single changes — don't create one change per discover
 Check for documented features and decisions that may no longer be accurate:
 
 **Dead features** — feature files that describe behavior the code no longer implements:
-- Feature files with no corresponding step definitions
-- Step definitions that reference modules, classes, or functions that no longer exist
-- Step definitions with `pass`, `NotImplementedError`, or empty bodies
-- Features tagged `@skip` or `@wip` indefinitely
-- Features whose routes/endpoints/views have been deleted
+- Feature files with no step definitions: for each `.feature` file, grep the test directory for its step text patterns
+- Orphaned step definitions: grep step definition imports, check if referenced modules still exist on disk
+- Stub step definitions: `grep -rn 'pass$\|NotImplementedError\|\.\.\.$$' <test-dir>` (empty bodies)
+- Stale skips: `grep -rn '@skip\|@wip' features/` cross-referenced with `git blame` for age
+- Deleted routes: for each feature's endpoint, grep the codebase for the route — missing = dead
 
 **Stale decisions** — ADRs that describe choices no longer reflected in the code:
 - ADR says "use library X" but library X is no longer in dependencies

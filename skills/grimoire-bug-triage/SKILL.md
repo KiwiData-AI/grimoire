@@ -52,11 +52,11 @@ Understand:
 Before making a triage decision, gather evidence:
 
 1. **Check the referenced specs** — read the feature scenarios the report mentions. Does the spec clearly describe the expected behavior?
-2. **Read the relevant code** — find the implementation for the reported area. Does the code match the spec?
-3. **Try to reproduce** — if you can run the relevant tests, do so. If there's a test that covers this scenario, does it pass or fail? If testing tool MCPs are configured (e.g., Playwright), consider running the relevant test flow.
-4. **Check recent changes** — `git log` the affected files. Was this area changed recently? Could it be a regression?
-5. **Check environment context** — if the bug is reported on a specific environment, consider whether the issue is environment-specific (data, config, infra differences).
-6. **Check external dependencies** — does the feature depend on a third-party API, service, or library? Could the issue be upstream?
+2. **Read the relevant code** — find the implementation. Does the code match the spec? Use `codebase-memory-mcp` `search_graph`/`trace_path` if available, otherwise grep for route/view/handler.
+3. **Try to reproduce** — run the relevant tests: `config.tools.bdd_test` for BDD scenarios, `config.tools.unit_test` for unit tests. If testing tool MCPs are configured (Playwright, Cypress), run the relevant test flow.
+4. **Check recent changes** — `git log --oneline --since="2 weeks ago" -- <affected-files>`. Was this area changed recently? Could it be a regression?
+5. **Check environment context** — read `.grimoire/docs/context.yml` for environment differences (data, config, infra).
+6. **Check external dependencies** — read `schema.yml` for external API contracts. Check provider status pages if applicable.
 
 ### 3. Classify the Root Cause
 

@@ -134,13 +134,12 @@ As the tester works, they'll report what they're doing and finding. Track this i
 
 ### 4. Timebox Management
 
-Track elapsed time against the timebox:
+LLMs cannot track wall-clock time. Use interaction counting as a proxy:
 
-- **Halfway point** — brief status: "You're 25 minutes in, 25 remaining. You've covered 4 of 8 test ideas. The error handling paths are untouched — prioritize those?"
-- **5 minutes remaining** — prompt wrap-up: "5 minutes left. Want to extend by 15 minutes, or wrap up? Here's what you haven't covered: <list>"
-- **Time's up** — prompt debrief: "Timebox reached. Let's do the debrief."
-
-The tester can always extend. The timebox prevents open-ended sessions, not productive ones.
+- **Set a checkpoint interval** at charter creation: every N interactions (suggest 8-10), pause and summarize progress.
+- **At each checkpoint**: report test ideas covered vs remaining, suggest what to prioritize next.
+- **After 3 checkpoints** (or when the user signals): prompt wrap-up and debrief.
+- **The user controls pacing.** They can say "keep going", "wrap up", or "extend". The skill tracks coverage, not the clock.
 
 ### 5. Generate Session Debrief
 
