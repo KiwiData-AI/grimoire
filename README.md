@@ -139,6 +139,7 @@ Grimoire routes your request to the right format:
 - **"Users should be able to log in with 2FA"** → Gherkin feature
 - **"We should use PostgreSQL instead of MySQL"** → MADR decision record
 - **"The login page is broken"** → `/grimoire:bug` (reproduce first, then fix)
+- **"A tester found a problem"** → `/grimoire:bug-report` → `/grimoire:bug-triage` → routed fix
 
 Produces `.feature` files, decision records, `data.yml` for schema changes, and a manifest tracking the change.
 
@@ -150,11 +151,12 @@ The plan skill reads `.grimoire/docs/` to find reusable utilities, coding patter
 
 ### 3. Review — Multi-perspective design review (optional)
 
-Four personas validate the change before any code is written:
+Five personas validate the change before any code is written:
 
 - **Product manager** — completeness, missing edge cases, unclear requirements
 - **Senior engineer** — simplicity, code reuse, architecture fit, task quality
 - **Security engineer** — input validation, auth boundaries, vulnerable dependencies, secrets
+- **QA engineer** — testability, negative scenarios, edge cases, observability, regression risk
 - **Data engineer** — schema design, migration safety, index coverage (when `data.yml` present)
 
 Issues flagged as **blocker** or **suggestion**. Skip for small/low-risk changes.
@@ -274,6 +276,55 @@ grimoire check
 Tools are auto-detected during `grimoire init`. Supports linters, formatters, test frameworks, duplicate detection (jscpd), complexity analysis, security scanners, dependency auditing (npm audit, pip-audit, safety), secret detection (detect-secrets, gitleaks, trufflehog), and LLM-based reviews.
 
 `grimoire init` also sets up enforcement hooks for Claude Code (`.claude/hooks.json`) and git (`.git/hooks/pre-commit`).
+
+### Bug Workflow
+
+Grimoire provides a full bug lifecycle for teams with testers and developers:
+
+```
+Tester finds issue → /grimoire:bug-report → structured report with spec references
+                                                    ↓
+Developer picks it up → /grimoire:bug-triage → classify root cause
+                                                    ↓
+                                    ┌───────────────┼───────────────┐
+                                    ↓               ↓               ↓
+                                CODE            INFRA/CONFIG     SECURITY
+                            /grimoire:bug      route to team    confidential fix
+                          (repro test → fix)   (create ticket)  (restricted workflow)
+```
+
+**Bug reports** accept output from testing tools (Playwright, Cypress, Postman, k6) via MCP or pasted directly — auto-extracting failed assertions, screenshots, and reproduction steps.
+
+**Triage** classifies issues into 7 categories — code, infrastructure, configuration, data, third-party, security, or documentation — and routes to the right team. Security issues follow a restricted workflow with confidential handling.
+
+**Exploratory testing** (`/grimoire:bug-explore`) analyzes feature specs for missing negative scenarios, boundary conditions, and cross-feature interaction risks.
+
+`grimoire init` asks where bug reports live (Jira, Linear, GitHub Issues) and what testing tools your team uses, offering to install MCP servers for each:
+
+```yaml
+# .grimoire/config.yaml
+bug_trackers:
+  - name: jira
+    mcp:
+      name: atlassian
+      url: https://mcp.atlassian.com/v1/sse
+      transport: sse
+  - name: github
+    mcp:
+      name: github
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-github"]
+
+testing_tools:
+  - name: playwright
+    purpose: e2e
+    mcp:
+      name: playwright
+      command: npx
+      args: ["-y", "@playwright/mcp@latest"]
+  - name: k6
+    purpose: performance
+```
 
 ### Test Quality
 
@@ -520,13 +571,16 @@ The feature files move to `features/auth/login.feature` (baseline). The decision
 |-------|---------|
 | `/grimoire:draft` | Draft features and/or decisions collaboratively |
 | `/grimoire:plan` | Generate detailed implementation tasks from specs |
-| `/grimoire:review` | Multi-perspective design review (optional) |
+| `/grimoire:review` | Multi-perspective design review (PM, engineer, security, QA, data) |
 | `/grimoire:apply` | Execute tasks with strict red-green BDD |
 | `/grimoire:verify` | Post-implementation verification + test quality |
 | `/grimoire:audit` | Discover undocumented features and decisions |
 | `/grimoire:remove` | Tracked feature removal with impact assessment |
 | `/grimoire:discover` | Generate area docs and data schema from codebase |
 | `/grimoire:bug` | Disciplined bug fix with reproduction test first |
+| `/grimoire:bug-report` | Structured bug reporting for testers (accepts test tool output) |
+| `/grimoire:bug-triage` | Classify, route, and respond to bug reports (code/infra/config/data/security) |
+| `/grimoire:bug-explore` | AI-guided exploratory testing — find gaps and edge cases |
 | `/grimoire:commit` | Contextual commit messages with change trailers |
 | `/grimoire:pr` | Generate PR description + optional diff review |
 
@@ -642,6 +696,25 @@ checks:
   - dep_audit
   - secrets
   - best_practices
+
+# Bug tracking — where bug reports are filed (supports multiple)
+bug_trackers:
+  - name: jira                     # jira, linear, github, or custom
+    mcp:                           # Optional MCP server for ticket integration
+      name: atlassian
+      url: https://mcp.atlassian.com/v1/sse
+      transport: sse
+
+# Testing tools — what testers use (supports multiple with different purposes)
+testing_tools:
+  - name: playwright
+    purpose: e2e                   # e2e, integration, performance, api, general
+    mcp:                           # Optional MCP server for pulling test results
+      name: playwright
+      command: npx
+      args: ["-y", "@playwright/mcp@latest"]
+  - name: k6
+    purpose: performance
 ```
 
 </details>

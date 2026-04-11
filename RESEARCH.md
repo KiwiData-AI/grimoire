@@ -424,6 +424,125 @@ The Queen's University finding (76% hallucination rate) is critical — grimoire
 
 ---
 
+## AI Testing Harnesses for QA Testers
+
+Research into whether an AI harness exists for QA testers — equivalent to how Claude Code/Cursor/Kiro serve developers — but focused on helping human testers be more effective (April 2026).
+
+### The Gap
+
+The AI tooling ecosystem has split into two lanes, neither of which serves QA testers:
+
+1. **Developer harnesses** (Claude Code, Cursor, Kiro, OpenSpec, spec-kit) — help devs *build*
+2. **Autonomous QA agents** (QA.tech, Momentic, QA Wolf) — try to *replace* testers entirely
+
+Nobody has built the middle thing: **an AI harness that makes human testers better at their job.** QA Wolf explicitly named this gap in a January 2026 blog post: "AI IDE tools are built for developers, which means everyone else — PMs, execs, and manual testers — is left in the dark."
+
+Industry data: 89% of organizations say they use GenAI in quality engineering, but only 15% have scaled it successfully. 45% of practitioners believe manual testing is irreplaceable. The tools being built are either autonomous agents trying to replace testers or bolt-on AI features in existing SaaS platforms.
+
+### What a Tester Harness Would Look Like
+
+- Read specs/requirements → generate exploratory test charters and session plans
+- Guide a tester through a session, suggesting edge cases and areas to probe
+- Structure and enrich bug reports in real-time (flag missing repro steps, suggest severity, normalize language)
+- Maintain session context ("you already tested the happy path, here are the error paths you haven't hit")
+- CLI or lightweight UI, not a heavy SaaS platform
+- Structured, machine-readable bug reports that could drive automated reproduction or verification
+
+### Closest Existing Tools
+
+#### Tester-Focused (but not harnesses)
+
+| Tool | What it does | Form factor | Gap |
+|------|-------------|-------------|-----|
+| **TestKase** (testkase.com) | AI structures bug reports, flags missing info, suggests severity, normalizes language | Web SaaS | No CLI, no session guidance, no spec integration |
+| **Bugasura** (bugasura.io) | Exploratory session tracking, auto-bug-logging, context doc uploads | Chrome extension | Browser-only, no spec-driven test planning |
+| **Jam** (jam.dev) | One-click bug reports with auto-captured repro steps, console logs, network requests | Browser extension | Capture tool, not a testing assistant |
+| **FlowLens** | Captures video, network, console, DOM events; produces "AI-ready bug reports"; integrates with MCP agents | Chrome extension | Capture/export only, no session guidance |
+| **TestCollab QA Copilot** (testcollab.com/qa-copilot) | Generates test cases from requirements/screenshots/URLs, has CLI (`qac`) | Web SaaS + CLI | CLI is a pipeline trigger, not a tester workbench |
+
+#### AI-Augmented Test Management (SaaS platforms with AI bolted on)
+
+| Tool | AI Feature | Limitation |
+|------|-----------|------------|
+| **Qase** (qase.io) | AI test case generation, run management, reporting | Full SaaS, not a tester-centric harness |
+| **Testomat.io** | Creates tests from Jira/GitHub issues or plain text | Web-based, developer-consumption focused |
+| **BrowserStack Test Management** | AI parses unstructured requirements into test cases | Web-based, enterprise |
+
+#### Autonomous Agents (Replace testers, don't assist them)
+
+| Tool | What it does | Why it's not what we want |
+|------|-------------|--------------------------|
+| **QA.tech** | Scans app, finds flows, generates and runs tests, creates bug reports | Replaces testers, doesn't empower them |
+| **QA Wolf** | Managed QA service with AI | Managed service, not a tool |
+| **Momentic** (momentic.ai) | AI agent explores apps, finds critical flows, generates tests | Developer/CI-facing |
+
+#### AI Exploratory Testing (Mostly conceptual)
+
+No purpose-built tools exist. The current state of the art is raw LLM prompting:
+
+- **Xray + AI** describes using AI as a "brainstorming partner" during exploratory sessions — not a standalone tool
+- **Kualitee** published "30 Expert AI Prompts for QA Teams" — people are using raw prompts, not products
+- Blog posts describe using ChatGPT to generate session-based exploratory test charters (Charter ID, Mission, Areas of Focus, Timebox) — prompt engineering, not tooling
+
+### Structured Bug Reporting Standards
+
+There is no dominant open standard for structured, machine-readable bug reports:
+
+| Format/Tool | What it is | Adoption |
+|-------------|-----------|----------|
+| **GitHub Issue Forms** | YAML-based templates, validated fields, version-controlled | High (GitHub-only) |
+| **GitLab Issue Templates** | Markdown-based, repo-stored, group/instance inheritance | High (GitLab-only) |
+| **IEEE 829 Anomaly Report** | Formal standard for defect documentation | Low (heavyweight) |
+| **JUnit XML** | De facto CI/CD test result format | High (results only, not reports) |
+| **Allure JSON** | Rich test results: nested steps, attachments, labels, links | Medium |
+| **TAP** (Test Anything Protocol) | Simple text-based test result protocol | Medium |
+
+Research shows "steps to reproduce" appears in 83% of bug reports in large OSS projects, and structured templates with field descriptions are the #1 requested feature by developers (75%).
+
+### Spec-Driven Testing Tools (adjacent)
+
+| Tool | Type | What it does | Relevance |
+|------|------|-------------|-----------|
+| **fspec** (github.com/sengac/fspec) | CLI | Gherkin-based "coding factory" that auto-generates tests from Given/When/Then, enforces TDD, has rollback/checkpoints | Closest peer — but developer-facing, not tester-facing |
+| **Tessl** (tessl.io) | IDE/CLI | 1:1 spec-to-code mapping, reverse-engineers specs from code, test guardrails | Closed beta, developer-facing |
+| **Gauge** (gauge.org, ThoughtWorks) | CLI | Markdown-based test specs (not Gherkin), multi-language, plugin architecture | Open source, but test automation not test assistance |
+| **Concordion** (concordion.org) | Library | Plain-English executable specs as "living documentation" | Java/.NET, developer-facing |
+| **testRigor** (testrigor.com) | SaaS | Plain English executable test specs, no Gherkin needed | Automation, not tester assistance |
+
+### Grimoire Opportunity
+
+Given grimoire already uses Gherkin for behavioral specs, this is a natural extension:
+
+1. **Specs in → test charters out:** `.feature` files + manifest → exploratory test charters with session plans, edge cases, and risk areas
+2. **Structured bug reports as artifacts:** Bug reports as structured files (YAML or Markdown with frontmatter) that live alongside features — traceable via git trailers like changes
+3. **Session guidance:** AI reads the spec, knows what's been tested, suggests what to probe next
+4. **Bug → change pipeline:** Verified bug report feeds directly into `grimoire draft` as a change request
+5. **Report enrichment:** AI flags missing repro steps, suggests severity, checks against existing features for regression indicators
+
+This would make grimoire the first tool to close the full loop: **spec → build → test → report → fix** — all structured, all traceable, all file-based.
+
+### Sources
+
+- QA Wolf — "AI IDEs are simply the wrong tool for the QA job" (January 2026)
+- TestKase — testkase.com/blog/ai-better-bug-reports
+- Bugasura — bugasura.io/ai-issue-tracker
+- Jam — jam.dev/ai
+- FlowLens — Chrome Web Store
+- TestCollab — testcollab.com/qa-copilot
+- Qase — qase.io
+- QA.tech — qa.tech
+- Momentic — momentic.ai
+- Xray — getxray.app/blog/ai-in-exploratory-testing
+- Kualitee — kualitee.com/blog/ai/expert-ai-prompts-for-qa-teams
+- Gauge — gauge.org
+- fspec — github.com/sengac/fspec
+- Tessl — tessl.io; Martin Fowler — "Understanding SDD: Kiro, spec-kit, and Tessl"
+- ACM — "Bug Report Templates in Open-Source Software" (dl.acm.org/doi/fullHtml/10.1145/3671016.3671401)
+- AI Testing Adoption Gap — medium.com (2025-2026 QA Engineers survey)
+- TestCollab — "Claude Code for QA Testing: 6 Practical Use Cases"
+
+---
+
 ## Open Questions
 
 - How do we handle Background sections that need to change across features?

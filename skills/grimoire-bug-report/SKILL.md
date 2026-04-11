@@ -64,6 +64,26 @@ Walk the reporter through a structured interview for anything not already captur
 
 If the reporter provides screenshots, logs, error messages, or network traces — capture those references. Don't require them, but note what's available.
 
+### 1c. Security Screening
+
+After gathering details, check whether this might be a security issue. Look for signals in what the reporter described:
+
+- **Authentication/authorization bypass** — accessing something they shouldn't, or acting as another user
+- **Data exposure** — seeing other users' data, PII in logs, sensitive info in error messages
+- **Injection** — unusual characters causing unexpected behavior (SQL, XSS, command injection)
+- **Credential/secret exposure** — API keys, tokens, or passwords visible in UI, URLs, or logs
+- **Privilege escalation** — performing actions above their role (e.g., normal user accessing admin functions)
+- **Denial of service** — actions that crash or freeze the system for other users
+
+**If any security signals are detected:**
+
+1. **Warn the reporter** — "This looks like it might be a security issue. Security bugs need special handling to avoid exposing the vulnerability before it's fixed."
+2. **Set `security: true`** in the report frontmatter
+3. **Don't include exploit details in public trackers** — if the team's bug tracker is public (e.g., public GitHub repo), note that the full reproduction steps are in the local report only. The external ticket should describe the impact without providing a step-by-step exploit guide.
+4. **Flag for priority triage** — security issues should skip the queue
+
+The reporter doesn't need to make the security determination themselves. This screening happens automatically based on the described behavior. If in doubt, flag it — it's better to over-flag and have triage clear it than to miss a real vulnerability.
+
 ### 2. Match to Feature Specs
 
 Search `features/` for scenarios that describe the expected behavior:
@@ -92,6 +112,7 @@ Create `.grimoire/bugs/<bug-id>/report.md`:
 id: <bug-id>
 status: reported
 severity: <critical|major|minor|cosmetic>
+security: <true|false>
 environment: <dev|qa|staging|production>
 reported-by: <name or role>
 date: <YYYY-MM-DD>
@@ -159,6 +180,12 @@ Check `.grimoire/config.yaml` for configured `bug_trackers` with MCP servers. If
 - Post a notification to the relevant channel if a communication MCP is available
 
 If multiple bug trackers are configured, ask which one to use for this report.
+
+**Security reports get special handling:**
+- If the bug tracker is public (e.g., public GitHub repo), do NOT create a public ticket. Use GitHub's private security advisory feature, or create the ticket in a private tracker only.
+- The external ticket should describe the **impact** ("users can access other users' data") without the **exploit** ("by changing the user_id parameter in the URL to another user's ID").
+- Full reproduction steps stay in the local `.grimoire/bugs/` report only.
+- If a private security channel exists (e.g., `#security` Slack channel, private Jira project), notify there instead of the general channel.
 
 If no MCP tools are configured, tell the reporter the report is at `.grimoire/bugs/<bug-id>/report.md` and they can share it however they normally would.
 
