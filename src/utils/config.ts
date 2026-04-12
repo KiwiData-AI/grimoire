@@ -12,6 +12,8 @@ export interface ToolConfig {
 
 export type CavemanLevel = "none" | "lite" | "full" | "ultra";
 
+export const CURRENT_CONFIG_VERSION = 2;
+
 export interface DesignToolConfig {
   name: string;
   path?: string;

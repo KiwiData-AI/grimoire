@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile, copyFile } from "node:fs/promises";
+import { mkdir, writeFile, copyFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stringify as yamlStringify } from "yaml";
@@ -16,9 +16,10 @@ import { fileExists } from "../utils/fs.js";
 import {
   upsertAgentsFile,
   installSkillFiles,
-  upsertManagedBlock,
-  buildManagedBlock,
   SKILL_NAMES,
+  GRIMOIRE_DIRS,
+  TEMPLATE_FILES,
+  generateAgentFiles,
 } from "./shared-setup.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -72,31 +73,14 @@ export async function initProject(
   console.log(chalk.bold("Initializing grimoire...\n"));
 
   // Create directory structure
-  const dirs = [
-    "features",
-    ".grimoire/decisions",
-    ".grimoire/docs",
-    ".grimoire/changes",
-    ".grimoire/archive",
-    ".grimoire/bugs",
-  ];
-
-  for (const dir of dirs) {
+  for (const dir of GRIMOIRE_DIRS) {
     const fullPath = join(root, dir);
     await mkdir(fullPath, { recursive: true });
     console.log(`  ${chalk.green("created")} ${dir}/`);
   }
 
   // Copy template files
-  const templates: Array<[string, string]> = [
-    ["decision.md", ".grimoire/decisions/template.md"],
-    ["context.yml", ".grimoire/docs/context.yml"],
-    ["debt-exceptions.yml", ".grimoire/debt-exceptions.yml"],
-    ["mapignore", ".grimoire/mapignore"],
-    ["mapkeys", ".grimoire/mapkeys"],
-  ];
-
-  for (const [src, dest] of templates) {
+  for (const [src, dest] of TEMPLATE_FILES) {
     const srcPath = join(PACKAGE_ROOT, "templates", src);
     const destPath = join(root, dest);
     if (!(await fileExists(destPath))) {
@@ -137,7 +121,7 @@ export async function initProject(
 
   // Generate agent-specific instruction files
   if (options.agents.length > 0) {
-    await generateAgentFiles(root, options.agents);
+    await generateAgentFiles(root, PACKAGE_ROOT, options.agents, "created");
   }
 
   // Set up hooks (Claude Code + git)
@@ -699,34 +683,6 @@ function confidenceRank(c: "high" | "medium" | "low"): number {
 
 async function setupAgentsFile(root: string, caveman: CavemanLevel): Promise<void> {
   await upsertAgentsFile(root, PACKAGE_ROOT, "created", caveman);
-}
-
-async function generateAgentFiles(root: string, agents: string[]): Promise<void> {
-  const grimoireAgents = await readFile(join(PACKAGE_ROOT, "AGENTS.md"), "utf-8");
-  const managedBlock = buildManagedBlock(grimoireAgents);
-
-  for (const agent of agents) {
-    switch (agent) {
-      case "cursor": {
-        const rulesDir = join(root, ".cursor", "rules");
-        await mkdir(rulesDir, { recursive: true });
-        const mdcPath = join(rulesDir, "grimoire.mdc");
-        const frontmatter = "---\ndescription: Grimoire spec-driven development workflow\nglobs:\nalwaysApply: true\n---\n\n";
-        await writeFile(mdcPath, frontmatter + grimoireAgents);
-        console.log(`  ${chalk.green("created")} .cursor/rules/grimoire.mdc`);
-        break;
-      }
-      case "copilot": {
-        const ghDir = join(root, ".github");
-        await mkdir(ghDir, { recursive: true });
-        const instructionsPath = join(ghDir, "copilot-instructions.md");
-        await upsertManagedBlock(instructionsPath, managedBlock, "created", ".github/copilot-instructions.md");
-        break;
-      }
-      default:
-        console.log(`  ${chalk.yellow("unknown")} agent type: ${agent} (supported: cursor, copilot)`);
-    }
-  }
 }
 
 async function installSkills(root: string): Promise<void> {

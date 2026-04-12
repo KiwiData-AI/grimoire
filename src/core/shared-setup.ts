@@ -7,6 +7,23 @@ import type { CavemanLevel } from "../utils/config.js";
 export const GRIMOIRE_START_MARKER = "<!-- GRIMOIRE:START -->";
 export const GRIMOIRE_END_MARKER = "<!-- GRIMOIRE:END -->";
 
+export const GRIMOIRE_DIRS = [
+  "features",
+  ".grimoire/decisions",
+  ".grimoire/docs",
+  ".grimoire/changes",
+  ".grimoire/archive",
+  ".grimoire/bugs",
+];
+
+export const TEMPLATE_FILES: Array<[string, string]> = [
+  ["decision.md", ".grimoire/decisions/template.md"],
+  ["context.yml", ".grimoire/docs/context.yml"],
+  ["debt-exceptions.yml", ".grimoire/debt-exceptions.yml"],
+  ["mapignore", ".grimoire/mapignore"],
+  ["mapkeys", ".grimoire/mapkeys"],
+];
+
 export const SKILL_NAMES = [
   "grimoire-draft",
   "grimoire-plan",
@@ -126,6 +143,106 @@ export async function upsertAgentsFile(
   const content = cavemanBlock ? cavemanBlock + grimoireAgents : grimoireAgents;
   const managedBlock = buildManagedBlock(content);
   await upsertManagedBlock(agentsPath, managedBlock, verb, "AGENTS.md");
+}
+
+/**
+ * Ensure all grimoire directories exist (idempotent).
+ */
+export async function ensureDirectories(
+  root: string,
+): Promise<void> {
+  for (const dir of GRIMOIRE_DIRS) {
+    const fullPath = join(root, dir);
+    const existed = await fileExists(fullPath);
+    await mkdir(fullPath, { recursive: true });
+    if (!existed) {
+      console.log(`  ${chalk.green("created")} ${dir}/`);
+    }
+  }
+}
+
+/**
+ * Copy template files from the package into the project.
+ * By default only creates missing templates. With force=true, overwrites all.
+ */
+export async function installTemplates(
+  root: string,
+  packageRoot: string,
+  force: boolean = false
+): Promise<void> {
+  for (const [src, dest] of TEMPLATE_FILES) {
+    const srcPath = join(packageRoot, "templates", src);
+    const destPath = join(root, dest);
+    if (await fileExists(destPath)) {
+      if (force) {
+        await copyFile(srcPath, destPath);
+        console.log(`  ${chalk.blue("replaced")} ${dest}`);
+      } else {
+        console.log(`  ${chalk.yellow("exists")}  ${dest}`);
+      }
+    } else {
+      await copyFile(srcPath, destPath);
+      console.log(`  ${chalk.green("created")} ${dest}`);
+    }
+  }
+}
+
+/**
+ * Generate agent-specific instruction files (cursor, copilot).
+ */
+export async function generateAgentFiles(
+  root: string,
+  packageRoot: string,
+  agents: string[],
+  verb: "created" | "updated" = "created"
+): Promise<void> {
+  if (agents.length === 0) return;
+
+  const grimoireAgents = await readFile(join(packageRoot, "AGENTS.md"), "utf-8");
+  const managedBlock = buildManagedBlock(grimoireAgents);
+
+  for (const agent of agents) {
+    switch (agent) {
+      case "cursor": {
+        const rulesDir = join(root, ".cursor", "rules");
+        await mkdir(rulesDir, { recursive: true });
+        const mdcPath = join(rulesDir, "grimoire.mdc");
+        const frontmatter =
+          "---\ndescription: Grimoire spec-driven development workflow\nglobs:\nalwaysApply: true\n---\n\n";
+        await writeFile(mdcPath, frontmatter + grimoireAgents);
+        console.log(`  ${chalk[verb === "created" ? "green" : "blue"](verb)} .cursor/rules/grimoire.mdc`);
+        break;
+      }
+      case "copilot": {
+        const ghDir = join(root, ".github");
+        await mkdir(ghDir, { recursive: true });
+        const instructionsPath = join(ghDir, "copilot-instructions.md");
+        await upsertManagedBlock(
+          instructionsPath,
+          managedBlock,
+          verb,
+          ".github/copilot-instructions.md"
+        );
+        break;
+      }
+      default:
+        console.log(
+          `  ${chalk.yellow("unknown")} agent type: ${agent} (supported: cursor, copilot)`
+        );
+    }
+  }
+}
+
+/**
+ * Auto-detect which agent files exist in the project.
+ */
+export async function detectAgentFiles(root: string): Promise<string[]> {
+  const agents: string[] = [];
+  if (await fileExists(join(root, ".cursor", "rules", "grimoire.mdc")))
+    agents.push("cursor");
+  if (await fileExists(join(root, ".github", "copilot-instructions.md")))
+    agents.push("copilot");
+  return agents;
 }
 
 /**
