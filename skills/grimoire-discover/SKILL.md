@@ -17,6 +17,11 @@ Generate a structured project map in `.grimoire/docs/` from a codebase snapshot.
 - User wants to prevent duplicate code or find existing utilities
 - Loose match: "discover", "map", "standards", "conventions", "DRY", "utilities", "codebase layout"
 
+## Routing
+- Want to document existing behavior as Gherkin features → `grimoire-audit`
+- Want to find undocumented features and decisions → `grimoire-audit` (run discover first, then audit)
+- Want to draft new functionality → `grimoire-draft`
+
 ## Prerequisites
 
 **Structural snapshot:** Run `grimoire map` first. This produces `.grimoire/docs/.snapshot.json` — a structural scan of the directory tree, key files, and file extension counts. The snapshot is the input for directory structure; this skill adds the semantic layer.
@@ -287,3 +292,6 @@ These are read by `grimoire map` and affect the snapshot this skill consumes.
 - **The reuse inventory is the most valuable output.** An LLM that knows `format_currency()` exists in `utils/formatters.py` won't write a new one.
 - **Don't document the obvious.** Skip areas that are self-explanatory from file names alone. Focus on areas where an LLM would make mistakes.
 - **Update, don't accumulate.** When refreshing, replace stale docs rather than appending. The docs should reflect the current codebase, not its history.
+
+## Done
+When area docs, schema, context, and index are generated, the workflow is complete. Suggest `grimoire-audit` to document existing features and decisions as Gherkin specs and ADRs.

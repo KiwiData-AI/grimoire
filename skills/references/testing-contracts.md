@@ -54,6 +54,30 @@ Before importing a module, calling a function, or adding a dependency — confir
 - Check `schema.yml` for external API contracts (real endpoints, methods, field names)
 - For internal APIs, read the area doc or route file — don't assume paths
 
+## Step Definition Conventions
+
+Step definitions are organized by **domain concept**, NOT by feature file. One step file per feature file is an anti-pattern — steps should be reusable across features.
+
+**Before writing step definitions, check the project's existing test setup.** Read test config files, existing step definitions, and `package.json` / `requirements.txt` / `pyproject.toml` to determine which framework is in use and follow its conventions.
+
+**Key rules:**
+- NEVER create one step definition file per feature file
+- Given steps are most likely to be shared — put them in a common location
+- When/Then steps are more domain-specific — group by domain
+- If a step is used by 2+ features, move it to the shared/common file
+- Step definition bodies should be thin — delegate to helper functions, page objects, or API clients
+- **Match the project's existing patterns.** Don't introduce a new framework.
+
+Common patterns by ecosystem (use as reference, not gospel — follow the project's actual conventions):
+
+**Python (Behave):** `features/steps/` with `auth_steps.py`, `common_steps.py`, `environment.py`
+
+**Python (pytest-bdd):** `tests/conftest.py` for shared fixtures + `tests/step_defs/test_auth.py` per domain
+
+**JavaScript/TypeScript (Cucumber.js):** `features/step_definitions/` with `auth.steps.ts`, `common.steps.ts`, `features/support/world.ts`
+
+**React / Frontend (Playwright/Cypress + Cucumber):** `e2e/steps/` with domain step files + `e2e/pages/` for page objects
+
 ## Step Definition Quality
 
 Every Then step must have a specific assertion with an exact expected value:

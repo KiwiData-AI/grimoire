@@ -16,6 +16,11 @@ Generate a pull request description from grimoire change artifacts and optionall
 - User asks to generate a PR description
 - Loose match: "PR", "pull request", "ready to merge", "create PR"
 
+## Routing
+- Tasks incomplete → `grimoire-apply` first (or create a draft PR)
+- Haven't committed yet → `grimoire-commit` first
+- Want a pre-merge design review → this skill includes optional post-implementation review
+
 ## Prerequisites
 - A change exists in `.grimoire/changes/<change-id>/` with:
   - `manifest.md`
@@ -124,3 +129,6 @@ After PR creation:
 - Don't pad the description with boilerplate. Keep it factual: what changed, why, how to verify.
 - The post-implementation review is optional and quick — it's not a replacement for the design review, just a sanity check on the actual code.
 - If tasks are incomplete, warn the user but don't block PR creation — they may want a draft PR.
+
+## Done
+When the PR is created (or description is presented for manual creation), the workflow is complete. Suggest `grimoire archive <change-id>` to complete the lifecycle.

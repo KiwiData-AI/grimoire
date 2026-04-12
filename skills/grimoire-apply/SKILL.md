@@ -32,6 +32,12 @@ This applies to all LLMs: Claude, Codex, Cursor, Copilot, etc. The task list is 
 - User asks to apply, implement, or build a grimoire change
 - Loose match: "apply", "implement", "build" with a change reference
 
+## Routing
+- No tasks.md exists → `grimoire-plan` first
+- Task seems wrong or impossible → flag to user; do NOT silently re-plan or skip
+- Implementation reveals the spec is wrong → STOP. Go back to `grimoire-draft`.
+- Fix is needed (not a planned change) → `grimoire-bug`
+
 ## Prerequisites
 - A change exists in `.grimoire/changes/<change-id>/` with:
   - `manifest.md`
@@ -261,3 +267,8 @@ Present a brief summary:
 - If blocked, flag it rather than working around it
 - Commit frequently — one commit per logical task is ideal. Every commit during apply **MUST** include a `Change: <change-id>` git trailer for audit traceability. Use `/grimoire:commit` or manually add the trailer.
 - Existing tests must keep passing. A grimoire change that breaks existing behavior is not complete.
+
+## Done
+When all tasks are complete, tests pass, and artifacts are finalized, the workflow is complete. Present the summary and suggest:
+- `grimoire-verify` to confirm implementation matches specs
+- `grimoire-commit` to commit the changes

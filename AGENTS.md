@@ -89,9 +89,26 @@ User has a request
 │  → Don't use grimoire (no behavior change). UNLESS the refactoring
 │    changes module boundaries or patterns — then write an ADR.
 │
-└─ "Update config / deps / formatting"
-   → Don't use grimoire. Just do it.
+├─ "Update config / deps / formatting"
+│  → Don't use grimoire. Just do it.
+│
+├─ "Setting up grimoire on an existing project"
+│  1. `grimoire init` → creates .grimoire/ directory and config
+│  2. `grimoire map` → scans codebase structure into .snapshot.json
+│  3. `/grimoire:discover` → generates area docs, data schema, project context
+│  4. `/grimoire:audit` → discovers undocumented features and decisions
+│  5. Start working: `/grimoire:draft` for new changes, `/grimoire:bug` for fixes
+│
+└─ "Setting up grimoire on a new/greenfield project"
+   1. `grimoire init` → creates .grimoire/ directory and config
+   2. Start working: `/grimoire:draft` for the first feature
 ```
+
+### Skill Routing
+
+Every grimoire skill has a **Routing** section that redirects to the correct skill when a mismatch is detected. If you start a skill and realize the user's request doesn't match, check the Routing section — it tells you where to go instead.
+
+Skills also have a **Done** section that signals when the workflow is complete. When you reach it, present results and wait for the user's next instruction. Do not invent follow-up actions.
 
 ## Workflow: Creating or Changing a Feature
 
@@ -146,170 +163,6 @@ project-root/
 │           └── manifest.md
 ```
 
-## File Formats
-
-### Gherkin Features
-Standard Gherkin syntax. Every feature must have:
-- A `Feature:` title with user story (As a / I want / So that)
-- At least one `Scenario:` with Given/When/Then steps
-- `Background:` for shared preconditions (optional)
-
-```gherkin
-Feature: Login with two-factor authentication
-  As a user
-  I want to verify my identity with a second factor
-  So that my account is protected from unauthorized access
-
-  Background:
-    Given I am on the login page
-
-  Scenario: Successful login with valid TOTP code
-    Given I have entered valid credentials
-    When I enter a valid TOTP code
-    Then I should be redirected to the dashboard
-
-  Scenario: Login rejected with expired TOTP code
-    Given I have entered valid credentials
-    When I enter an expired TOTP code
-    Then I should see an error message "Code expired"
-    And I should remain on the verification page
-```
-
-Features describe WHAT the system does, never HOW. No implementation details in feature files.
-
-### MADR Decision Records
-Follow MADR v4.0 format. File naming: `NNNN-short-title.md` (zero-padded, sequential).
-
-```markdown
----
-status: proposed
-date: 2026-04-04
-decision-makers: [Fred]
----
-
-# Use PostgreSQL as Primary Database
-
-## Context and Problem Statement
-We need a relational database that supports full-text search and vector operations.
-
-## Decision Drivers
-- Must support pgvector for embeddings
-- Team familiarity
-- Managed hosting availability
-
-## Considered Options
-1. PostgreSQL with pgvector
-2. MySQL with separate vector store
-3. SQLite for development only
-
-## Decision Outcome
-Chosen option: "PostgreSQL with pgvector", because it consolidates relational and vector storage in one system the team already knows.
-
-### Consequences
-- Good: Single database to manage, strong ecosystem
-- Bad: Heavier than SQLite for local dev
-
-### Cost of Ownership
-- **Maintenance burden**: Requires managed PostgreSQL hosting, pgvector extension updates, team must know PostgreSQL-specific features
-- **Ongoing benefits**: Single database to operate and back up, pgvector improvements land automatically
-- **Sunset criteria**: Revisit if vector query volume exceeds what pgvector handles efficiently, or if a dedicated vector store becomes necessary for latency
-
-### Confirmation
-Verify with load test that pgvector queries meet <100ms p95 target.
-```
-
-### Change Manifest
-Every change in `.grimoire/changes/<change-id>/` has a `manifest.md`:
-
-```markdown
----
-status: draft
-branch:
----
-
-# Change: <Brief description>
-
-## Why
-[1-2 sentences on problem/opportunity]
-
-## Assumptions
-<!-- What must be true for this change to work? List beliefs that haven't been validated. -->
-- [assumption]: [evidence or "unvalidated"]
-
-## Pre-Mortem
-<!-- Imagine this change has failed or caused a production incident 6 months from now. What went wrong? -->
-- [risk]: [mitigation or "accepted"]
-
-## Feature Changes
-- **ADDED** `<capability>/<name>.feature` — [what it adds]
-- **MODIFIED** `<capability>/<name>.feature` — [what changed]
-- **REMOVED** `<capability>/<name>.feature` — [why removed]
-
-## Scenarios Added
-- `<file>`: "Scenario name", "Scenario name"
-
-## Scenarios Modified
-- `<file>`: "Scenario name" — [what changed]
-
-## Decisions
-- **ADDED** `NNNN-short-title.md` — [what it decides]
-- **SUPERSEDED** `NNNN-short-title.md` by `NNNN-new-title.md` — [why]
-```
-
-### Tasks
-Implementation checklist in `.grimoire/changes/<change-id>/tasks.md`:
-
-```markdown
-# Tasks: <change-id>
-
-## Implementation
-- [ ] 1.1 <task derived from scenario or decision>
-- [ ] 1.2 <task>
-
-## Step Definitions
-- [ ] 2.1 Wire up step defs for <feature>
-- [ ] 2.2 <task>
-
-## Verification
-- [ ] 3.1 Run feature files — all scenarios pass
-- [ ] 3.2 Validate ADR confirmation criteria (if applicable)
-```
-
-## Three-Stage Workflow
-
-### Stage 1: Draft
-1. **Qualify the request** — behavioral? architectural? bug fix? Route accordingly.
-2. **Check existing state** — read `features/` and `.grimoire/decisions/` for current baseline. Check `.grimoire/changes/` for in-progress work.
-3. **Create change directory** — `.grimoire/changes/<change-id>/` (kebab-case, verb-led: `add-`, `update-`, `remove-`)
-4. **Draft artifacts**:
-   - Behavioral → write proposed `.feature` files in `changes/<id>/features/<capability>/`
-   - Architectural → write MADR in `.grimoire/changes/<id>/decisions/`
-   - Write `manifest.md` capturing intent and what changed
-5. **Collaborate** — refine with the user until they approve
-6. **Validate** — parse `.feature` files for syntax; check MADR frontmatter
-
-### Stage 2: Plan
-1. **Read approved artifacts** — manifest, features, decisions
-2. **Generate tasks.md** — implementation checklist derived from:
-   - Each new/modified scenario → implementation task
-   - Each decision → implementation task(s)
-   - Step definition stubs for new scenarios
-3. **Traceability** — each task references the scenario or decision it implements
-4. **Review with user** — confirm task order and scope
-
-### Stage 3: Apply
-1. **Read all change artifacts** — manifest, features, decisions, tasks
-2. **Implement sequentially** — work through tasks in order:
-   - Write production code
-   - Wire up step definitions so `.feature` files become passing tests
-   - Implement architectural changes from ADRs
-3. **Mark progress** — update `- [ ]` to `- [x]` as tasks complete
-4. **Verify** — run feature files using the project's BDD framework
-5. **Finalize** — when all tasks complete:
-   - Copy proposed `.feature` files to `features/` (replacing baseline)
-   - Move new decisions to `.grimoire/decisions/` (with sequential numbering)
-   - Archive: move manifest to `.grimoire/archive/YYYY-MM-DD-<change-id>/`
-
 ## Conventions
 
 ### Manifest Status Lifecycle
@@ -361,69 +214,4 @@ This is what makes `grimoire trace` and `grimoire log` work. Without it, the com
 - Superseded decisions keep their number, status updated to `superseded by NNNN`
 
 ### Step Definitions
-Step definitions are organized by **domain concept**, NOT by feature file. One step file per feature file is an anti-pattern — steps should be reusable across features.
-
-**Before writing step definitions, check the project's existing test setup.** Different projects use different BDD frameworks. Read the test configuration files, existing step definitions, and `package.json` / `requirements.txt` / `pyproject.toml` to determine which framework is in use and follow its conventions.
-
-Common patterns by ecosystem (use as reference, not gospel — follow the project's actual conventions):
-
-**Python (Behave):**
-```
-features/
-├── steps/
-│   ├── auth_steps.py        # steps for auth domain
-│   ├── document_steps.py    # steps for document domain
-│   └── common_steps.py      # shared steps
-├── environment.py           # hooks and setup
-```
-
-**Python (pytest-bdd):**
-```
-tests/
-├── conftest.py              # shared fixtures and Given steps
-├── step_defs/
-│   ├── test_auth.py         # steps for auth domain
-│   └── test_documents.py    # steps for document domain
-```
-
-**JavaScript/TypeScript (Cucumber.js):**
-```
-features/
-├── step_definitions/
-│   ├── auth.steps.ts        # steps for auth domain
-│   └── common.steps.ts      # shared steps
-├── support/
-│   └── world.ts             # test context/setup
-```
-
-**React / Frontend (Playwright + Cucumber or Cypress + Cucumber):**
-```
-e2e/
-├── features/
-│   └── auth/login.feature
-├── steps/
-│   ├── auth.steps.ts
-│   └── common.steps.ts
-├── pages/                   # page objects
-│   └── login.page.ts
-```
-
-**Key rules:**
-- NEVER create one step definition file per feature file
-- Given steps are most likely to be shared — put them in a common location
-- When/Then steps are more domain-specific — group by domain
-- If a step is used by 2+ features, move it to the shared/common file
-- Step definition bodies should be thin — delegate to helper functions, page objects, or API clients
-- **Match the project's existing patterns.** If the project uses Behave, write Behave steps. If it uses Cucumber.js, write Cucumber.js steps. Don't introduce a new framework.
-
-## Validation Checklist
-Before moving past draft stage:
-- [ ] Every Feature has a user story (As a / I want / So that)
-- [ ] Every Scenario has at least Given + When + Then
-- [ ] Feature files parse without syntax errors (validated via `@cucumber/gherkin` parser)
-- [ ] MADR records have valid YAML frontmatter (status, date)
-- [ ] MADR records include Cost of Ownership (maintenance burden, ongoing benefits, sunset criteria)
-- [ ] Manifest lists all added/modified/removed artifacts
-- [ ] Manifest includes Assumptions (what must be true, with evidence status)
-- [ ] Manifest includes Pre-Mortem (failure modes and mitigations)
-- [ ] No implementation details in feature files (WHAT not HOW)
+Organize by **domain concept**, NOT by feature file. Check the project's existing test setup and match its BDD framework conventions. See the active skill's testing reference for ecosystem-specific patterns.

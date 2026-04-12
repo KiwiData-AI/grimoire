@@ -16,6 +16,11 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 - User asks to create tasks or plan work for a grimoire change
 - Loose match: "plan", "tasks" with a change reference
 
+## Routing
+- No approved change exists → `grimoire-draft` first
+- Change is Level 1 (trivial) → plan is optional; suggest applying directly with minimal tasks
+- User wants to review the design → `grimoire-review` (after plan, before apply)
+
 ## Prerequisites
 - A change exists in `.grimoire/changes/<change-id>/` with:
   - `manifest.md` (approved)
@@ -71,29 +76,15 @@ Review the specs through each persona's lens and flag gaps. **Only check persona
 - Does the manifest have a **Non-goals** section? If missing or empty on a level 3-4 change, flag it — without non-goals, scope creep is invisible during implementation.
 - Do any scenarios appear to implement something listed as a non-goal? Flag as **blocker** — the draft contradicts itself.
 
-#### Product Manager lens
-- Are there scenarios for success **and** for errors, invalid input, edge cases? (Happy-path-only features are the #1 source of rework.)
-- Does every feature have a user story (`As a / I want / So that`)? Without intent, tasks will solve the wrong problem.
-- Are Given/When/Then steps specific — concrete values, states, outcomes? (Flag vague steps like "Then it should work correctly".)
-- Are there conflicting scenarios that describe contradictory behavior for the same trigger?
-- Is the scope clear? If a feature touches multiple capabilities, are the boundaries explicit?
+Evaluate through each relevant persona's lens — see `../references/elicitation-personas.md` for the full question set. In plan, you're checking completeness, not asking questions. Flag gaps as issues.
 
-#### Senior Engineer lens
-- Are there unvalidated assumptions on the critical path in the manifest? If so, the plan is built on guesses.
-- If the change was "build custom" — does the manifest document what patterns are being borrowed from prior art? Without this, tasks will reinvent instead of reuse.
-- Are the scenarios specific enough to map to concrete file paths and assertions, or will you have to make design decisions during planning?
-
-#### Security Engineer lens
-- Do scenarios involving user input, auth, or sensitive data have corresponding error/abuse scenarios?
-- If decision records have security-relevant Quality Attributes with blank targets, flag them — you can't plan security verification without targets.
-
-#### Data Engineer lens
-- Does the change involve external APIs or new data models without a `data.yml`? If so, you can't plan migrations or contract tests.
-- Are data constraints (required, unique, nullable, enums) specified, or will the implementer have to guess?
-
-#### QA Engineer lens
-- For every happy-path scenario, is there at least one negative scenario? What happens when the dependency is down, input is malformed, or the user lacks permission?
-- Are boundary values specified — min/max lengths, zero vs. one, empty collections?
+**Key checks per persona:**
+- **Outcome & Scope**: Does the manifest have a clear Why (outcome, not mechanism)? Does it have Non-goals? Do any scenarios contradict non-goals?
+- **PM**: Scenarios for success AND errors? User stories on every feature? Specific Given/When/Then (not vague)?
+- **Engineer**: Unvalidated assumptions on critical path? Prior art patterns documented (if building custom)? Scenarios specific enough for concrete file paths?
+- **Security**: Input/auth/sensitive-data scenarios have corresponding error/abuse scenarios? Quality Attribute targets not blank?
+- **Data**: External APIs or new models without `data.yml`? Data constraints specified (required, unique, nullable)?
+- **QA**: Negative scenario for every happy path? Boundary values specified?
 
 **If issues are found:**
 
@@ -330,3 +321,9 @@ Check `.grimoire/config.yaml` for the configured agents:
 - Order matters: dependencies first, verification last
 - Don't generate tasks for things that already work (check the baseline)
 - Read the actual codebase before writing tasks. Reference real file paths, real patterns, real conventions. Don't guess.
+
+## Done
+When the user approves the tasks, the workflow is complete. Suggest next steps based on complexity:
+- **Level 1**: Skip review, proceed to `grimoire-apply`
+- **Level 2-3**: Optionally run `grimoire-review`, or proceed to `grimoire-apply`
+- **Level 4**: `grimoire-review` is mandatory before `grimoire-apply`

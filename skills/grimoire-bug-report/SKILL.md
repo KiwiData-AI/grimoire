@@ -17,6 +17,11 @@ Guided bug reporting workflow for testers. Produces structured, reproducible bug
 - User pastes test output, a failing test trace, or a screenshot from a testing tool
 - Loose match: "bug report", "report issue", "found a problem", "something's wrong", "test failed"
 
+## Routing
+- Developer wanting to fix a bug → `grimoire-bug`
+- Developer investigating/triaging → `grimoire-bug-triage`
+- Looking for test gaps proactively → `grimoire-bug-explore`
+
 ## Prerequisites
 - A grimoire project (`.grimoire/config.yaml` exists)
 - Ideally, feature files exist in `features/` so the report can reference violated specs
@@ -227,3 +232,6 @@ If no MCP tools are configured, tell the reporter the report is at `.grimoire/bu
 - **Link to specs, not code.** Feature files are readable by testers. Source code references are not helpful here.
 - **One bug per report.** If the reporter describes multiple issues, create separate reports.
 - **Test tool output is evidence, not the report.** Even with rich test output, the report should be human-readable. The test output goes in the Evidence/Test Tool Output sections.
+
+## Done
+When the report is confirmed by the reporter and saved to `.grimoire/bugs/`, the workflow is complete. Suggest `grimoire-bug-triage` to classify and route the bug.

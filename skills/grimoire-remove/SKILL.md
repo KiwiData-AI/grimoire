@@ -16,6 +16,11 @@ Remove a feature or deprecate a decision through a tracked, deliberate change.
 - User wants to supersede or retire an architecture decision
 - Loose match: "remove", "delete", "deprecate", "sunset", "retire" with feature/decision reference
 
+## Routing
+- Feature was never documented → `grimoire-audit` first to establish baseline
+- Want to change behavior (not remove it) → `grimoire-draft`
+- Want to clean up code quality → `grimoire-refactor`
+
 ## Workflow
 
 ### 1. Identify What's Being Removed
@@ -102,3 +107,6 @@ Do NOT proceed without user approval. Removal is destructive.
 - When removing scenarios from a feature (not the whole feature), the proposed `.feature` file represents the desired end state — the feature minus the removed scenarios.
 - After removal, remaining features must still pass. This is verified in the apply stage.
 - Archive preserves the removal rationale forever — future developers can understand why something was removed.
+
+## Done
+When the removal plan is approved and ready for implementation, the workflow is complete. Proceed to `grimoire-apply` to execute the removal tasks.

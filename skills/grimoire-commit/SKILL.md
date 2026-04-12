@@ -16,6 +16,11 @@ Write a commit message from staged changes and active grimoire context. Never au
 - User asks to stage and commit changes
 - Loose match: "commit", "commit message", "stage", "save progress"
 
+## Routing
+- No changes to commit → nothing to do
+- Want to create a PR → `grimoire-pr` (commit first, then PR)
+- Want to review changes before committing → show the diff first
+
 ## Workflow
 
 ### 1. Gather Context
@@ -140,3 +145,6 @@ Decisions: 0005-adopt-sqlalchemy
 - If the diff is too large to summarize meaningfully, suggest the user split it into smaller commits.
 - The grimoire footer (Change/Scenarios/Decisions) is only included when an active grimoire change exists and is relevant to the staged changes.
 - Respect the project's configured `commit_style` from `.grimoire/config.yaml`.
+
+## Done
+When the commit is created (or the user cancels), the workflow is complete. If this was the last commit for a change, suggest `grimoire-pr` to create a pull request.

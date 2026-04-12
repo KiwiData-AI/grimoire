@@ -17,6 +17,12 @@ Multi-perspective LLM review of a completed design before coding begins. Expert 
 - Automatically suggested after `grimoire-plan` completes
 - Loose match: "review", "design review", "ready to code", "before we start"
 
+## Routing
+- No tasks.md exists → `grimoire-plan` first
+- Level 1 change → skip review entirely, proceed to `grimoire-apply`
+- User says "skip review" → proceed to `grimoire-apply`
+- Post-implementation review → `grimoire-pr` (has optional post-impl review)
+
 ## Prerequisites
 - A change exists in `.grimoire/changes/<change-id>/` with:
   - `manifest.md` (approved)
@@ -236,3 +242,6 @@ Recommendation: Fix blockers, then proceed to apply.
 - A blocker means "if we code this as-is, we'll have to come back and redo work." A suggestion means "this would improve the design but isn't blocking."
 - Keep each persona's review focused and short. Three bullet points that matter are better than ten that don't.
 - If the change is trivial (e.g., rename a field, fix a typo in a feature), say so and don't manufacture issues.
+
+## Done
+When findings are presented and blockers resolved (or accepted), the review is complete. Suggest proceeding to `grimoire-apply`.

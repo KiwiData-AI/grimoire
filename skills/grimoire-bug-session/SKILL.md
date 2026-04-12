@@ -16,6 +16,11 @@ Guided exploratory testing sessions. Create a charter, track coverage as you wor
 - User says "start a testing session", "explore [area] for [time]", "session-based testing"
 - Loose match: "testing session", "session charter", "timebox testing", "exploratory session", "let's explore"
 
+## Routing
+- Want AI analysis of specs/code without interactive testing → `grimoire-bug-explore`
+- Want to file a specific bug → `grimoire-bug-report`
+- Want to fix a bug → `grimoire-bug`
+
 ## Prerequisites
 - A grimoire project with feature files in `features/`
 - Ideally, a previous `grimoire-bug-explore` run or knowledge of what areas are risky (but not required)
@@ -212,3 +217,6 @@ After the debrief:
 - **Debrief is mandatory.** The value of a session is in the debrief — what was found, what wasn't covered, what to do next. Without it, the session is just unstructured clicking.
 - **Respect the timebox.** Sessions without time limits become aimless. The timebox creates focus and urgency. Extend if productive, but always be conscious of time.
 - **Build on previous sessions.** Check `.grimoire/sessions/` for past sessions in the same area. What was covered before? What was flagged for follow-up?
+
+## Done
+When the session debrief is generated and follow-up actions are identified, the workflow is complete. The debrief is saved to `.grimoire/sessions/`. Bugs filed during the session flow through normal triage.

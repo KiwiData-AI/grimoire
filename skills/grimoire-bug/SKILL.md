@@ -16,6 +16,12 @@ Disciplined bug fix workflow: reproduce first, then fix. Every bug gets a failin
 - User says something is "broken", "wrong", "not working"
 - Loose match: "bug", "fix", "broken", "defect", "issue", "regression"
 
+## Routing
+- Tester/non-developer reporting a bug → `grimoire-bug-report`
+- Feature request disguised as a bug → `grimoire-draft`
+- Performance issue → handle directly (profiling, not repro test)
+- Configuration error → just fix the config
+
 ## Workflow
 
 ### 1. Understand the Bug
@@ -92,6 +98,8 @@ Now — and only now — modify production code:
 3. Run ALL existing tests — no regressions
 4. If the fix is more than a few lines, pause and consider whether the approach is the simplest one
 
+**Escalation guard:** If the fix requires changes to more than 3 files, introduces new abstractions, modifies data models, or crosses service boundaries — STOP. This is not a bug fix, it's a change that needs design. Tell the user: "This fix is larger than a typical bug fix. I recommend routing to `grimoire-draft` to handle this as a proper change with specs and a plan." The user can override.
+
 ### 7. Verify
 - Reproduction test passes (`config.tools.bdd_test`)
 - All existing feature scenarios pass (`config.tools.bdd_test`)
@@ -147,3 +155,6 @@ Report to the user:
 - **Don't over-document.** The test is the documentation. A one-line comment in the test explaining the bug is enough. Don't create tracking files, bug reports, or manifests for a bug fix.
 - **The feature file is truth.** If a scenario describes behavior the user now says is wrong, that's a spec change, not a bug. Handle it through `grimoire-draft`.
 - **One bug, one fix.** Don't bundle "while I'm in here" improvements with a bug fix. Fix the bug, nothing more.
+
+## Done
+When the bug is fixed, tests pass (reproduction + regression), and the summary is presented, the workflow is complete. Suggest `grimoire-commit` for the fix commit.

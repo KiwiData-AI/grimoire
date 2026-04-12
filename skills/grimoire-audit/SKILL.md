@@ -17,6 +17,11 @@ Audit an existing codebase to discover undocumented features and architecture de
 - User asks "what features do we have?" or "what's not documented?"
 - Loose match: "audit", "discover", "onboard", "baseline", "inventory"
 
+## Routing
+- Want to map codebase structure, utilities, and patterns → `grimoire-discover` first
+- Want to add new functionality → `grimoire-draft`
+- Want to find code quality issues → `grimoire-refactor`
+
 ## Workflow
 
 ### 1. Determine Audit Scope
@@ -119,3 +124,6 @@ After the interview, summarize:
 - Don't try to document everything in one session. It's ok to do multiple audit passes.
 - Features should describe WHAT the system does, not HOW the code works. Don't just translate code into Gherkin.
 - For decisions, focus on choices that were non-obvious or have alternatives. "We use Python" doesn't need an ADR. "We use Huey instead of Celery" probably does.
+
+## Done
+When the audit interview is complete and confirmed items are drafted as grimoire changes, the workflow is complete. Suggest next steps: `grimoire-plan` for approved changes, or another audit pass for uncovered areas.

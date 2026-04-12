@@ -17,6 +17,12 @@ AI-guided exploratory testing. Systematically analyze feature specs and code to 
 - Loose match: "exploratory testing", "edge cases", "negative scenarios", "what's untested", "find gaps"
 - User says "onboard", "where do I start testing?", "what's risky?" → onboard mode
 
+## Routing
+- Want a focused, timeboxed testing session with live tracking → `grimoire-bug-session`
+- Found a specific bug during exploration → `grimoire-bug-report` to file it
+- Want to fix a known bug → `grimoire-bug`
+- Analyzing a filed bug report → `grimoire-bug-triage`
+
 ## Prerequisites
 - A grimoire project with feature files in `features/`
 - For developer mode: code exists to analyze (not just specs)
@@ -231,3 +237,6 @@ Generated: <YYYY-MM-DD>
 - **Respect existing coverage.** If an area is well-covered, say so. Don't manufacture findings for completeness.
 - **Don't duplicate test-quality.** `grimoire verify` already checks assertion strength and test anti-patterns. This skill focuses on missing coverage, not weak tests.
 - **Scope matters.** A full-sweep exploration of a large codebase will produce a lot of findings. Help the user prioritize rather than dumping everything on them.
+
+## Done
+When the findings report is presented and the user has acted on findings (write scenarios, file bugs, defer, or dismiss), the workflow is complete. Suggest follow-up actions based on findings.

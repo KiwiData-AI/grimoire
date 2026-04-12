@@ -17,6 +17,11 @@ Triage bug reports from any source. Investigate, classify the root cause, decide
 - User provides a ticket URL or ID (e.g., "triage PROJ-123", "look at #456")
 - Loose match: "triage", "investigate bug", "check this report", "validate bug", "reject bug", "route this"
 
+## Routing
+- No bug report exists and user is a tester → `grimoire-bug-report` first
+- Developer found a simple bug themselves → `grimoire-bug` directly (skip triage for obvious code defects)
+- Bug needs architectural fix → after triage, route to `grimoire-draft` (not `grimoire-bug`)
+
 ## Prerequisites
 - A bug report exists in one of these forms:
   - `.grimoire/bugs/<bug-id>/report.md` (created by `grimoire-bug-report`)
@@ -60,150 +65,23 @@ Before making a triage decision, gather evidence:
 
 ### 3. Classify the Root Cause
 
-Determine what category this issue falls into. This drives routing.
+Classify the issue using the 8-way taxonomy in `../references/bug-classification.md`. Read it now.
 
-#### CODE — Application defect
-The code doesn't match the spec, or the behavior is clearly wrong due to a bug in the application logic.
+The categories are: **code**, **infrastructure**, **configuration**, **data**, **third-party**, **security**, **documentation**, **not-a-bug**. Each has specific signals — match the investigation evidence to the signals.
 
-**Signals:**
-- The bug reproduces in tests
-- The code path has an obvious logic error, missing edge case, or regression
-- `git log` shows a recent change that introduced the issue
-- The spec is clear and the implementation diverges from it
-
-#### INFRASTRUCTURE — Platform or deployment issue
-The application code is correct, but the environment it runs in is broken or misconfigured.
-
-**Signals:**
-- Works locally or in other environments, fails in a specific one
-- Related to resources (memory, CPU, disk, network timeouts)
-- Deploy pipeline, container, or orchestration issue
-- Database server, cache, or queue is degraded
-- DNS, load balancer, or certificate problem
-
-**Examples:** staging database overloaded, k8s pod OOM-killed, CDN serving stale assets, Redis connection pool exhausted.
-
-#### CONFIGURATION — Environment or feature config issue
-The code is correct and infrastructure is healthy, but the environment is configured wrong.
-
-**Signals:**
-- Feature flag is off when it should be on (or vice versa)
-- Environment variable is missing, wrong, or pointing to the wrong resource
-- Permissions or CORS settings differ between environments
-- A migration ran in one environment but not another
-
-**Examples:** `STRIPE_API_KEY` pointing to test mode in production, feature flag `enable-2fa` disabled on staging, missing database migration on QA.
-
-#### DATA — Data integrity or content issue
-The code and config are correct, but the data is bad, missing, or in an unexpected state.
-
-**Signals:**
-- Only affects specific records, accounts, or tenants
-- Data doesn't match expected schema or constraints
-- Related to a recent data migration, import, or manual edit
-- Null/missing where a value is expected
-
-**Examples:** user record has null email from a botched migration, product has negative price from a CSV import, orphaned foreign key from a deleted parent.
-
-#### THIRD-PARTY — External service or dependency issue
-The issue originates outside the application boundary — in a vendor API, library, or upstream service.
-
-**Signals:**
-- Third-party status page shows an incident
-- API responses from the vendor changed format or started returning errors
-- Library behavior changed after an update
-- Issue only occurs when the external service is involved
-
-**Examples:** Stripe webhook format changed, SendGrid rate-limiting, a library upgrade introduced a breaking change, OAuth provider returning new error codes.
-
-#### SECURITY — Vulnerability or security defect
-The issue has security implications — unauthorized access, data exposure, injection, privilege escalation, or other vulnerabilities. May overlap with CODE, CONFIGURATION, or INFRASTRUCTURE but the security dimension changes how it's handled.
-
-**Check the report's `security: true` flag** — the bug-report skill auto-screens for security signals. But also evaluate during investigation even if the flag wasn't set.
-
-**Signals:**
-- Authentication or authorization bypass — accessing resources without proper credentials or acting as another user
-- Data exposure — PII, credentials, or internal data visible to unauthorized parties (in responses, logs, error messages, URLs)
-- Injection — SQL, XSS, command injection, template injection, SSRF
-- Privilege escalation — performing actions above the user's role
-- Credential/secret leakage — API keys, tokens, or passwords in source code, logs, client-side bundles, or error responses
-- Broken access control — IDOR (insecure direct object references), missing ownership checks, horizontal privilege escalation
-- Cryptographic issues — weak hashing, plaintext storage, broken TLS configuration
-- Denial of service — unbounded queries, resource exhaustion, regex DoS
-
-**Severity uses a security-specific scale:**
-- **critical** — active exploitation possible, data breach risk, auth bypass on production
-- **high** — exploitable vulnerability but requires specific conditions or authenticated access
-- **medium** — security weakness that increases risk but isn't directly exploitable (e.g., missing rate limiting, verbose error messages leaking internals)
-- **low** — defense-in-depth improvement, hardening recommendation (e.g., missing security headers, overly permissive CORS in dev)
-
-**Examples:** user can view other users' invoices by changing the ID in the URL (IDOR), admin API endpoint has no auth check, SQL injection in search query, JWT secret is hardcoded in source, error pages expose stack traces and DB connection strings.
-
-#### DOCUMENTATION — Correct behavior, wrong expectations
-The application works as designed, but the user's expectation doesn't match reality because documentation, training, or UX is misleading.
-
-**Signals:**
-- Feature spec clearly describes the reported behavior as correct
-- The reporter's expectation is reasonable but doesn't match the design
-- Help text, tooltips, or docs describe different behavior than what's implemented
-- Onboarding or training missed this workflow
-
-**Examples:** user expects instant unlock but spec says 30-minute cooldown, docs say "click Save" but the button is labeled "Apply", reported "bug" is actually an undocumented limitation.
-
-#### NOT A BUG — Cannot reproduce or invalid
-After thorough investigation, the reported issue is not reproducible or the report is invalid.
-
-**This still requires evidence.** Never dismiss with "works for me." Document:
-- Exactly what you tried
-- In what environment, with what data
-- Why you believe the issue is not valid
-- What follow-up questions might clarify
+For security-classified issues, use the security-specific severity scale in the reference.
 
 ### 4. Make a Triage Decision
 
 Based on the classification, one of four outcomes:
 
-#### VALIDATE + ROUTE
-The issue is real. Classify it AND route it:
+Follow the triage decision framework in `../references/bug-classification.md` (section "Triage Decision Outcomes").
 
-| Classification | Route to | Next action |
-|---|---|---|
-| **Code** | Developer (this team) | → `grimoire-bug` for repro test + fix |
-| **Infrastructure** | Infra/DevOps/SRE | Create or update ticket for the infra team with evidence |
-| **Configuration** | DevOps or config owner for the affected environment | Describe the specific misconfiguration and expected correct value |
-| **Data** | Developer or DBA depending on scope | Describe affected records and whether a migration/script is needed |
-| **Third-party** | Developer (workaround) + vendor (upstream fix) | Document the vendor issue, check for workarounds, file upstream if possible |
-| **Security** | Security lead + developer (see special handling below) | Confidential fix, may trigger incident response |
-
-1. Update the bug report status to `validated`
-2. Adjust severity if the investigation reveals it's more or less serious than reported
-3. Write the triage response with classification, routing, and evidence
-
-**Security issues get special handling — see section 7.**
-
-#### REJECT — Not a bug
-The reported behavior is correct and the expectations are wrong, or the issue cannot be reproduced.
-
-Rejection **requires evidence**. Provide one of:
-
-- **By design** — cite the specific feature scenario or decision record. Quote the spec.
-- **Cannot reproduce** — document exactly what you tried, in what environment, with what data.
-- **Duplicate** — reference the existing bug report or fix.
-
-#### REDIRECT — Documentation/training issue
-The behavior is correct but the user's confusion is valid. The fix is better docs, UX copy, or training — not a code change.
-
-1. Update status to `redirected`
-2. Explain why the behavior is correct (cite specs)
-3. Recommend specific documentation or UX improvements
-4. Offer to file a separate improvement ticket for the docs/UX fix
-
-#### NEEDS INFO — Can't decide yet
-The report is incomplete or ambiguous. Generate specific follow-up questions — not "can you provide more details?" but:
-- "Does this happen with all user roles or just admin?"
-- "Which environment — dev, staging, or production?"
-- "Can you share the exact error message or a screenshot?"
-- "Is this specific to certain records/accounts, or does it affect everyone?"
+Key points:
+1. **VALIDATE + ROUTE**: Update status to `validated`, adjust severity if needed, write triage response. Security issues → section 7 (special handling).
+2. **REJECT**: Requires evidence — cite the spec, document reproduction attempts, or reference the duplicate.
+3. **REDIRECT**: Behavior is correct, confusion is valid. Recommend docs/UX fix.
+4. **NEEDS INFO**: Ask specific follow-up questions, not "provide more details."
 
 ### 5. Write the Triage Response
 
@@ -391,3 +269,6 @@ If the fix requires significant structural changes (new abstractions, schema cha
 - **Keep the audit trail.** Every triage decision is written down with classification, routing, and reasoning. This prevents the same issue from being triaged three times by three people.
 - **One triage per bug.** If new information arrives after a "needs info" response, update the existing triage — don't create a new one.
 - **Sync both directions.** If you update the local triage, update the external ticket. If the external ticket gets new comments, incorporate them.
+
+## Done
+When the triage response is written and communicated, the workflow is complete. The bug is now classified, routed, and documented. Next steps depend on classification — the triage response specifies the handoff.

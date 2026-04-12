@@ -16,6 +16,11 @@ Verify that implementation matches the feature specs and decision records. Run a
 - User asks to check, verify, or review a change before archiving
 - Loose match: "verify", "check", "review" with a change reference
 
+## Routing
+- Change not yet applied → `grimoire-apply` first
+- Want a pre-implementation design review → `grimoire-review`
+- Found issues that need fixing → user decides: fix directly or route to `grimoire-apply` / `grimoire-draft`
+
 ## Prerequisites
 - A change exists in `.grimoire/changes/<change-id>/` with completed tasks
 - Or: user wants to verify baseline features against the codebase (no active change required)
@@ -210,3 +215,9 @@ Based on the report:
 - A step definition with no assertions is always CRITICAL — it's a false positive.
 - Don't verify implementation details — only verify that the behavior described in the scenario is covered.
 - For baseline verification, this may take a while on large codebases. Present results incrementally by capability.
+
+## Done
+When the verification report is presented, the workflow is complete. Suggest next steps based on findings:
+- **All clear** → `grimoire archive <change-id>` or `grimoire-pr`
+- **Critical issues** → must fix before archiving
+- **Warnings only** → user decides whether to fix or accept

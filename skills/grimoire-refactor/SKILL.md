@@ -17,6 +17,12 @@ Systematically find, prioritize, and plan tech debt reduction. Combines automate
 - User asks "what should we clean up?" or "where's the tech debt?"
 - Loose match: "refactor", "tech debt", "simplify", "clean up", "reduce complexity", "code smells"
 
+## Routing
+- Behavior change needed (not just code quality) → `grimoire-draft`
+- Removing a feature → `grimoire-remove`
+- Fixing a bug → `grimoire-bug`
+- Documenting existing code → `grimoire-discover`
+
 ## Prerequisites
 - A grimoire-initialized project (`.grimoire/` exists)
 - Git history available (hotspot analysis needs `git log`)
@@ -240,3 +246,6 @@ The debt register is a living document. Recommend:
 - **Measure before and after.** A refactoring without measurable improvement is just code churn. Track lines, complexity, coverage, and file count.
 - **Existing tests are your safety net.** Never refactor without tests. If tests don't exist, write them first (that's test debt — address it before or alongside the structural refactoring).
 - **Present findings collaboratively** — same interview pattern as grimoire-audit. Batches of 3-5, let the user drive priority. Don't dump a 50-item list.
+
+## Done
+When debt items are triaged (fixed, deferred, or accepted) and grimoire changes are created for approved fixes, the workflow is complete. Each approved fix flows through the standard pipeline: `grimoire-plan` → `grimoire-apply`.
