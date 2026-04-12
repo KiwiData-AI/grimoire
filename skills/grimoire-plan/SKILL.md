@@ -33,10 +33,16 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 **Grimoire docs first, codebase second.** The `.grimoire/docs/` directory is a pre-computed map of the codebase — it tells you where code lives, what utilities exist, what patterns to follow, and what the data layer looks like. Read these *instead of* exploring the raw codebase. Only read specific source files when the docs don't have what you need.
 
 **Always read:**
-- `manifest.md` for the change summary, **including Assumptions and Pre-Mortem sections**
+- `manifest.md` for the change summary, **including Assumptions, Pre-Mortem, and Prior Art sections**
 - All proposed `.feature` files
 - All proposed decision records, **including Cost of Ownership sections**
 - The current baseline (`features/`, `.grimoire/decisions/`) for context on what's changing
+
+**Validate the build-vs-buy decision:**
+- Check that `manifest.md` has a **Prior Art** section documenting what existing solutions were researched. If it's missing or empty, **stop and tell the user** — planning without a build-vs-buy analysis produces plans that ignore cheaper alternatives.
+- If the decision was to **adopt** a library/service, the plan tasks should focus on integration, configuration, and contract testing — not reimplementation.
+- If the decision was to **build custom**, verify the manifest documents (1) what existing tools were considered, (2) the specific requirements they don't meet, and (3) what design patterns are being borrowed from prior art.
+- If the decision was **hybrid** (adopt for part, build for part), ensure the boundary between adopted and custom code is clear in the tasks.
 
 **Read from grimoire docs (these replace codebase exploration):**
 - **`.grimoire/docs/<area>.md`** for each area the change touches — these contain: key files with responsibilities, reusable utilities (exact function names, file paths, line numbers), naming conventions, structural patterns, and "Where New Code Goes" guidance. This is the information that lets you write tasks with exact file paths without reading every source file.
@@ -162,6 +168,12 @@ Follow the rules in `../references/testing-contracts.md`. Key points: mock at HT
 - Prefer implementation approaches that minimize the maintenance burden identified in the ADR
 - If the ADR identifies sunset criteria, add a task to document them where they'll be seen (e.g., a comment in config, a monitoring alert, or a calendar reminder)
 - If maintenance burden is high, prefer simpler alternatives even if they're less elegant
+
+**From manifest Prior Art (when building custom):**
+- If the manifest identifies design patterns borrowed from existing tools, tasks must follow those patterns — don't reinvent what the prior art already refined
+- If the manifest identifies specific data flows or API shapes from existing tools, reference them in the task descriptions so the implementing agent understands the intent
+- If the prior art research surfaced an existing tool that covers part of the need, consider whether the plan should adopt it for that part instead of building everything custom — flag this to the user as a simplification opportunity
+- If a library was rejected for a specific reason (e.g., doesn't support X), add a comment to the relevant task noting this so future developers don't re-evaluate the same option
 
 **Existing code to reuse:**
 - If `.grimoire/docs/` has area docs, check the Reusable Code tables for utilities that apply to this change

@@ -32,15 +32,73 @@ Before doing anything, determine what kind of change this is:
 If unclear, ask the user one clarifying question to route correctly.
 
 ### 2. Research Existing Solutions
-Before designing anything, search for well-maintained tools, libraries, or frameworks that already solve the problem (or a close variant of it). This applies to both behavioral features and architectural decisions.
+Before designing anything, **you must actively research** what already exists. Do not ask the user to research — do it yourself and present findings. This applies to both behavioral features and architectural decisions.
 
-- **Search broadly**: npm/PyPI packages, framework built-ins, platform features, SaaS APIs, open-source projects. Use web search if needed.
-- **Evaluate what you find**: Is it actively maintained? Does it fit the project's stack and constraints? What are its design trade-offs?
-- **Present findings to the user** before drafting:
-  - If an existing tool solves the problem well → recommend adopting it. The draft becomes an ADR documenting the adoption decision.
-  - If an existing tool is close but has different design trade-offs → document it as prior art. Note what it does well and where the project's needs diverge. This becomes valuable context in the ADR's "Considered Options" and helps future readers understand why custom code was written.
-  - If nothing exists → note this in the manifest. A gap in the ecosystem is useful context.
-- **The goal is not to avoid writing code** — it's to make informed build-vs-reuse decisions and to learn from existing implementations before designing new ones.
+#### 2a. Conduct the Research
+Search for existing solutions across these categories (skip categories that clearly don't apply):
+
+- **Language/framework built-ins**: Does the framework already have this? (e.g., Django has auth, React has context, Express has middleware). Check official docs.
+- **First-party ecosystem**: Official plugins, extensions, or companion packages from the framework maintainers.
+- **Popular libraries**: Search the relevant package registry (npm, PyPI, crates.io, etc.) for well-maintained packages. Use web search to find comparison articles, "best of" lists, and Stack Overflow recommendations.
+- **Open-source projects**: GitHub repos that solve the same problem as a standalone tool or reference implementation.
+- **SaaS/managed services**: Hosted solutions that handle the problem as a service (e.g., Auth0 for auth, Stripe for payments, Algolia for search).
+
+For each candidate found, gather:
+- **Name and link** to docs/repo
+- **Maintenance signals**: last release date, commit frequency, open issues, download count
+- **Fit**: does it match the project's language, framework, and deployment constraints?
+- **Scope match**: does it solve 100% of the need, 80%, or just a part?
+- **Trade-offs**: what design decisions does it impose? What would the project give up by adopting it?
+
+#### 2b. Evaluate Build vs Buy/Import
+Apply this decision framework:
+
+| Signal | Points toward **adopt** | Points toward **build** |
+|--------|------------------------|------------------------|
+| Scope match | Solves ≥80% of the need | Solves <50% or forces unwanted constraints |
+| Maintenance | Active, >1 maintainer, regular releases | Abandoned, single maintainer, or unmaintained fork |
+| Integration cost | Drop-in or <1 day to integrate | Requires significant adapter code or workarounds |
+| Customization | Configurable or extensible where needed | Core behavior can't be changed without forking |
+| Dependencies | Few, well-known transitive deps | Heavy dependency tree or conflicts with project deps |
+| Security | Audited, follows best practices, no known CVEs | Unaudited, handles sensitive data unsafely |
+| Licensing | Compatible with project license | Incompatible or ambiguous license |
+| Project constraints | Fits deployment target, bundle size, performance needs | Doesn't fit runtime environment or adds unacceptable overhead |
+
+When the decision is close, **prefer adopting** — maintaining custom code is almost always more expensive than people expect.
+
+#### 2c. If Building: Learn from What Exists
+When the decision is to build custom code, **study existing implementations before designing**:
+
+- **Document the prior art**: For each relevant existing tool, note its architecture, data flows, API design, and key abstractions. What patterns does it use? What did its maintainers learn over time (check changelogs, migration guides, design docs)?
+- **Identify what's different**: Be precise about why the project's needs diverge. "We need something different" is not enough — state the specific requirements that existing tools don't meet.
+- **Borrow deliberately**: List specific design patterns, data flow approaches, API shapes, or architectural decisions from existing tools that should inform the custom implementation. This prevents reinventing what others have already refined.
+- **Scope the custom work**: Define the minimum viable version. If an existing tool does 10 things and you only need 3, build those 3. Don't replicate the full feature set.
+
+#### 2d. Present Findings to User
+Present a structured summary **before drafting any artifacts**:
+
+```markdown
+## Prior Art Research
+
+### Existing Solutions Found
+1. **[name]** — [one-line description]. [fit assessment]. [key trade-off].
+2. **[name]** — ...
+
+### Recommendation
+- **Adopt [name]** because [reasons] → draft becomes an ADR documenting the adoption
+- OR **Build custom** because [specific gaps: requirement X isn't met by any option, constraint Y rules out adoption]. Borrowing [patterns/flows] from [existing tool].
+- OR **Hybrid**: adopt [name] for [scope] and build custom [scope] because [reasons]
+
+### If Building: What Makes This Different
+- [Requirement that no existing tool meets]
+- [Constraint that rules out adoption]
+- [Design decision that must differ from prior art, and why]
+
+### If Building: Borrowed from Prior Art
+- [Pattern/flow/API shape] from [tool] — because [reason it's proven]
+```
+
+Wait for user agreement on the direction before proceeding to draft artifacts. If the user hasn't done this research and has a strong opinion, present the findings anyway — they may not be aware of the options.
 
 ### 3. Check Existing State
 - Read `features/` to understand the current behavioral baseline
@@ -139,7 +197,7 @@ This is the contract. Downstream skills (plan, review, verify) use it to generat
 - Write `manifest.md` listing all artifacts, what's added/modified/removed, and why
 - Include an **Assumptions** section: list what must be true for this change to succeed. For each assumption, note whether there is evidence or it is unvalidated. Unvalidated assumptions on the critical path should be flagged to the user.
 - Include a **Pre-Mortem** section: imagine this change has failed or caused a production incident 6 months from now — what went wrong? List 2-5 plausible failure modes with mitigations or "accepted" if the risk is acknowledged.
-- Before drafting, consider whether **existing tools, libraries, or patterns** already solve the problem. If a well-maintained package, framework feature, or existing codebase utility handles the need, prefer it over writing new code. Note any "build vs. reuse" decisions in the manifest or as an ADR if the choice is significant.
+- The manifest must include a **Prior Art** section summarizing the research from step 2: what was found, what was evaluated, and why the chosen direction (adopt, build, or hybrid) was selected. If the decision was to build, include what's being borrowed from existing implementations. This section is consumed by the plan and review stages — without it, reviewers can't validate the build-vs-buy decision.
 
 ### 6. Collaborate
 - Present the draft to the user

@@ -35,7 +35,7 @@ This step is optional. The user can skip it by saying "skip review" or "go strai
 
 ### 2. Gather Context
 Read all artifacts for the change:
-- `manifest.md` — change summary and scope
+- `manifest.md` — change summary, scope, **and Prior Art section** (build-vs-buy rationale)
 - All `.feature` files — behavioral specifications
 - All decision records — architectural choices
 - `tasks.md` — implementation plan
@@ -63,6 +63,7 @@ Output a short list of findings — flag issues as **blocker** (must fix before 
 Adopt the perspective of a **senior software engineer** reviewing the technical design.
 
 Evaluate:
+- **Build vs Buy**: Was the prior art research thorough? Check the manifest's Prior Art section. If the change builds custom code, is the justification for not adopting an existing library convincing? Do a quick sanity check — search for obvious libraries the research may have missed. If a well-maintained library exists that the manifest doesn't mention, flag it as a **blocker**. If the research was done but the build decision is debatable, flag as **suggestion** with the alternative.
 - **Simplicity**: Is this the simplest design that solves the problem? Could any task be done with less code, fewer files, or fewer moving parts? Flag anything that looks over-engineered — new abstractions without justification, premature generalization, unnecessary indirection layers, config-driven behavior where a direct call would do.
 - **Architecture**: Do the decisions make sense for this codebase? Are there simpler alternatives? Will this paint us into a corner?
 - **Task quality**: Are the tasks specific enough to execute without re-planning? Do they reference real files, real patterns, real conventions from the codebase?
