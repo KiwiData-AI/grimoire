@@ -33,7 +33,7 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 **Grimoire docs first, codebase second.** The `.grimoire/docs/` directory is a pre-computed map of the codebase — it tells you where code lives, what utilities exist, what patterns to follow, and what the data layer looks like. Read these *instead of* exploring the raw codebase. Only read specific source files when the docs don't have what you need.
 
 **Always read:**
-- `manifest.md` for the change summary, **including Assumptions, Pre-Mortem, and Prior Art sections**
+- `manifest.md` for the change summary, **including complexity level, Assumptions, Pre-Mortem, and Prior Art sections**
 - All proposed `.feature` files
 - All proposed decision records, **including Cost of Ownership sections**
 - The current baseline (`features/`, `.grimoire/decisions/`) for context on what's changing
@@ -60,8 +60,57 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 
 **Do NOT read the entire codebase** for "context." The plan skill's job is to produce tasks with specific file paths and specific assertions. Area docs + data schema give you this. Reading dozens of source files wastes context window and doesn't produce better plans.
 
-### 3. Generate Tasks
+### 3. Check Specification Completeness
+
+Before generating tasks, evaluate whether the specifications are detailed enough to plan against. Underspecified requirements produce vague tasks, which produce wrong code.
+
+Review the specs through each persona's lens and flag gaps. **Only check personas relevant to the change** — don't manufacture issues.
+
+#### Outcome & Scope check
+- Does the manifest have a clear **Why** that describes the outcome, not just the mechanism? ("Users can reset passwords" not "Add password reset endpoint.")
+- Does the manifest have a **Non-goals** section? If missing or empty on a level 3-4 change, flag it — without non-goals, scope creep is invisible during implementation.
+- Do any scenarios appear to implement something listed as a non-goal? Flag as **blocker** — the draft contradicts itself.
+
+#### Product Manager lens
+- Are there scenarios for success **and** for errors, invalid input, edge cases? (Happy-path-only features are the #1 source of rework.)
+- Does every feature have a user story (`As a / I want / So that`)? Without intent, tasks will solve the wrong problem.
+- Are Given/When/Then steps specific — concrete values, states, outcomes? (Flag vague steps like "Then it should work correctly".)
+- Are there conflicting scenarios that describe contradictory behavior for the same trigger?
+- Is the scope clear? If a feature touches multiple capabilities, are the boundaries explicit?
+
+#### Senior Engineer lens
+- Are there unvalidated assumptions on the critical path in the manifest? If so, the plan is built on guesses.
+- If the change was "build custom" — does the manifest document what patterns are being borrowed from prior art? Without this, tasks will reinvent instead of reuse.
+- Are the scenarios specific enough to map to concrete file paths and assertions, or will you have to make design decisions during planning?
+
+#### Security Engineer lens
+- Do scenarios involving user input, auth, or sensitive data have corresponding error/abuse scenarios?
+- If decision records have security-relevant Quality Attributes with blank targets, flag them — you can't plan security verification without targets.
+
+#### Data Engineer lens
+- Does the change involve external APIs or new data models without a `data.yml`? If so, you can't plan migrations or contract tests.
+- Are data constraints (required, unique, nullable, enums) specified, or will the implementer have to guess?
+
+#### QA Engineer lens
+- For every happy-path scenario, is there at least one negative scenario? What happens when the dependency is down, input is malformed, or the user lacks permission?
+- Are boundary values specified — min/max lengths, zero vs. one, empty collections?
+
+**If issues are found:**
+
+1. Present findings grouped by persona, with a specific question for each gap
+2. Ask the user to choose:
+   - **Clarify now** — answer the questions and update the draft before continuing to task generation
+   - **Proceed anyway** — acknowledge the gaps and plan around them (tasks will note where assumptions were made)
+   - **Return to draft** — go back to `grimoire-draft` to fill in the gaps
+
+This is not a gate — level 1-2 changes (from manifest `complexity`) can proceed with minor gaps. Level 3-4 changes with multiple signals should strongly recommend clarification before planning.
+
+**If no issues are found**, proceed directly to task generation.
+
+### 4. Generate Tasks
 Create `.grimoire/changes/<change-id>/tasks.md`. **Every scenario must produce both production code AND tests.** Tasks are structured as pairs: step definitions first, then production code.
+
+**THE PLAN MUST RESPECT NON-GOALS.** Read the manifest's Non-goals section. If a task would touch, implement, or extend something listed as a non-goal, do not include it. If you think a non-goal should be reconsidered, flag it to the user — don't silently include it.
 
 **THE PLAN MUST BE SPECIFIC ENOUGH TO EXECUTE WITHOUT FURTHER PLANNING.**
 
@@ -185,7 +234,7 @@ Follow the rules in `../references/testing-contracts.md`. Key points: mock at HT
 - Run full project test suite
 - Validate ADR confirmation criteria (if applicable)
 
-### 4. Task Format
+### 5. Task Format
 The tasks file starts with a context block so any LLM can orient without re-reading every artifact. Each task section includes a `<!-- context: ... -->` block listing the exact files an agent should load before working on that section. This is critical for reducing context rot — each task or task group can run in a fresh session that loads only what it needs.
 
 ```markdown
@@ -244,7 +293,7 @@ The tasks file starts with a context block so any LLM can orient without re-read
 1. **Fresh sessions:** An agent starting a new session loads only the context block for its current section, avoiding accumulated noise from prior work
 2. **Subagent delegation:** In Claude Code, the parent agent passes the context list when spawning a subagent for a task group
 
-### 5. Quality Check
+### 6. Quality Check
 Before presenting to the user, verify the plan:
 - [ ] Every task references a specific file path (no "implement the feature")
 - [ ] Every step definition task describes what to assert (no "write a test")
@@ -255,14 +304,16 @@ Before presenting to the user, verify the plan:
 
 If any task is too vague, make it more specific before presenting. Read more codebase if needed.
 
-### 6. Present to User
+### 7. Present to User
 - Present tasks to user
 - Confirm order and scope
 - Adjust based on feedback
 
-### 7. Design Review
-- Once the user approves the tasks, suggest running `grimoire-review` for a multi-perspective design review (product manager, senior engineer, security engineer)
-- This step is **optional** — the user can skip it and go straight to `grimoire-apply`
+### 8. Design Review
+- Once the user approves the tasks, suggest running `grimoire-review` for a multi-perspective design review
+- **Complexity 1**: Skip review — suggest proceeding directly to `grimoire-apply`
+- **Complexity 2-3**: Review is **optional** — the user can skip it and go straight to `grimoire-apply`
+- **Complexity 4**: Review is **mandatory** — do not suggest skipping
 - If the user wants the review, hand off to the `grimoire-review` skill
 - Do NOT proceed to apply without user approval
 

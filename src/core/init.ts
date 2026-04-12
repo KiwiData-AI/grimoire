@@ -412,6 +412,33 @@ async function askPreferences(config: GrimoireConfig): Promise<GrimoireConfig> {
       commentAnswer.trim() === "none" ? undefined : commentAnswer.trim();
   }
 
+  // Design tool preferences
+  console.log(chalk.bold("\n  Front-end design:\n"));
+  console.log(chalk.dim("    Where do UI/UX designs live? This helps grimoire reference"));
+  console.log(chalk.dim("    designs during requirements elicitation.\n"));
+
+  const designToolAnswer = await rl.question(
+    `    Design tool? (figma/storybook/sketch/zeplin/none) [none]: `
+  );
+  const designTool = designToolAnswer.trim().toLowerCase();
+  if (designTool && designTool !== "none") {
+    const designPathAnswer = await rl.question(
+      `    Local design assets path? (e.g., designs/, docs/wireframes/) [none]: `
+    );
+    const designUrlAnswer = await rl.question(
+      `    Design project URL? (e.g., Figma project link) [none]: `
+    );
+    config.project.design_tool = {
+      name: designTool,
+      path: designPathAnswer.trim() && designPathAnswer.trim() !== "none"
+        ? designPathAnswer.trim()
+        : undefined,
+      url: designUrlAnswer.trim() && designUrlAnswer.trim() !== "none"
+        ? designUrlAnswer.trim()
+        : undefined,
+    };
+  }
+
   // LLM agent preferences
   console.log(chalk.bold("\n  AI agent preferences:\n"));
 

@@ -1,12 +1,17 @@
 ---
 status: draft
+complexity:
 branch:
+design_ref:
 ---
 
 # Change: <Brief description>
 
 ## Why
-<!-- 1-2 sentences: what problem or opportunity does this address? -->
+<!-- 1-2 sentences: what problem or opportunity does this address? How will you know it's solved? -->
+
+## Non-goals
+<!-- What is explicitly out of scope? What should this change NOT do, NOT handle, or NOT affect? Downstream skills use this to catch scope creep during planning and review. -->
 
 ## Feature Changes
 <!-- List each feature file affected. Use ADDED, MODIFIED, or REMOVED. -->

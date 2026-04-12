@@ -12,6 +12,12 @@ export interface ToolConfig {
 
 export type CavemanLevel = "none" | "lite" | "full" | "ultra";
 
+export interface DesignToolConfig {
+  name: string;
+  path?: string;
+  url?: string;
+}
+
 export interface ProjectConfig {
   language?: string;
   package_manager?: string;
@@ -20,6 +26,7 @@ export interface ProjectConfig {
   comment_style?: string;
   caveman?: CavemanLevel;
   compliance?: string[];
+  design_tool?: DesignToolConfig;
 }
 
 export interface LlmAgentConfig {
@@ -120,6 +127,16 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
       ? (raw.project as Record<string, unknown>)
       : {};
 
+  let design_tool: DesignToolConfig | undefined;
+  if (projectRaw.design_tool && typeof projectRaw.design_tool === "object") {
+    const dt = projectRaw.design_tool as Record<string, unknown>;
+    design_tool = {
+      name: String(dt.name ?? ""),
+      path: str(dt.path),
+      url: str(dt.url),
+    };
+  }
+
   return {
     language: str(projectRaw.language ?? raw.language),
     package_manager: str(projectRaw.package_manager),
@@ -132,6 +149,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     compliance: Array.isArray(projectRaw.compliance)
       ? (projectRaw.compliance as string[]).map(String)
       : undefined,
+    design_tool,
   };
 }
 

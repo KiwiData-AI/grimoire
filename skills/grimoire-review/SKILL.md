@@ -26,6 +26,18 @@ Multi-perspective LLM review of a completed design before coding begins. Expert 
 ## Skipping
 This step is optional. The user can skip it by saying "skip review" or "go straight to apply". Not every change needs a full review — small or low-risk changes can go directly from plan to apply.
 
+## Complexity-Gated Review
+Read `complexity` from `manifest.md` frontmatter to determine review depth:
+
+| Complexity | Review Depth |
+|------------|-------------|
+| **1 (Trivial)** | Skip review entirely — suggest proceeding to apply |
+| **2 (Simple)** | Senior Engineer only. Skip other personas unless the change touches security or data. |
+| **3 (Moderate)** | All relevant personas (skip Data Engineer if no data changes, skip QA if no user-facing behavior) |
+| **4 (Complex)** | All personas mandatory. No skipping. |
+
+The user can always override: "run full review" on a level 2, or "just senior engineer" on a level 4.
+
 ## Workflow
 
 ### 1. Select Change
@@ -51,9 +63,10 @@ Read all artifacts for the change:
 Adopt the perspective of a **product manager** focused on completeness and user value.
 
 Evaluate:
+- **Outcome**: Does the manifest's Why clearly state the problem being solved and how success is measured? If it describes a mechanism ("add an endpoint") instead of an outcome ("users can reset passwords"), flag it — the team will argue about scope later.
 - **Coverage**: Do the feature scenarios cover all user-facing behaviors? Are there missing edge cases, error states, or alternate flows that a user would encounter?
 - **Clarity**: Are the feature descriptions and user stories clear enough that a non-technical stakeholder could validate them? Would QA know exactly what to test?
-- **Scope**: Is the change well-bounded? Are there implicit requirements hiding in the scenarios that aren't spelled out?
+- **Scope**: Is the change well-bounded? Are there implicit requirements hiding in the scenarios that aren't spelled out? Do any scenarios or tasks stray into the manifest's Non-goals? Scope creep into non-goals is a **blocker**.
 - **Acceptance**: Could you ship this and confidently say the feature is "done"? What would a user complain about?
 
 Output a short list of findings — flag issues as **blocker** (must fix before coding) or **suggestion** (nice to have).
@@ -72,6 +85,7 @@ Evaluate:
 - **Contract compatibility**: Does this change alter the request/response shape for any external API documented in `schema.yml`? If fields are added, removed, renamed, or re-typed in `data.yml`, flag it — the client code and any downstream consumers need contract tests updated. A contract change without updated contract tests is a **blocker**.
 - **Reuse**: Are there existing utilities, patterns, or modules that should be used instead of writing new code? Check `.grimoire/docs/` area docs if available. The goal is less new code, not more.
 - **Surface area**: Does the change introduce new public APIs, exports, or interfaces beyond what's needed? Fewer public functions with fewer parameters is better.
+- **Quality attributes**: If decision records have a Quality Attributes table, are the targets measurable and realistic? For performance-sensitive changes (new endpoints, data pipelines, search), flag blank targets as a **blocker** — you can't verify what you haven't defined. For non-performance-sensitive changes, blank targets are fine.
 - **Testing**: Is the test strategy sound? Are there gaps between what the features describe and what the step definitions will actually verify?
 
 Output a short list of findings — flag issues as **blocker** or **suggestion**.

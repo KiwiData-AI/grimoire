@@ -26,6 +26,20 @@ Chosen option: "", because [justification].
 - Good:
 - Bad:
 
+### Quality Attributes
+<!-- Delete rows that don't apply. Targets should be measurable. Leave blank if not yet known — the review stage will flag missing targets for quality-sensitive decisions. -->
+
+| Attribute        | Target | Measurement |
+|------------------|--------|-------------|
+| Latency (p95)    |        |             |
+| Throughput       |        |             |
+| Availability     |        |             |
+| Recovery time    |        |             |
+| Data freshness   |        |             |
+| Concurrent users |        |             |
+| Storage growth   |        |             |
+| Security (CIA)   |        |             |
+
 ### Cost of Ownership
 <!-- What are the ongoing costs and benefits of this decision? -->
 - **Maintenance burden**: <!-- What does this add to ongoing maintenance? New dependencies to update, monitoring to watch, migrations to run, concepts for new devs to learn? -->
