@@ -27,6 +27,7 @@ Claude Code skill definitions that provide the AI-driven workflow. Each skill is
 | `skills/grimoire-bug-session/SKILL.md` | Guided exploratory testing sessions — charter, progress tracking, timebox, debrief |
 | `skills/grimoire-commit/SKILL.md` | Generate contextual commit messages with change trailers |
 | `skills/grimoire-pr/SKILL.md` | Generate PR descriptions from grimoire artifacts |
+| `skills/grimoire-pr-review/SKILL.md` | Review a teammate's PR with multi-persona lens against the actual diff |
 
 ## Patterns
 

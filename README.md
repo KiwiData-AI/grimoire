@@ -535,6 +535,7 @@ grimoire init --agent copilot   # creates .github/copilot-instructions.md
 | `/grimoire:bug-session` | Charter-based exploratory testing sessions |
 | `/grimoire:commit` | Contextual commit messages with change trailers |
 | `/grimoire:pr` | Generate PR description + optional diff review |
+| `/grimoire:pr-review` | Review a teammate's PR with the multi-persona lens |
 
 </details>
 
