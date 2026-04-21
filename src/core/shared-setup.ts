@@ -43,6 +43,7 @@ export const SKILL_NAMES = [
   "grimoire-pr",
   "grimoire-pr-review",
   "grimoire-refactor",
+  "grimoire-branch-guard",
 ];
 
 /**

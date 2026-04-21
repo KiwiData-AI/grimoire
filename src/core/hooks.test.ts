@@ -91,6 +91,69 @@ describe("setupHooks", () => {
     expect(writeArgs.some((p) => p.includes("pre-commit"))).toBe(false);
   });
 
+  it("wires UserPromptSubmit branch-check into .claude/settings.json when none exists", async () => {
+    setExists("/root/.git");
+    await setupHooks("/root");
+
+    const settingsWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("/.claude/settings.json")
+    );
+    expect(settingsWrite).toBeDefined();
+    const written = JSON.parse(String(settingsWrite![1]));
+    expect(written.hooks.UserPromptSubmit).toHaveLength(1);
+    expect(written.hooks.UserPromptSubmit[0].hooks[0].command).toContain("grimoire branch-check");
+  });
+
+  it("does not duplicate UserPromptSubmit branch-check if already wired", async () => {
+    const existing = {
+      hooks: {
+        UserPromptSubmit: [
+          { hooks: [{ type: "command", command: "grimoire branch-check --hook" }] },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/settings.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("/.claude/settings.json")) return JSON.stringify(existing) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const settingsWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("/.claude/settings.json")
+    );
+    expect(settingsWrite).toBeUndefined();
+  });
+
+  it("preserves existing UserPromptSubmit hooks and appends branch-check", async () => {
+    const existing = {
+      permissions: { allow: ["Bash(ls:*)"] },
+      hooks: {
+        UserPromptSubmit: [
+          { hooks: [{ type: "command", command: "custom-linter" }] },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/settings.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("/.claude/settings.json")) return JSON.stringify(existing) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const settingsWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("/.claude/settings.json")
+    );
+    expect(settingsWrite).toBeDefined();
+    const written = JSON.parse(String(settingsWrite![1]));
+    expect(written.permissions.allow).toEqual(["Bash(ls:*)"]);
+    expect(written.hooks.UserPromptSubmit).toHaveLength(2);
+    expect(written.hooks.UserPromptSubmit[0].hooks[0].command).toBe("custom-linter");
+    expect(written.hooks.UserPromptSubmit[1].hooks[0].command).toContain("grimoire branch-check");
+  });
+
   it("appends to existing pre-commit without grimoire", async () => {
     setExists("/root/.git", "/root/.git/hooks/pre-commit");
     mockReadFile.mockImplementation(async (path: any) => {

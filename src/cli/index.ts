@@ -15,6 +15,7 @@ import { prCommand } from "../commands/pr.js";
 import { testQualityCommand } from "../commands/test-quality.js";
 import { diffCommand } from "../commands/diff.js";
 import { ciCommand } from "../commands/ci.js";
+import { branchCheckCommand } from "../commands/branch-check.js";
 
 const program = new Command();
 
@@ -41,5 +42,6 @@ program.addCommand(prCommand);
 program.addCommand(testQualityCommand);
 program.addCommand(diffCommand);
 program.addCommand(ciCommand);
+program.addCommand(branchCheckCommand);
 
 program.parse();

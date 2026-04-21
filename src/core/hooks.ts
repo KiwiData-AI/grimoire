@@ -19,6 +19,7 @@ interface HookEntry {
  */
 export async function setupHooks(root: string): Promise<void> {
   await setupClaudeHooks(root);
+  await setupClaudeSettings(root);
   await setupGitHooks(root);
 }
 
@@ -114,6 +115,69 @@ fi
   await writeFile(preCommitPath, hookScript);
   await chmod(preCommitPath, 0o755);
   console.log(`  ${chalk.green("created")} .git/hooks/pre-commit`);
+}
+
+/**
+ * Native Claude Code hook format lives in .claude/settings.json.
+ * Wires UserPromptSubmit → grimoire branch-check so feature-intent prompts
+ * get a branch-hygiene warning before Claude sees them.
+ */
+interface ClaudeSettings {
+  hooks?: Record<string, ClaudeHookEntry[]>;
+  [key: string]: unknown;
+}
+
+interface ClaudeHookEntry {
+  matcher?: string;
+  hooks: Array<{ type: string; command: string }>;
+}
+
+const BRANCH_GUARD_COMMAND = "grimoire branch-check --hook";
+const BRANCH_GUARD_MARKER = "grimoire branch-check";
+
+async function setupClaudeSettings(root: string): Promise<void> {
+  const settingsPath = join(root, ".claude", "settings.json");
+  const existed = await exists(settingsPath);
+
+  let settings: ClaudeSettings = {};
+  let wasMalformed = false;
+  if (existed) {
+    const raw = await readFile(settingsPath, "utf-8");
+    try {
+      settings = JSON.parse(raw) as ClaudeSettings;
+    } catch {
+      await writeFile(settingsPath + ".bak", raw);
+      wasMalformed = true;
+      settings = {};
+    }
+  }
+
+  const hooks = settings.hooks ?? {};
+  const userPromptSubmit = hooks.UserPromptSubmit ?? [];
+
+  const alreadyWired = userPromptSubmit.some((entry) =>
+    entry.hooks?.some((h) => h.command?.includes(BRANCH_GUARD_MARKER))
+  );
+
+  if (alreadyWired) {
+    console.log(`  ${chalk.yellow("exists")}  .claude/settings.json (UserPromptSubmit branch-check)`);
+    return;
+  }
+
+  userPromptSubmit.push({
+    hooks: [{ type: "command", command: BRANCH_GUARD_COMMAND }],
+  });
+  hooks.UserPromptSubmit = userPromptSubmit;
+  settings.hooks = hooks;
+
+  await mkdir(join(root, ".claude"), { recursive: true });
+  await writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+
+  let verb: string;
+  if (!existed) verb = "created";
+  else if (wasMalformed) verb = "replaced";
+  else verb = "updated";
+  console.log(`  ${chalk[verb === "created" ? "green" : verb === "replaced" ? "yellow" : "blue"](verb)} .claude/settings.json (UserPromptSubmit branch-check)`);
 }
 
 function trailerCheckScript(): string {
