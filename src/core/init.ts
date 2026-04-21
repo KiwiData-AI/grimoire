@@ -20,6 +20,7 @@ import {
   GRIMOIRE_DIRS,
   TEMPLATE_FILES,
   generateAgentFiles,
+  detectAgentFiles,
 } from "./shared-setup.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -94,19 +95,36 @@ export async function initProject(
   // Generate config.yaml with optional tool detection
   const configPath = join(root, ".grimoire", "config.yaml");
   let cavemanLevel: CavemanLevel = "lite";
+  let configAgents: string[] = [];
   if (!(await fileExists(configPath))) {
     const config = options.noDetect
       ? buildMinimalConfig()
       : await buildDetectedConfig(root);
     cavemanLevel = config.project.caveman ?? "lite";
+    configAgents = config.project.agents ?? [];
     await writeFile(configPath, yamlStringify(config));
     console.log(`  ${chalk.green("created")} .grimoire/config.yaml`);
   } else {
     console.log(`  ${chalk.yellow("exists")}  .grimoire/config.yaml`);
-    // Read existing config to get caveman level
+    // Read existing config to get caveman level + agents
     const { loadConfig } = await import("../utils/config.js");
     const existing = await loadConfig(root);
     cavemanLevel = existing.project.caveman ?? "none";
+    configAgents = existing.project.agents ?? [];
+  }
+
+  // Merge agents from config + CLI flag (--agent). De-dup.
+  const allAgents = Array.from(new Set([...configAgents, ...options.agents]));
+  const SKILL_SUPPORTED = ["claude", "opencode", "codex"];
+  const INSTRUCTION_SUPPORTED = ["cursor", "copilot"];
+  const skillAgents = allAgents.filter((a) => SKILL_SUPPORTED.includes(a));
+  const instructionAgents = allAgents.filter((a) => INSTRUCTION_SUPPORTED.includes(a));
+  for (const a of allAgents) {
+    if (!SKILL_SUPPORTED.includes(a) && !INSTRUCTION_SUPPORTED.includes(a)) {
+      console.log(
+        `  ${chalk.yellow("unknown")} agent type: ${a} (supported: ${[...SKILL_SUPPORTED, ...INSTRUCTION_SUPPORTED].join(", ")})`
+      );
+    }
   }
 
   // Generate AGENTS.md (or append grimoire section)
@@ -114,14 +132,15 @@ export async function initProject(
     await setupAgentsFile(root, cavemanLevel);
   }
 
-  // Install Claude Code skills
+  // Install skills to each selected agent's skill directory
   if (!options.skipSkills) {
-    await installSkills(root);
+    const targets = skillAgents.length > 0 ? skillAgents : ["claude"];
+    await installSkills(root, targets);
   }
 
-  // Generate agent-specific instruction files
-  if (options.agents.length > 0) {
-    await generateAgentFiles(root, PACKAGE_ROOT, options.agents, "created");
+  // Generate agent-specific instruction files (cursor, copilot)
+  if (instructionAgents.length > 0) {
+    await generateAgentFiles(root, PACKAGE_ROOT, instructionAgents, "created");
   }
 
   // Set up hooks (Claude Code + git)
@@ -180,7 +199,7 @@ async function buildDetectedConfig(root: string): Promise<GrimoireConfig> {
 
   if (detections.length === 0) {
     console.log(chalk.dim("  No tools detected. Using minimal config.\n"));
-    return await askPreferences(config);
+    return await askPreferences(config, root);
   }
 
   // Group detections by category and pick highest confidence per category
@@ -224,7 +243,7 @@ async function buildDetectedConfig(root: string): Promise<GrimoireConfig> {
   if (answer.toLowerCase() === "n") {
     rl.close();
     console.log(chalk.dim("  Skipping tool detection.\n"));
-    return await askPreferences(config);
+    return await askPreferences(config, root);
   }
 
   if (answer.toLowerCase() === "edit") {
@@ -315,7 +334,7 @@ async function buildDetectedConfig(root: string): Promise<GrimoireConfig> {
     };
   }
 
-  return await askPreferences(config);
+  return await askPreferences(config, root);
 }
 
 async function editDetections(
@@ -351,12 +370,32 @@ async function editDetections(
   }
 }
 
-async function askPreferences(config: GrimoireConfig): Promise<GrimoireConfig> {
+async function askPreferences(
+  config: GrimoireConfig,
+  root: string
+): Promise<GrimoireConfig> {
   const readline = await import("node:readline/promises");
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
+
+  console.log(chalk.bold("\n  AI agents:\n"));
+  console.log(chalk.dim("    Which AI coding tools will use these skills?"));
+  console.log(chalk.dim("    Skills install per tool: claude→.claude/skills, opencode→.opencode/skills, codex→.agents/skills."));
+  console.log(chalk.dim("    cursor/copilot use AGENTS.md-derived files (no skills).\n"));
+
+  const detectedAgents = await detectAgentFiles(root).catch(() => [] as string[]);
+  const defaultAgents = detectedAgents.length > 0 ? detectedAgents.join(",") : "claude";
+  const agentsAnswer = await rl.question(
+    `    AI agents (comma-separated: claude/opencode/codex/cursor/copilot) [${defaultAgents}]: `
+  );
+  const rawAgents = agentsAnswer.trim() || defaultAgents;
+  const agents = rawAgents
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  config.project.agents = agents;
 
   console.log(chalk.bold("\n  Project preferences:\n"));
 
@@ -685,7 +724,7 @@ async function setupAgentsFile(root: string, caveman: CavemanLevel): Promise<voi
   await upsertAgentsFile(root, PACKAGE_ROOT, "created", caveman);
 }
 
-async function installSkills(root: string): Promise<void> {
-  await installSkillFiles(root, PACKAGE_ROOT, SKILL_NAMES, "created");
+async function installSkills(root: string, agents: string[]): Promise<void> {
+  await installSkillFiles(root, PACKAGE_ROOT, SKILL_NAMES, "created", agents);
 }
 

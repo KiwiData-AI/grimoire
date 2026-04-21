@@ -59,25 +59,30 @@ export async function updateProject(
     await updateAgentsFile(root);
   }
 
-  // 5. Update agent-specific files (cursor, copilot) — auto-detect
-  if (!options.skipAgents) {
-    const agents = await detectAgentFiles(root);
-    if (agents.length > 0) {
-      await generateAgentFiles(root, PACKAGE_ROOT, agents, "updated");
-    }
+  // 5. Determine agents from config (fallback to auto-detect for legacy projects)
+  const config = await loadConfig(root);
+  const configAgents = config.project.agents ?? [];
+  const agents = configAgents.length > 0 ? configAgents : await detectAgentFiles(root);
+  const instructionAgents = agents.filter((a) => ["cursor", "copilot"].includes(a));
+  const skillAgents = agents.filter((a) => ["claude", "opencode", "codex"].includes(a));
+
+  // 6. Update agent-specific instruction files (cursor, copilot)
+  if (!options.skipAgents && instructionAgents.length > 0) {
+    await generateAgentFiles(root, PACKAGE_ROOT, instructionAgents, "updated");
   }
 
-  // 6. Update skills
+  // 7. Update skills (install to every selected agent's skill dir)
   if (!options.skipSkills) {
-    await updateSkills(root);
+    const targets = skillAgents.length > 0 ? skillAgents : ["claude"];
+    await updateSkills(root, targets);
   }
 
-  // 7. Update hooks
+  // 8. Update hooks
   if (!options.skipHooks) {
     await setupHooks(root);
   }
 
-  // 8. Write version stamp
+  // 9. Write version stamp
   await writeVersionStamp(root);
 
   console.log(`\n${chalk.bold.green("Done!")} Grimoire updated.`);
@@ -89,8 +94,8 @@ async function updateAgentsFile(root: string): Promise<void> {
   await upsertAgentsFile(root, PACKAGE_ROOT, "updated", caveman);
 }
 
-async function updateSkills(root: string): Promise<void> {
-  await installSkillFiles(root, PACKAGE_ROOT, SKILL_NAMES, "updated");
+async function updateSkills(root: string, agents: string[]): Promise<void> {
+  await installSkillFiles(root, PACKAGE_ROOT, SKILL_NAMES, "updated", agents);
 }
 
 /**

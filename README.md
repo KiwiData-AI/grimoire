@@ -503,13 +503,19 @@ The refactor skill maintains `.grimoire/debt-register.yml` — a persistent reco
 
 Grimoire works with any AI coding assistant that reads [AGENTS.md](https://agents.md/) (open standard, 60K+ repos):
 
-- **Claude Code** — full skill support via `.claude/skills/`, hooks via `.claude/hooks.json`
-- **OpenCode** — reads AGENTS.md natively
-- **Codex, Cursor, Windsurf, Cline, Aider, etc.** — read AGENTS.md for workflow instructions
+- **Claude Code** — skills in `.claude/skills/`, hooks via `.claude/hooks.json`
+- **OpenCode** — skills in `.opencode/skills/` (also reads `.claude/skills/` natively)
+- **Codex (OpenAI)** — skills in `.agents/skills/`
+- **Cursor** — `.cursor/rules/grimoire.mdc` (AGENTS.md derivative)
+- **GitHub Copilot** — `.github/copilot-instructions.md` (AGENTS.md derivative)
+- **Windsurf, Cline, Aider, etc.** — read `AGENTS.md` for workflow instructions
+
+`grimoire init` prompts for which agents you use and installs skills to the correct path(s) for each. You can also pass `--agent` to select non-interactively:
 
 ```bash
-grimoire init --agent cursor    # creates .cursor/rules/grimoire.mdc
-grimoire init --agent copilot   # creates .github/copilot-instructions.md
+grimoire init --agent claude --agent opencode   # skills to both dirs
+grimoire init --agent cursor                    # .cursor/rules/grimoire.mdc
+grimoire init --agent copilot                   # .github/copilot-instructions.md
 ```
 
 ## Reference

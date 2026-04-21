@@ -24,7 +24,7 @@ program
   .description(
     "Gherkin + MADR spec-driven development for AI coding assistants"
   )
-  .version("0.1.0");
+  .version("0.1.1");
 
 program.addCommand(initCommand);
 program.addCommand(updateCommand);

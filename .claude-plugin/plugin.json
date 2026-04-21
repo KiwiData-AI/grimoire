@@ -1,7 +1,7 @@
 {
   "name": "grimoire",
   "description": "BDD-powered AI coding assistant — Gherkin specs, MADR decisions, and red-green development for AI agents",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Kiwi Data",
   "homepage": "https://github.com/kiwi-data/grimoire",
   "license": "MIT"

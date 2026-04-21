@@ -25,6 +25,14 @@ export const TEMPLATE_FILES: Array<[string, string]> = [
   ["dupignore", ".grimoire/dupignore"],
 ];
 
+export const SKILL_AGENTS: Record<string, string> = {
+  claude: ".claude/skills",
+  opencode: ".opencode/skills",
+  codex: ".agents/skills",
+};
+
+export const DEFAULT_SKILL_AGENT = "claude";
+
 export const SKILL_NAMES = [
   "grimoire-draft",
   "grimoire-plan",
@@ -238,6 +246,7 @@ export async function generateAgentFiles(
 
 /**
  * Auto-detect which agent files exist in the project.
+ * Covers cursor, copilot (instruction files) and claude, opencode, codex (skill dirs).
  */
 export async function detectAgentFiles(root: string): Promise<string[]> {
   const agents: string[] = [];
@@ -245,29 +254,39 @@ export async function detectAgentFiles(root: string): Promise<string[]> {
     agents.push("cursor");
   if (await fileExists(join(root, ".github", "copilot-instructions.md")))
     agents.push("copilot");
+  for (const [name, dir] of Object.entries(SKILL_AGENTS)) {
+    if (await fileExists(join(root, dir))) agents.push(name);
+  }
   return agents;
 }
 
 /**
- * Copy SKILL.md files from the package into the project's .claude/skills directory.
+ * Copy SKILL.md files from the package into each selected agent's skill directory.
+ * Unknown agents (cursor, copilot) are ignored — they use instruction files, not skills.
  */
 export async function installSkillFiles(
   root: string,
   packageRoot: string,
   skillNames: string[],
-  verb: "created" | "updated"
+  verb: "created" | "updated",
+  agents: string[] = [DEFAULT_SKILL_AGENT]
 ): Promise<void> {
-  const skillsDir = join(root, ".claude", "skills");
   const sourceSkillsDir = join(packageRoot, "skills");
+  const targets = agents.filter((a) => a in SKILL_AGENTS);
+  if (targets.length === 0) return;
 
-  for (const skill of skillNames) {
-    const destDir = join(skillsDir, skill);
-    await mkdir(destDir, { recursive: true });
+  for (const agent of targets) {
+    const relDir = SKILL_AGENTS[agent];
+    const skillsDir = join(root, relDir);
+    for (const skill of skillNames) {
+      const destDir = join(skillsDir, skill);
+      await mkdir(destDir, { recursive: true });
 
-    const src = join(sourceSkillsDir, skill, "SKILL.md");
-    const dest = join(destDir, "SKILL.md");
-    await copyFile(src, dest);
-    const color = verb === "created" ? chalk.green : chalk.blue;
-    console.log(`  ${color(verb)} .claude/skills/${skill}/SKILL.md`);
+      const src = join(sourceSkillsDir, skill, "SKILL.md");
+      const dest = join(destDir, "SKILL.md");
+      await copyFile(src, dest);
+      const color = verb === "created" ? chalk.green : chalk.blue;
+      console.log(`  ${color(verb)} ${relDir}/${skill}/SKILL.md`);
+    }
   }
 }

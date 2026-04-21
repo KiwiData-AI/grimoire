@@ -29,6 +29,7 @@ export interface ProjectConfig {
   caveman?: CavemanLevel;
   compliance?: string[];
   design_tool?: DesignToolConfig;
+  agents?: string[];
 }
 
 export interface LlmAgentConfig {
@@ -152,6 +153,9 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
       ? (projectRaw.compliance as string[]).map(String)
       : undefined,
     design_tool,
+    agents: Array.isArray(projectRaw.agents)
+      ? (projectRaw.agents as string[]).map(String)
+      : undefined,
   };
 }
 
