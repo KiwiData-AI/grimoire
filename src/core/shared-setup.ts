@@ -22,6 +22,7 @@ export const TEMPLATE_FILES: Array<[string, string]> = [
   ["debt-exceptions.yml", ".grimoire/debt-exceptions.yml"],
   ["mapignore", ".grimoire/mapignore"],
   ["mapkeys", ".grimoire/mapkeys"],
+  ["dupignore", ".grimoire/dupignore"],
 ];
 
 export const SKILL_NAMES = [

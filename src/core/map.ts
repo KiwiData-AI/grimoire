@@ -118,10 +118,14 @@ export async function generateMap(options: MapOptions): Promise<void> {
   const docsDir = join(root, ".grimoire", "docs");
 
   // Load config files
+  // mapignore → structure scan only (dir-name match)
+  // dupignore → jscpd only (glob match)
   const ignoreContent = await loadConfigFile(root, "mapignore");
   const keysContent = await loadConfigFile(root, "mapkeys");
+  const dupIgnoreContent = await loadConfigFile(root, "dupignore");
   const ignorePatterns = parseIgnoreFile(ignoreContent);
   const keyFilePatterns = parseKeyFilesConfig(keysContent);
+  const dupIgnoreGlobs = parseIgnoreFile(dupIgnoreContent);
 
   // Scan the directory tree
   const directories: DirectoryInfo[] = [];
@@ -155,7 +159,7 @@ export async function generateMap(options: MapOptions): Promise<void> {
   // Run duplicate detection if requested
   let duplicates: DuplicateReport | null = null;
   if (options.duplicates) {
-    duplicates = await runJscpd(root, ignorePatterns);
+    duplicates = await runJscpd(root, dupIgnoreGlobs);
   }
 
   const snapshot: MapSnapshot = {
@@ -359,7 +363,7 @@ async function scanDirectory(
 
 async function runJscpd(
   root: string,
-  ignorePatterns: Set<string>
+  dupIgnoreGlobs: Set<string>
 ): Promise<DuplicateReport | null> {
   // Check if jscpd is available
   try {
@@ -379,10 +383,7 @@ async function runJscpd(
   console.log(chalk.dim("\nRunning jscpd duplicate detection..."));
 
   try {
-    // Build ignore pattern for jscpd
-    const ignoreArg = [...ignorePatterns]
-      .map((p) => `**/${p}/**`)
-      .join(",");
+    const ignoreArg = [...dupIgnoreGlobs].join(",");
 
     const args = [
       "jscpd",

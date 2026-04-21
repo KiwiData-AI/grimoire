@@ -12,6 +12,13 @@ venv
 env
 vendor
 bower_components
+third_party
+external
+Pods
+Carthage
+site-packages
+.pnpm-store
+.yarn
 
 # Build output
 dist
@@ -20,6 +27,8 @@ build
 .nuxt
 out
 target
+.gradle
+obj
 
 # Caches
 __pycache__
