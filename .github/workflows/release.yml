@@ -1,6 +1,18 @@
-name: Publish to npm
+name: Release
 
 on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'bin/**'
+      - 'templates/**'
+      - 'skills/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'eslint.config.js'
+      - 'vitest.config.ts'
+      - '.github/workflows/release.yml'
   push:
     branches: [main]
     paths:
@@ -11,18 +23,40 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig.json'
-      - '.github/workflows/publish.yml'
+      - 'eslint.config.js'
+      - 'vitest.config.ts'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 concurrency:
-  group: publish-${{ github.ref }}
-  cancel-in-progress: false
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test -- --run
+      - run: npm run build
+
   publish:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@v4
@@ -31,18 +65,10 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+          cache: npm
 
-      - name: Install
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test -- --run
-
-      - name: Build
-        run: npm run build
+      - run: npm ci
+      - run: npm run build
 
       - name: Check version vs registry
         id: check
@@ -52,10 +78,9 @@ jobs:
           PUBLISHED=$(npm view "$PKG_NAME" version 2>/dev/null || echo "none")
           echo "name=$PKG_NAME" >> "$GITHUB_OUTPUT"
           echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
-          echo "published=$PUBLISHED" >> "$GITHUB_OUTPUT"
           if [ "$PKG_VERSION" = "$PUBLISHED" ]; then
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            echo "Version $PKG_VERSION already on registry; skipping publish."
+            echo "Version $PKG_VERSION already on registry; skipping."
           else
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "Will publish $PKG_NAME@$PKG_VERSION (registry: $PUBLISHED)"

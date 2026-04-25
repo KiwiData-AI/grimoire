@@ -36,7 +36,12 @@ export function spawnWithStdin(
       }
     });
 
-    proc.stdin.write(input);
-    proc.stdin.end();
+    proc.stdin.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code !== "EPIPE") reject(err);
+    });
+    proc.stdin.write(input, (err) => {
+      if (err && (err as NodeJS.ErrnoException).code !== "EPIPE") reject(err);
+      proc.stdin.end();
+    });
   });
 }
