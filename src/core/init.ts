@@ -31,6 +31,8 @@ interface InitOptions {
   skipSkills: boolean;
   noDetect: boolean;
   agents: string[];
+  installCodebaseMemoryMcp?: boolean;
+  installCavemanPlugin?: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -96,12 +98,24 @@ export async function initProject(
   const configPath = join(root, ".grimoire", "config.yaml");
   let cavemanLevel: CavemanLevel = "lite";
   let configAgents: string[] = [];
+  let integrationFlags = {
+    codebaseMemoryMcp: options.installCodebaseMemoryMcp,
+    cavemanPlugin: options.installCavemanPlugin,
+  };
   if (!(await fileExists(configPath))) {
     const config = options.noDetect
       ? buildMinimalConfig()
-      : await buildDetectedConfig(root);
+      : await buildDetectedConfig(root, integrationFlags);
     cavemanLevel = config.project.caveman ?? "lite";
     configAgents = config.project.agents ?? [];
+    integrationFlags = {
+      codebaseMemoryMcp:
+        integrationFlags.codebaseMemoryMcp ??
+        config.project.integrations?.codebase_memory_mcp,
+      cavemanPlugin:
+        integrationFlags.cavemanPlugin ??
+        config.project.integrations?.caveman_plugin,
+    };
     await writeFile(configPath, yamlStringify(config));
     console.log(`  ${chalk.green("created")} .grimoire/config.yaml`);
   } else {
@@ -111,6 +125,14 @@ export async function initProject(
     const existing = await loadConfig(root);
     cavemanLevel = existing.project.caveman ?? "none";
     configAgents = existing.project.agents ?? [];
+    integrationFlags = {
+      codebaseMemoryMcp:
+        integrationFlags.codebaseMemoryMcp ??
+        existing.project.integrations?.codebase_memory_mcp,
+      cavemanPlugin:
+        integrationFlags.cavemanPlugin ??
+        existing.project.integrations?.caveman_plugin,
+    };
   }
 
   // Merge agents from config + CLI flag (--agent). De-dup.
@@ -160,6 +182,47 @@ export async function initProject(
   console.log("Next steps:");
   console.log("  Edit .grimoire/docs/context.yml to describe your deployment,");
   console.log("  related services, and infrastructure.\n");
+
+  printIntegrationInstructions(integrationFlags);
+}
+
+function printIntegrationInstructions(flags: {
+  codebaseMemoryMcp?: boolean;
+  cavemanPlugin?: boolean;
+}): void {
+  if (!flags.codebaseMemoryMcp && !flags.cavemanPlugin) return;
+
+  console.log(chalk.bold("Recommended integrations to install:\n"));
+
+  if (flags.codebaseMemoryMcp) {
+    console.log(
+      `  ${chalk.cyan("codebase-memory-mcp")} — call graphs, dead-code detection, cross-service routes`
+    );
+    console.log(
+      "    macOS / Linux:"
+    );
+    console.log(
+      `      ${chalk.dim("curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash")}`
+    );
+    console.log(
+      "    Windows (PowerShell):"
+    );
+    console.log(
+      `      ${chalk.dim("Invoke-WebRequest https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.ps1 -OutFile install.ps1; .\\install.ps1")}`
+    );
+    console.log(
+      `    Restart your agent, then say "Index this project".\n`
+    );
+  }
+
+  if (flags.cavemanPlugin) {
+    console.log(
+      `  ${chalk.cyan("caveman skill plugin")} — token-efficient response style for Claude Code`
+    );
+    console.log("    In Claude Code:");
+    console.log(`      ${chalk.dim("/plugin marketplace add JuliusBrussee/caveman")}`);
+    console.log(`      ${chalk.dim("/plugin install caveman@JuliusBrussee/caveman")}\n`);
+  }
 }
 
 function buildMinimalConfig(): GrimoireConfig {
@@ -191,7 +254,15 @@ function buildMinimalConfig(): GrimoireConfig {
   };
 }
 
-async function buildDetectedConfig(root: string): Promise<GrimoireConfig> {
+interface IntegrationPrefill {
+  codebaseMemoryMcp?: boolean;
+  cavemanPlugin?: boolean;
+}
+
+async function buildDetectedConfig(
+  root: string,
+  prefill: IntegrationPrefill = {}
+): Promise<GrimoireConfig> {
   console.log(chalk.bold("\nDetecting project tools...\n"));
 
   const detections = await detectTools(root);
@@ -199,7 +270,7 @@ async function buildDetectedConfig(root: string): Promise<GrimoireConfig> {
 
   if (detections.length === 0) {
     console.log(chalk.dim("  No tools detected. Using minimal config.\n"));
-    return await askPreferences(config, root);
+    return await askPreferences(config, root, prefill);
   }
 
   // Group detections by category and pick highest confidence per category
@@ -243,7 +314,7 @@ async function buildDetectedConfig(root: string): Promise<GrimoireConfig> {
   if (answer.toLowerCase() === "n") {
     rl.close();
     console.log(chalk.dim("  Skipping tool detection.\n"));
-    return await askPreferences(config, root);
+    return await askPreferences(config, root, prefill);
   }
 
   if (answer.toLowerCase() === "edit") {
@@ -372,7 +443,8 @@ async function editDetections(
 
 async function askPreferences(
   config: GrimoireConfig,
-  root: string
+  root: string,
+  prefill: IntegrationPrefill = {}
 ): Promise<GrimoireConfig> {
   const readline = await import("node:readline/promises");
   const rl = readline.createInterface({
@@ -396,6 +468,37 @@ async function askPreferences(
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   config.project.agents = agents;
+
+  // Recommended integrations
+  console.log(chalk.bold("\n  Recommended integrations:\n"));
+  console.log(
+    chalk.dim("    These are optional but recommended. Saying yes records the")
+  );
+  console.log(
+    chalk.dim("    intent in config and prints install commands at the end.\n")
+  );
+
+  const integrations: { codebase_memory_mcp?: boolean; caveman_plugin?: boolean } = {};
+
+  if (prefill.codebaseMemoryMcp === undefined) {
+    const cbmAnswer = await rl.question(
+      "    Install codebase-memory-mcp (call graphs, code intelligence)? (Y/n) "
+    );
+    integrations.codebase_memory_mcp = cbmAnswer.trim().toLowerCase() !== "n";
+  } else {
+    integrations.codebase_memory_mcp = prefill.codebaseMemoryMcp;
+  }
+
+  if (prefill.cavemanPlugin === undefined) {
+    const cavemanPluginAnswer = await rl.question(
+      "    Install caveman skill plugin (Claude Code marketplace)? (y/N) "
+    );
+    integrations.caveman_plugin = cavemanPluginAnswer.trim().toLowerCase() === "y";
+  } else {
+    integrations.caveman_plugin = prefill.cavemanPlugin;
+  }
+
+  config.project.integrations = integrations;
 
   console.log(chalk.bold("\n  Project preferences:\n"));
 

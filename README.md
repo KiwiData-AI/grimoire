@@ -41,7 +41,7 @@ cd grimoire
 npm install
 npm run build
 npm link              # makes `grimoire` available globally
-grimoire --version    # should print 0.1.0
+grimoire --version    # should print 0.1.2
 ```
 
 To update after pulling new changes:
@@ -64,7 +64,7 @@ To unlink: `npm unlink -g @kiwidata/grimoire`
 ```bash
 cd my-project
 grimoire init          # Auto-detect tools, configure checks, install skills
-grimoire map --symbols # Scan codebase + extract function signatures
+grimoire map           # Snapshot codebase structure into .grimoire/docs/
 ```
 
 Then talk to your AI assistant:
@@ -314,6 +314,103 @@ The feature files move to `features/auth/login.feature` (baseline). The decision
 
 </details>
 
+<details>
+<summary>Bug walkthrough — report → triage → fix</summary>
+
+Tester hits a failure during exploratory checkout. Developer reproduces, classifies, fixes, hands back for verification.
+
+### Report
+
+Tester runs Playwright against staging and a checkout step fails. They run `/grimoire:bug-report` and paste the Playwright output (or hand it via the Playwright MCP):
+
+```
+You: /grimoire:bug-report
+     [pastes Playwright failure: timeout on #place-order, screenshot, trace.zip]
+```
+
+The skill scans `features/checkout/*.feature` for matching scenarios, references the affected spec, and writes a structured report:
+
+```
+.grimoire/bugs/0042-place-order-timeout/
+├── report.md           # Reproduction steps, env, severity, spec refs
+└── artifacts/
+    ├── screenshot.png
+    └── trace.zip
+```
+
+**report.md** lists: failing scenario (`features/checkout/place-order.feature:23`), exact steps, expected vs actual, env (browser, build SHA), and a confidence note (`high — Playwright trace shows network 504 from /api/orders`).
+
+### Triage
+
+Developer picks it up, runs `/grimoire:bug-triage 0042`. The skill classifies into one of 8 categories (code, infra, config, data, third-party, security, docs, not-a-bug) and routes:
+
+```
+Bug 0042: place-order timeout
+  Category: CODE (small)
+  Root cause hypothesis: missing timeout on outbound payment-provider call
+  Spec coverage: place-order.feature covers happy path; no timeout scenario
+  Route: /grimoire:bug (reproduce-first fix in current repo)
+  Suggested feature gap: add "payment provider unavailable" scenario
+```
+
+For `INFRA/CONFIG` it would emit a ticket stub for the platform team. For `SECURITY` it routes to the restricted workflow with confidential handling.
+
+### Fix
+
+Developer runs `/grimoire:bug 0042`. Reproduce-first discipline:
+
+```
+1. Write failing test reproducing the bug
+   → tests/checkout/test_place_order.py::test_payment_timeout
+   → pytest -k test_payment_timeout
+   ✗ FAILED — reproduces the timeout
+
+2. Add timeout + retry to PaymentClient.charge()
+   → src/checkout/payment.py
+   → pytest -k test_payment_timeout
+   ✓ PASSED
+
+3. Full regression
+   → pytest tests/checkout/
+   ✓ 31 passed
+```
+
+Skill also drafts the missing scenario into `features/checkout/place-order.feature` (under a `# pending tester sign-off` comment) and appends a tester verification checklist to `report.md`:
+
+```
+.grimoire/bugs/0042-place-order-timeout/report.md (verification section)
+- [ ] Original Playwright scenario passes against the fix branch
+- [ ] New "payment provider unavailable" scenario passes
+- [ ] No regression in existing checkout suite
+```
+
+Commit trailer: `Bug: 0042-place-order-timeout`. Tester runs through the checklist, marks complete, and the bug archives alongside the change.
+
+</details>
+
+<details>
+<summary>PR review walkthrough — multi-persona review of a teammate's PR</summary>
+
+Reviewing PR #312 from a teammate. Run `/grimoire:pr-review 312` (or paste the PR URL).
+
+The skill fetches the diff via `gh pr view 312 --json` + `gh pr diff 312`, loads relevant area docs and feature files, and runs the multi-persona lens (PM, engineer, security, QA, data — same set as `/grimoire:review` on outgoing changes):
+
+```
+PR #312: Add bulk export endpoint
+  Spec coverage: features/exports/bulk-export.feature ✓ (3 scenarios)
+  Decisions referenced: 0021-export-pagination.md ✓
+
+  PM lens          ⚠ scope drift — diff also touches user-search; not in PR description
+  Engineering lens ✗ N+1 in src/exports/serializer.py:48 (loop calls user.profile)
+  Security lens    ✗ no rate limit on /api/exports/bulk — DoS risk (CWE-770)
+  QA lens          ⚠ no scenario for partial-failure path (some rows succeed, some fail)
+  Data lens        ✓ schema unchanged
+```
+
+Output is structured Markdown ready to paste as a PR comment, or wired through `gh pr comment 312 --body-file review.md`. Each finding includes file:line, severity, and a suggested change — same format the post-implementation review uses on your own diffs (`grimoire pr --review`), so reviewers and authors share one mental model.
+
+</details>
+
 ## Scope & Boundaries
 
 Grimoire owns the **inner loop** — the Dev and Sec portions of DevSecOps. Ops is explicitly out of scope.
@@ -363,13 +460,15 @@ Grimoire does not provide compliance framework enforcement (OWASP ASVS checklist
 ### Codebase Intelligence
 
 ```bash
-grimoire map --symbols      # Extract function signatures, classes, exports
-grimoire map --compress     # Also generate compressed .symbols.md
+grimoire map                # Structural snapshot (.grimoire/docs/.snapshot.json)
+grimoire map --refresh      # Diff against existing docs, show gaps
+grimoire map --duplicates   # Run jscpd duplicate detection
+grimoire map --depth <n>    # Max directory depth to scan (default 4)
 ```
 
-Extracts the API surface of your codebase — function signatures, class definitions, methods, exports, and constants across Python, TypeScript, JavaScript, Go, and Rust. No native dependencies. Feeds into area docs and the plan skill.
+Snapshots the directory layout, language mix, and per-area metrics so area docs and plans don't have to re-explore the tree. No native dependencies.
 
-For richer intelligence (call graphs, data flow tracing, dependency analysis), see [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp).
+For richer intelligence (call graphs, data flow tracing, dependency analysis), grimoire integrates with [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp). `grimoire init` offers to install it.
 
 ### Area Docs & Data Schema
 
@@ -539,6 +638,7 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | `/grimoire:bug-triage` | Classify and route bug reports |
 | `/grimoire:bug-explore` | AI-guided exploratory testing and gap analysis |
 | `/grimoire:bug-session` | Charter-based exploratory testing sessions |
+| `/grimoire:branch-guard` | Enforce branch hygiene before starting new feature work (also wired as a hook) |
 | `/grimoire:commit` | Contextual commit messages with change trailers |
 | `/grimoire:pr` | Generate PR description + optional diff review |
 | `/grimoire:pr-review` | Review a teammate's PR with the multi-persona lens |
@@ -551,31 +651,44 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | Command | Description |
 |---------|-------------|
 | `grimoire init [path]` | Initialize grimoire (auto-detects tools, installs skills, sets up hooks) |
+| `grimoire init --agent <type>` | Add agent (claude/opencode/codex/cursor/copilot, repeatable) |
+| `grimoire init --skip-agents` | Skip generating AGENTS.md instructions |
+| `grimoire init --skip-skills` | Skip installing skills for selected agents |
+| `grimoire init --no-detect` | Skip auto-detection of project tools |
+| `grimoire init --install-codebase-memory-mcp` | Mark codebase-memory-mcp as a recommended integration |
+| `grimoire init --install-caveman-plugin` | Mark caveman skill plugin as a recommended integration |
 | `grimoire update [path]` | Update AGENTS.md, skills, and hooks to latest version |
+| `grimoire update --skip-agents\|--skip-skills\|--skip-hooks\|--skip-templates\|--skip-config` | Skip parts of the update |
+| `grimoire update --force-templates` | Overwrite existing template files |
 | `grimoire list` | List active changes (with conflict detection) |
 | `grimoire list --features` | List feature files |
 | `grimoire list --decisions` | List decision records |
 | `grimoire status <id>` | Show change status, branch, and task progress |
 | `grimoire validate [id]` | Validate features, decisions, and manifests |
-| `grimoire archive <id>` | Archive a completed change |
+| `grimoire validate --strict` | Enable strict validation |
+| `grimoire archive <id> [-y]` | Archive a completed change (`-y` skips confirmation) |
 | `grimoire map` | Structural codebase scan |
-| `grimoire map --symbols` | Extract function signatures, classes, exports |
-| `grimoire map --compress` | Generate compressed symbol map (`.symbols.md`) |
 | `grimoire map --duplicates` | Run jscpd duplicate detection |
 | `grimoire map --refresh` | Diff against existing docs, show gaps |
+| `grimoire map --depth <n>` | Max directory depth to scan (default 4) |
 | `grimoire check [steps...]` | Run pre-commit pipeline |
-| `grimoire ci [--setup]` | Run CI pipeline / generate GitHub Actions workflow |
+| `grimoire ci` | Run CI pipeline |
+| `grimoire ci --setup` | Generate `.github/workflows/grimoire.yml` template |
+| `grimoire ci --annotations` | Output GitHub Actions annotations |
+| `grimoire ci --skip <steps...>` | Skip specific check steps |
 | `grimoire pr [id]` | Generate PR description from change artifacts |
 | `grimoire pr --create` | Create PR via gh/glab |
 | `grimoire pr --review` | Run post-implementation LLM review of diff |
 | `grimoire test-quality [files]` | Analyze test files for quality issues |
-| `grimoire log [--from] [--to]` | Generate change log / release notes |
+| `grimoire log [--from <ref>] [--to <ref>]` | Generate change log / release notes |
 | `grimoire trace <file[:line]>` | Trace file to originating grimoire change |
 | `grimoire diff <id>` | Compare proposed change specs against the baseline |
-| `grimoire docs` | Generate human-readable project overview |
-| `grimoire health [--badges]` | Project health score with optional badges |
+| `grimoire docs [-o <path>]` | Generate human-readable project overview |
+| `grimoire health` | Project health score |
+| `grimoire health --badges <file>` | Write shields.io badges into a file (e.g., README.md) |
+| `grimoire branch-check` | Branch-guard check (used by hook; `--hook`, `--prompt <text>`) |
 
-Most commands support `--json` for machine-readable output. `grimoire check` also supports `--changed` (only changed files), `--continue-on-fail`, and `--skip <steps>`.
+Most commands support `--json` for machine-readable output. `grimoire check` also supports `--changed` (only changed files), `--continue` (run all steps even on failure), and `--skip <steps...>`.
 
 </details>
 

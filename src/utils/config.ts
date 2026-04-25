@@ -30,6 +30,12 @@ export interface ProjectConfig {
   compliance?: string[];
   design_tool?: DesignToolConfig;
   agents?: string[];
+  integrations?: IntegrationsConfig;
+}
+
+export interface IntegrationsConfig {
+  codebase_memory_mcp?: boolean;
+  caveman_plugin?: boolean;
 }
 
 export interface LlmAgentConfig {
@@ -140,6 +146,19 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     };
   }
 
+  let integrations: IntegrationsConfig | undefined;
+  if (projectRaw.integrations && typeof projectRaw.integrations === "object") {
+    const it = projectRaw.integrations as Record<string, unknown>;
+    integrations = {
+      codebase_memory_mcp:
+        typeof it.codebase_memory_mcp === "boolean"
+          ? it.codebase_memory_mcp
+          : undefined,
+      caveman_plugin:
+        typeof it.caveman_plugin === "boolean" ? it.caveman_plugin : undefined,
+    };
+  }
+
   return {
     language: str(projectRaw.language ?? raw.language),
     package_manager: str(projectRaw.package_manager),
@@ -156,6 +175,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     agents: Array.isArray(projectRaw.agents)
       ? (projectRaw.agents as string[]).map(String)
       : undefined,
+    integrations,
   };
 }
 
