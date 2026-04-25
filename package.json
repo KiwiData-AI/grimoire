@@ -1,5 +1,5 @@
 {
-  "name": "@kiwi-data/grimoire",
+  "name": "@kiwidata/grimoire",
   "version": "0.1.1",
   "description": "Gherkin + MADR spec-driven development for AI coding assistants",
   "type": "module",

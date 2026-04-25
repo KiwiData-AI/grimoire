@@ -21,7 +21,7 @@ Grimoire needs to be installable on any developer machine regardless of what lan
 3. Go binary (cross-compiled)
 
 ## Decision Outcome
-Chosen option: "npm package", because `npx @kiwi-data/grimoire init` works on any machine with Node — no virtualenv, no Python version management. The consuming projects can be any language.
+Chosen option: "npm package", because `npx @kiwidata/grimoire init` works on any machine with Node — no virtualenv, no Python version management. The consuming projects can be any language.
 
 ### Consequences
 - Good: Single command install, works everywhere Node exists

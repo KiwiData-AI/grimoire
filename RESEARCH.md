@@ -169,7 +169,7 @@ OpenSpec uses ADDED/MODIFIED/REMOVED sections within spec files. Grimoire uses a
 
 ### npm CLI for distribution
 
-Chose npm over Python CLI for cross-platform ease. `npx @kiwi-data/grimoire init` works on any machine with Node — no virtualenv or Python version issues. The consuming projects can be any language; the CLI just scaffolds files and validates structure.
+Chose npm over Python CLI for cross-platform ease. `npx @kiwidata/grimoire init` works on any machine with Node — no virtualenv or Python version issues. The consuming projects can be any language; the CLI just scaffolds files and validates structure.
 
 ### Multi-LLM via AGENTS.md
 

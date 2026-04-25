@@ -27,7 +27,7 @@ Works with **any AI coding agent** that reads AGENTS.md: Claude Code, Cursor, Co
 ## Install
 
 ```bash
-npm install -g @kiwi-data/grimoire
+npm install -g @kiwidata/grimoire
 ```
 
 <details>
@@ -55,7 +55,7 @@ cd /path/to/your-project
 grimoire update       # refreshes AGENTS.md + skills to latest
 ```
 
-To unlink: `npm unlink -g @kiwi-data/grimoire`
+To unlink: `npm unlink -g @kiwidata/grimoire`
 
 </details>
 
