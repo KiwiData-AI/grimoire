@@ -688,7 +688,7 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | `grimoire health --badges <file>` | Write shields.io badges into a file (e.g., README.md) |
 | `grimoire branch-check` | Branch-guard check (used by hook; `--hook`, `--prompt <text>`) |
 
-Most commands support `--json` for machine-readable output. `grimoire check` also supports `--changed` (only changed files), `--continue` (run all steps even on failure), and `--skip <steps...>`.
+Most commands support `--json` for machine-readable output. `grimoire check` runs all steps by default and also supports `--changed` (only changed files), `--fail-fast` (stop at first failure), and `--skip <steps...>`.
 
 </details>
 

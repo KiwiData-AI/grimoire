@@ -17,16 +17,16 @@ Feature: Pre-commit check pipeline
     When I run "grimoire check"
     Then the "security" step should be skipped with "not configured"
 
-  Scenario: Stop on first failure by default
+  Scenario: Continue past failures by default
     Given the "lint" step will fail
     When I run "grimoire check"
+    Then all remaining steps should still execute
+
+  Scenario: Stop on first failure with --fail-fast
+    Given the "lint" step will fail
+    When I run "grimoire check --fail-fast"
     Then the pipeline should stop after "lint"
     And subsequent steps should not execute
-
-  Scenario: Continue on failure with --continue
-    Given the "lint" step will fail
-    When I run "grimoire check --continue"
-    Then all remaining steps should still execute
 
   Scenario: Skip specific steps
     When I run "grimoire check --skip security --skip best_practices"
