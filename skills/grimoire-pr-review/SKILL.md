@@ -75,6 +75,56 @@ If no `Change:` trailer exists, that's itself a finding for a grimoire-managed r
 - `.grimoire/docs/data/schema.yml` — current data baseline
 - Relevant `.grimoire/docs/<area>.md` for the directories touched by the diff
 
+### 4.5 Synthesize Project Briefing
+
+Build a project briefing that grounds every persona in real business context. Findings that don't threaten anything in the briefing are dropped (materiality gate, applied per-persona below).
+
+**Sources:**
+- `README.md` — first 50 lines or up to first H2
+- `.grimoire/config.yaml` — `project.compliance`, language, `dep_audit`
+- `.grimoire/docs/context.yml` — deployment env, related services (if exists)
+- Tag histogram across `.grimoire/changes/**/*.feature` + `.grimoire/archive/**/*.feature`
+- All `.grimoire/decisions/*.md` with `status: accepted` — extract ID, title, top Decision Driver
+- Linked manifest's `Why` and `Non-goals` (if a Change trailer exists); else PR body's stated intent
+
+**Feature inventory:**
+- Glob `.grimoire/changes/**/*.feature` + `.grimoire/archive/**/*.feature`
+- Parse: `Feature:` line, first description line, `@tags`
+- Bucket by path prefix
+- If total >80, area-level summary only
+
+**README fallback:** if missing or <200 chars, note `Product framing: unknown` and proceed.
+
+**Emit briefing block:**
+
+```markdown
+## Project Briefing
+
+**Product:** <one-line from README>
+**Stage:** <prototype | internal | customer-facing | regulated>
+**Users:** <who, scale, trust level>
+**Data sensitivity:** <none | pii | financial | phi>
+**Threat surface:** <only tags with count >0, e.g. auth=4, pii=3, payment=2>
+
+**Active constraints (accepted decisions):**
+- ADR-XXXX — <title>
+- ...
+
+**Feature inventory:**
+<area>/ (N features)
+  - <Feature title> [@tags] — one-line capability
+  ...
+Total: <N> features across <M> areas.
+
+**Linked change non-goals (if Change trailer present):**
+- <bullets, or "n/a — no linked change">
+```
+
+Inject as preface to every persona below. Each persona applies the **materiality gate**:
+- Every finding must cite a briefing axis it threatens (stage, data sensitivity, active constraint, threat-surface tag) OR a concrete feature-inventory gap.
+- If the inventory shows the concern is already covered elsewhere, drop or downgrade to a cross-feature integration note.
+- Findings with no briefing anchor are dropped.
+
 ### 5. Complexity-Gated Depth
 Read `complexity` from the linked manifest frontmatter if available. Fall back to heuristics on the diff:
 
@@ -90,7 +140,7 @@ User can override: "full review", "just security", "just engineer", etc.
 ### 6. Product Manager Review
 *(Skip if PR is pure internal refactor with no user-facing change.)*
 
-Evaluate against the linked feature files (if any) or the PR body:
+Apply briefing materiality gate. Evaluate against the linked feature files (if any) or the PR body:
 
 - **Scenario coverage**: If a feature file exists in the change, does the diff implement every scenario? Any scenario with no matching code change?
 - **Non-goals**: Does the diff touch anything the manifest's Non-goals section excludes?
@@ -100,7 +150,7 @@ Evaluate against the linked feature files (if any) or the PR body:
 Flag as **blocker** or **suggestion**.
 
 ### 7. Senior Engineer Review
-Review the actual code:
+Apply briefing materiality gate. Treat accepted decisions as constraints — cite ADR ID before suggesting an override. Review the actual code:
 
 - **Simplicity**: Is this the simplest implementation? Any unnecessary abstraction, indirection, or config that could be inlined?
 - **Conventions**: Does the new code match the file layout, naming, and patterns already in the touched areas? Check `.grimoire/docs/<area>.md` if present.
@@ -116,7 +166,7 @@ Review the actual code:
 Flag as **blocker** or **suggestion**.
 
 ### 8. Security Engineer Review
-Apply `../references/security-compliance.md`.
+Apply briefing materiality gate. Calibrate severity to stage and data sensitivity from the briefing — a missing rate limit on an internal prototype is a suggestion; on a customer-facing PCI-scoped flow it is a blocker. Don't flag generic OWASP items that don't threaten the briefing's threat surface. Apply `../references/security-compliance.md`.
 
 #### 8a. STRIDE on the diff
 For every new entry point, data flow, or trust boundary introduced by the diff:
@@ -148,7 +198,7 @@ If `project.compliance` configured, verify per `../references/security-complianc
 Every security finding gets OWASP 2021 + CWE tags. See the CWE quick-reference in `../references/security-compliance.md`.
 
 ### 9. QA Engineer Review (optional)
-Skip if PR is purely internal.
+Skip if PR is purely internal. Apply briefing materiality gate.
 
 - **Test presence**: Every new user-facing behavior has a test? Every scenario from the linked feature file has step definitions?
 - **Test quality**: Are tests asserting outputs, or just that code "ran"? Over-mocked tests are a red flag.
@@ -158,7 +208,7 @@ Skip if PR is purely internal.
 - **Accessibility**: New UI — keyboard nav, aria labels, contrast?
 
 ### 10. Data Engineer Review (optional)
-Skip unless diff touches migrations, models, schema files, or external API clients.
+Skip unless diff touches migrations, models, schema files, or external API clients. Apply briefing materiality gate — calibrate to stage and data sensitivity. Use feature inventory to spot relationships with existing data features.
 
 - **Migrations**: Safe to run on a live DB? Adding a NOT NULL without default on a large table = **blocker**. Renames without a two-step migration = **blocker**.
 - **Indexes**: New foreign keys with no index? New query patterns against unindexed columns?
@@ -235,6 +285,9 @@ If a linked grimoire change was found and the review surfaced blockers that need
 - Don't re-derive tasks or specs. If the linked change's artifacts are wrong, that's a separate `grimoire-draft` / `grimoire-plan` cycle.
 - If the diff is too large or too sprawling to review meaningfully, say so — offer to focus on a subset rather than producing a shallow full-pass review.
 - Never post to the PR without explicit user confirmation.
+- **Materiality gate:** every finding must cite a briefing axis it threatens (stage, data sensitivity, active constraint, threat-surface tag) or a concrete feature-inventory gap. No anchor = drop the finding.
+- **Decisions are constraints, not suggestions.** Treat accepted ADRs as given. If a persona thinks one is wrong, name the ADR by ID and propose superseding it.
+- **Coverage check via inventory:** before flagging a missing capability, check the feature inventory for a sibling feature that already covers it. If covered, drop or downgrade to a cross-feature integration note.
 
 ## Done
 When the report is presented (and optionally posted), the workflow is complete. If blockers exist, suggest the author address them; if not, suggest approving via `gh pr review <id> --approve`.

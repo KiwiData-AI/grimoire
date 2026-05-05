@@ -64,9 +64,66 @@ Read all artifacts for the change:
 - Read relevant `.grimoire/docs/` area docs if they exist
 - Skim the areas of the codebase the tasks reference
 
+### 2.5 Synthesize Project Briefing
+
+Build a project briefing that grounds every persona in real business context. Findings that don't threaten anything in the briefing are dropped (materiality gate, applied per-persona below).
+
+**Sources to read:**
+- `README.md` — first 50 lines or up to first H2 (product framing, audience, stage signals)
+- `.grimoire/config.yaml` — `project.compliance`, language, `dep_audit`
+- `.grimoire/docs/context.yml` — deployment env, related services (if it exists)
+- Tag histogram: count each `@tag` across `.grimoire/changes/**/*.feature` + `.grimoire/archive/**/*.feature`
+- All `.grimoire/decisions/*.md` with `status: accepted` — extract ID, title, top Decision Driver
+- Current manifest's `Why` and `Non-goals` sections
+
+**Feature inventory:**
+- Glob `.grimoire/changes/**/*.feature` + `.grimoire/archive/**/*.feature`
+- Parse each: `Feature:` line, first description line, `@tags`
+- Bucket by path prefix (area)
+- If total >80 features, emit area-level summary only (count + capability one-liner). Otherwise per-feature one-liners.
+
+**README fallback:** if missing or <200 chars, prompt user once: "README thin — add 3 lines on product / users / stage, or proceed with what exists?" If user proceeds, mark `Product framing: unknown`.
+
+**Emit briefing block:**
+
+```markdown
+## Project Briefing
+
+**Product:** <one-line from README>
+**Stage:** <prototype | internal | customer-facing | regulated — inferred from compliance config + README>
+**Users:** <who, scale, trust level — from README>
+**Data sensitivity:** <none | pii | financial | phi — derived from tag histogram + compliance>
+**Threat surface:** <only tags with count >0, e.g. auth=4, pii=3, payment=2, input-validation=5>
+
+**Active constraints (accepted decisions):**
+- ADR-0001 — Gherkin over custom format
+- ADR-0007 — Data schema as YAML
+- ... (all accepted, one line each)
+
+**Feature inventory:**
+auth/ (4 features)
+  - Login with email+password [@auth] — happy path + lockout
+  - Logout [@auth]
+  - Email verification [@auth @pii]
+  - Session refresh [@auth @security]
+billing/ (2 features)
+  - Subscription create [@payment @pci-dss]
+  - Webhook from Stripe [@input-validation]
+...
+Total: <N> features across <M> areas.
+
+**This change's non-goals (from manifest):**
+- <bullets>
+```
+
+Inject this briefing as preface to every persona below. Each persona applies the **materiality gate**:
+- Every finding must cite a briefing axis it threatens (stage, data sensitivity, active constraint, threat-surface tag) OR a concrete gap vs the feature inventory.
+- If the inventory shows the concern is already covered elsewhere (e.g., rate-limit feature exists in `auth/`), drop the finding or downgrade to a cross-feature integration note.
+- Findings with no briefing anchor are dropped. Don't manufacture findings to hit a quota.
+
 ### 3. Product Manager Review
 
-Adopt the perspective of a **product manager** focused on completeness and user value.
+Adopt the perspective of a **product manager** focused on completeness and user value. Apply briefing materiality gate.
 
 Evaluate:
 - **Outcome**: Does the manifest's Why clearly state the problem being solved and how success is measured? If it describes a mechanism ("add an endpoint") instead of an outcome ("users can reset passwords"), flag it — the team will argue about scope later.
@@ -79,7 +136,7 @@ Output a short list of findings — flag issues as **blocker** (must fix before 
 
 ### 4. Senior Engineer Review
 
-Adopt the perspective of a **senior software engineer** reviewing the technical design.
+Adopt the perspective of a **senior software engineer** reviewing the technical design. Apply briefing materiality gate. Treat accepted decisions as constraints, not suggestions — don't re-litigate; cite the ADR ID if you propose overriding one.
 
 Evaluate:
 - **Build vs Buy**: Was the prior art research thorough? Check the manifest's Prior Art section. If the change builds custom code, is the justification for not adopting an existing library convincing? Do a quick sanity check — search for obvious libraries the research may have missed. If a well-maintained library exists that the manifest doesn't mention, flag it as a **blocker**. If the research was done but the build decision is debatable, flag as **suggestion** with the alternative.
@@ -98,7 +155,7 @@ Output a short list of findings — flag issues as **blocker** or **suggestion**
 
 ### 5. Security Engineer Review
 
-Adopt the perspective of a **security engineer** reviewing the design for vulnerabilities.
+Adopt the perspective of a **security engineer** reviewing the design for vulnerabilities. Apply briefing materiality gate — calibrate severity to stage and data sensitivity. A missing CSRF check on an internal prototype with no PII is a suggestion; the same check missing on a customer-facing PCI-scoped change is a blocker. Don't flag generic OWASP items that don't threaten the briefing's threat surface.
 
 #### 5a. STRIDE Threat Analysis
 
@@ -160,7 +217,7 @@ Output format:
 
 **Skip this review if the change is purely internal (no user-facing behavior, no new inputs, no observable state changes).**
 
-If the change has user-facing behavior, adopt the perspective of a **QA engineer** focused on testability and real-world failure modes.
+If the change has user-facing behavior, adopt the perspective of a **QA engineer** focused on testability and real-world failure modes. Apply briefing materiality gate.
 
 Evaluate:
 - **Testability**: Can every scenario be verified automatically? Are there behaviors that require manual testing — and if so, is that documented? Are the Given/When/Then steps specific enough to implement as real tests?
@@ -176,7 +233,7 @@ Output a short list of findings — flag issues as **blocker** or **suggestion**
 
 **Skip this review if the change has no `data.yml` and doesn't touch data models, schemas, migrations, or external API integrations.**
 
-If the change touches data, adopt the perspective of a **data engineer** reviewing the schema design.
+If the change touches data, adopt the perspective of a **data engineer** reviewing the schema design. Apply briefing materiality gate — calibrate to stage and data sensitivity. Schema lint on an internal prototype is suggestion-level; the same finding on a regulated/PII system is a blocker. Use feature inventory to spot relationships with existing data features.
 
 Read:
 - `.grimoire/changes/<change-id>/data.yml` — proposed schema changes
@@ -242,6 +299,9 @@ Recommendation: Fix blockers, then proceed to apply.
 - A blocker means "if we code this as-is, we'll have to come back and redo work." A suggestion means "this would improve the design but isn't blocking."
 - Keep each persona's review focused and short. Three bullet points that matter are better than ten that don't.
 - If the change is trivial (e.g., rename a field, fix a typo in a feature), say so and don't manufacture issues.
+- **Materiality gate:** every finding must cite a briefing axis it threatens (stage, data sensitivity, active constraint, threat-surface tag) or a concrete feature-inventory gap. No anchor = drop the finding. Generic checklist hits without business-context anchor are noise.
+- **Decisions are constraints, not suggestions.** Treat accepted ADRs as given. If a persona thinks one is wrong, name the ADR by ID and propose superseding it — don't re-litigate silently.
+- **Coverage check via inventory:** before flagging a missing capability (rate limit, audit log, etc.), check the feature inventory for a sibling feature that already covers it. If covered, drop or downgrade to a cross-feature integration note.
 
 ## Done
 When findings are presented and blockers resolved (or accepted), the review is complete. Suggest proceeding to `grimoire-apply`.
