@@ -83,12 +83,35 @@ generation, causing user lookup to fail on the reset page.
 Added scenario: "Password reset with plus-sign email"
 ```
 
-### 5. Create Fix Branch
-Before writing any code, create a branch for the fix:
+### 5. Decide the Branch
+
+Default bias: **stay on the current branch if the bug is related to in-flight work.** Only create a new branch when the bug is clearly a separate concern from whatever the current branch is doing.
+
+Snapshot state first:
+
 ```
-fix/<short-description>
+git branch --show-current
+git status --porcelain
+grimoire list --changes --json
 ```
-For example: `fix/special-chars-password-reset`, `fix/null-pricing-response`.
+
+Find any active change whose `manifest.md` `branch:` matches the current branch.
+
+| Current state | Bug relation | Action |
+|---------------|--------------|--------|
+| Protected branch (`main`/`master`/`develop`/`trunk`), clean tree | any | Create `fix/<short-description>` and switch |
+| Feature branch + active change on it | Bug is in the same feature/code path the change touches | **Stay on the branch.** Fix in place. The repro test and fix become part of that change |
+| Feature branch + active change on it | Bug is unrelated to that change | Ask the user. Default: stash/commit, switch to default branch, create `fix/...` off it |
+| Feature branch + no matching active change | any | Create `fix/<short-description>` off the default branch |
+| Dirty tree, no clear owner | any | Block. Commit, stash, or discard before proceeding |
+
+How to judge "related vs separate":
+- **Related** — the bug lives in files the in-flight change is modifying, or the bug is a direct consequence of the in-flight work (e.g. tests added by the change reveal it, the new code path crashes on an edge case). Fixing it on the same branch keeps the change coherent and the PR self-contained.
+- **Separate** — the bug exists on `main` independent of the in-flight change, touches unrelated code, or would still need to ship if the in-flight change were abandoned. Mixing it in pollutes the diff and the `Change:` trailer.
+
+When in doubt, ask the user one question: "This bug looks like it's [in / outside] the scope of the current `<branch>` work — fix it here, or branch off main?"
+
+Branch name format when creating new: `fix/<short-description>` (e.g. `fix/special-chars-password-reset`, `fix/null-pricing-response`).
 
 ### 6. Fix the Bug
 Now — and only now — modify production code:
@@ -120,7 +143,7 @@ After the fix, generate a checklist for testers to verify the fix and check for 
 3. **Generate the checklist:**
 ```markdown
 ## Verification Checklist: <bug-id>
-Fix branch: `fix/<name>`
+Branch: `<current-branch>` (new `fix/...` branch, or the in-flight feature branch if fixed in place)
 
 ### Original Bug
 - [ ] Reproduce the original steps: <steps>
@@ -155,6 +178,7 @@ Report to the user:
 - **Don't over-document.** The test is the documentation. A one-line comment in the test explaining the bug is enough. Don't create tracking files, bug reports, or manifests for a bug fix.
 - **The feature file is truth.** If a scenario describes behavior the user now says is wrong, that's a spec change, not a bug. Handle it through `grimoire-draft`.
 - **One bug, one fix.** Don't bundle "while I'm in here" improvements with a bug fix. Fix the bug, nothing more.
+- **Don't reflexively branch.** A bug related to in-flight work belongs on the in-flight branch — splitting it into a separate PR fragments the change and breaks the `Change:` trailer audit trail. Branch only when the bug is genuinely a separate concern. See step 5.
 
 ## Done
 When the bug is fixed, tests pass (reproduction + regression), and the summary is presented, the workflow is complete. Suggest `grimoire-commit` for the fix commit.
