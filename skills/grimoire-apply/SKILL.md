@@ -9,7 +9,7 @@ metadata:
 
 # grimoire-apply
 
-Implement tasks from a planned grimoire change. Write production code AND tests. A task is not complete until its scenarios pass.
+Implement tasks from a planned grimoire change using strict red-green BDD: write the failing test first, then the production code that makes it pass. A task is not complete until its scenarios pass.
 
 ## CRITICAL: Two Rules That Must Not Be Broken
 
@@ -190,7 +190,7 @@ This links the git history to the grimoire change — `grimoire trace` and `grim
 3. Tell the user: "Context is getting large. I've updated tasks.md with progress. A fresh session can resume from here."
 
 ### 5. Implement Tasks
-Work through `tasks.md` sequentially. **Every task follows the same cycle: code → test → green → next.**
+Work through `tasks.md` sequentially. **Every task follows the same cycle: test → red → code → green → next.**
 
 **For each task:**
 1. Announce which task you're working on
