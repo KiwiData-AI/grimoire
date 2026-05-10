@@ -19,7 +19,8 @@ Write a commit message from staged changes and active grimoire context. Never au
 ## Routing
 - No changes to commit → nothing to do
 - Want to create a PR → `grimoire-pr` (commit first, then PR)
-- Want to review changes before committing → show the diff first
+- Want a multi-persona review of the staged diff before committing → `grimoire-precommit-review`
+- Just want to eyeball the diff → show the diff first
 
 ## Workflow
 

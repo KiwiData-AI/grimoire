@@ -31,6 +31,12 @@ export interface ProjectConfig {
   design_tool?: DesignToolConfig;
   agents?: string[];
   integrations?: IntegrationsConfig;
+  precommit_review?: PrecommitReviewConfig;
+}
+
+export interface PrecommitReviewConfig {
+  depth?: "quick" | "full";
+  block_on?: "blocker" | "none";
 }
 
 export interface IntegrationsConfig {
@@ -159,6 +165,21 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     };
   }
 
+  let precommit_review: PrecommitReviewConfig | undefined;
+  if (
+    projectRaw.precommit_review &&
+    typeof projectRaw.precommit_review === "object"
+  ) {
+    const pr = projectRaw.precommit_review as Record<string, unknown>;
+    const depth = str(pr.depth);
+    const blockOn = str(pr.block_on);
+    precommit_review = {
+      depth: depth === "quick" || depth === "full" ? depth : undefined,
+      block_on:
+        blockOn === "blocker" || blockOn === "none" ? blockOn : undefined,
+    };
+  }
+
   return {
     language: str(projectRaw.language ?? raw.language),
     package_manager: str(projectRaw.package_manager),
@@ -176,6 +197,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
       ? (projectRaw.agents as string[]).map(String)
       : undefined,
     integrations,
+    precommit_review,
   };
 }
 

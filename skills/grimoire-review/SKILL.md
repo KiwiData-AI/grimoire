@@ -4,12 +4,12 @@ description: Multi-perspective design review before coding begins. Expert person
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
-  version: "0.1"
+  version: "0.2"
 ---
 
 # grimoire-review
 
-Multi-perspective LLM review of a completed design before coding begins. Expert personas validate the change for completeness, feasibility, security, and data integrity.
+Multi-perspective LLM review of a completed design before coding begins. Applies the shared persona engine in `../references/review-personas.md` to the specs (manifest, features, decisions, tasks) — no diff exists yet.
 
 ## Triggers
 - User has a grimoire change with approved features, decisions, and tasks
@@ -21,7 +21,9 @@ Multi-perspective LLM review of a completed design before coding begins. Expert 
 - No tasks.md exists → `grimoire-plan` first
 - Level 1 change → skip review entirely, proceed to `grimoire-apply`
 - User says "skip review" → proceed to `grimoire-apply`
-- Post-implementation review → `grimoire-pr` (has optional post-impl review)
+- Reviewing the diff after coding (own change) → `grimoire-pr` post-impl review
+- Reviewing a teammate's PR → `grimoire-pr-review`
+- Reviewing your own staged but uncommitted diff → `grimoire-precommit-review`
 
 ## Prerequisites
 - A change exists in `.grimoire/changes/<change-id>/` with:
@@ -31,18 +33,6 @@ Multi-perspective LLM review of a completed design before coding begins. Expert 
 
 ## Skipping
 This step is optional. The user can skip it by saying "skip review" or "go straight to apply". Not every change needs a full review — small or low-risk changes can go directly from plan to apply.
-
-## Complexity-Gated Review
-Read `complexity` from `manifest.md` frontmatter to determine review depth:
-
-| Complexity | Review Depth |
-|------------|-------------|
-| **1 (Trivial)** | Skip review entirely — suggest proceeding to apply |
-| **2 (Simple)** | Senior Engineer only. Skip other personas unless the change touches security or data. |
-| **3 (Moderate)** | All relevant personas (skip Data Engineer if no data changes, skip QA if no user-facing behavior) |
-| **4 (Complex)** | All personas mandatory. No skipping. |
-
-The user can always override: "run full review" on a level 2, or "just senior engineer" on a level 4.
 
 ## Workflow
 
@@ -58,205 +48,48 @@ Read all artifacts for the change:
 - All decision records — architectural choices
 - `tasks.md` — implementation plan
 - `data.yml` — proposed schema changes (if present)
-- Read `.grimoire/config.yaml` for project context (language, tools, conventions)
-- Read `.grimoire/docs/data/schema.yml` for current data baseline (if it exists)
-- Read `.grimoire/docs/context.yml` for deployment environment, related services, and infrastructure (if it exists) — this informs security review (cross-service auth), engineering review (deployment constraints), and data review (infrastructure availability)
-- Read relevant `.grimoire/docs/` area docs if they exist
+- `.grimoire/config.yaml` for project context (language, tools, conventions, `comment_style`, `compliance`)
+- `.grimoire/docs/data/schema.yml` for current data baseline (if exists)
+- `.grimoire/docs/context.yml` for deployment environment, related services, infrastructure (if exists) — informs security review (cross-service auth), engineering review (deployment constraints), and data review (infrastructure availability)
+- Relevant `.grimoire/docs/` area docs if they exist
 - Skim the areas of the codebase the tasks reference
 
-### 2.5 Synthesize Project Briefing
+### 3. Build Project Briefing
+Follow `../references/review-personas.md` §1 (Project Briefing). README fallback: if missing or <200 chars, prompt user once: "README thin — add 3 lines on product / users / stage, or proceed with what exists?" If user proceeds, mark `Product framing: unknown`.
 
-Build a project briefing that grounds every persona in real business context. Findings that don't threaten anything in the briefing are dropped (materiality gate, applied per-persona below).
+Inject as preface to every persona run below.
 
-**Sources to read:**
-- `README.md` — first 50 lines or up to first H2 (product framing, audience, stage signals)
-- `.grimoire/config.yaml` — `project.compliance`, language, `dep_audit`
-- `.grimoire/docs/context.yml` — deployment env, related services (if it exists)
-- Tag histogram: count each `@tag` across `.grimoire/changes/**/*.feature` + `.grimoire/archive/**/*.feature`
-- All `.grimoire/decisions/*.md` with `status: accepted` — extract ID, title, top Decision Driver
-- Current manifest's `Why` and `Non-goals` sections
+### 4. Pick Personas — Design Review Gating
+Use the **Design review** table in `../references/review-personas.md` §3 (Complexity Gating). Read `complexity` from `manifest.md` frontmatter.
 
-**Feature inventory:**
-- Glob `.grimoire/changes/**/*.feature` + `.grimoire/archive/**/*.feature`
-- Parse each: `Feature:` line, first description line, `@tags`
-- Bucket by path prefix (area)
-- If total >80 features, emit area-level summary only (count + capability one-liner). Otherwise per-feature one-liners.
+| Complexity | Review Depth |
+|---|---|
+| 1 (Trivial) | Skip review — suggest proceeding to apply |
+| 2 (Simple) | Senior Engineer only; skip others unless touching security or data |
+| 3 (Moderate) | All relevant personas (skip Data Engineer if no data changes, skip QA if no user-facing behavior) |
+| 4 (Complex) | All personas mandatory |
 
-**README fallback:** if missing or <200 chars, prompt user once: "README thin — add 3 lines on product / users / stage, or proceed with what exists?" If user proceeds, mark `Product framing: unknown`.
+User can always override: "run full review" on a level 2, or "just senior engineer" on a level 4.
 
-**Emit briefing block:**
+### 5. Run Personas
+For each selected persona, follow its evaluation criteria in `../references/review-personas.md` §4 against the **specs and tasks** (no diff exists yet). Apply the materiality gate (§2) — every finding cites a briefing axis or feature-inventory gap, or is dropped.
 
-```markdown
-## Project Briefing
+Persona scope for design review:
+- 4.1 Product Manager — completeness and user value
+- 4.2 Senior Engineer — feasibility, simplicity, build-vs-buy, contract compatibility, quality attributes
+- 4.3 Security Engineer — STRIDE on the design + compliance (skip §4.3 "Code-level scan" — no code yet)
+- 4.4 QA Engineer — testability and edge cases (skip if purely internal)
+- 4.5 Data Engineer — schema/migration design (skip if no data.yml and no models touched)
+- 4.6 Code Style Reviewer — **skip** (no code yet; runs only on diff reviews)
 
-**Product:** <one-line from README>
-**Stage:** <prototype | internal | customer-facing | regulated — inferred from compliance config + README>
-**Users:** <who, scale, trust level — from README>
-**Data sensitivity:** <none | pii | financial | phi — derived from tag histogram + compliance>
-**Threat surface:** <only tags with count >0, e.g. auth=4, pii=3, payment=2, input-validation=5>
-
-**Active constraints (accepted decisions):**
-- ADR-0001 — Gherkin over custom format
-- ADR-0007 — Data schema as YAML
-- ... (all accepted, one line each)
-
-**Feature inventory:**
-auth/ (4 features)
-  - Login with email+password [@auth] — happy path + lockout
-  - Logout [@auth]
-  - Email verification [@auth @pii]
-  - Session refresh [@auth @security]
-billing/ (2 features)
-  - Subscription create [@payment @pci-dss]
-  - Webhook from Stripe [@input-validation]
-...
-Total: <N> features across <M> areas.
-
-**This change's non-goals (from manifest):**
-- <bullets>
-```
-
-Inject this briefing as preface to every persona below. Each persona applies the **materiality gate**:
-- Every finding must cite a briefing axis it threatens (stage, data sensitivity, active constraint, threat-surface tag) OR a concrete gap vs the feature inventory.
-- If the inventory shows the concern is already covered elsewhere (e.g., rate-limit feature exists in `auth/`), drop the finding or downgrade to a cross-feature integration note.
-- Findings with no briefing anchor are dropped. Don't manufacture findings to hit a quota.
-
-### 3. Product Manager Review
-
-Adopt the perspective of a **product manager** focused on completeness and user value. Apply briefing materiality gate.
-
-Evaluate:
-- **Outcome**: Does the manifest's Why clearly state the problem being solved and how success is measured? If it describes a mechanism ("add an endpoint") instead of an outcome ("users can reset passwords"), flag it — the team will argue about scope later.
-- **Coverage**: Do the feature scenarios cover all user-facing behaviors? Are there missing edge cases, error states, or alternate flows that a user would encounter?
-- **Clarity**: Are the feature descriptions and user stories clear enough that a non-technical stakeholder could validate them? Would QA know exactly what to test?
-- **Scope**: Is the change well-bounded? Are there implicit requirements hiding in the scenarios that aren't spelled out? Do any scenarios or tasks stray into the manifest's Non-goals? Scope creep into non-goals is a **blocker**.
-- **Acceptance**: Could you ship this and confidently say the feature is "done"? What would a user complain about?
-
-Output a short list of findings — flag issues as **blocker** (must fix before coding) or **suggestion** (nice to have).
-
-### 4. Senior Engineer Review
-
-Adopt the perspective of a **senior software engineer** reviewing the technical design. Apply briefing materiality gate. Treat accepted decisions as constraints, not suggestions — don't re-litigate; cite the ADR ID if you propose overriding one.
-
-Evaluate:
-- **Build vs Buy**: Was the prior art research thorough? Check the manifest's Prior Art section. If the change builds custom code, is the justification for not adopting an existing library convincing? Do a quick sanity check — search for obvious libraries the research may have missed. If a well-maintained library exists that the manifest doesn't mention, flag it as a **blocker**. If the research was done but the build decision is debatable, flag as **suggestion** with the alternative.
-- **Simplicity**: Is this the simplest design that solves the problem? Could any task be done with less code, fewer files, or fewer moving parts? Flag anything that looks over-engineered — new abstractions without justification, premature generalization, unnecessary indirection layers, config-driven behavior where a direct call would do.
-- **Architecture**: Do the decisions make sense for this codebase? Are there simpler alternatives? Will this paint us into a corner?
-- **Task quality**: Are the tasks specific enough to execute without re-planning? Do they reference real files, real patterns, real conventions from the codebase?
-- **Dependencies**: Are tasks ordered correctly? Are there missing dependencies or implicit assumptions between tasks?
-- **Integration**: How does this change interact with existing code? Are there areas that will break or need updating that the tasks don't cover?
-- **Contract compatibility**: Does this change alter the request/response shape for any external API documented in `schema.yml`? If fields are added, removed, renamed, or re-typed in `data.yml`, flag it — the client code and any downstream consumers need contract tests updated. A contract change without updated contract tests is a **blocker**.
-- **Reuse**: Are there existing utilities, patterns, or modules that should be used instead of writing new code? Check `.grimoire/docs/` area docs if available. The goal is less new code, not more.
-- **Surface area**: Does the change introduce new public APIs, exports, or interfaces beyond what's needed? Fewer public functions with fewer parameters is better.
-- **Quality attributes**: If decision records have a Quality Attributes table, are the targets measurable and realistic? For performance-sensitive changes (new endpoints, data pipelines, search), flag blank targets as a **blocker** — you can't verify what you haven't defined. For non-performance-sensitive changes, blank targets are fine.
-- **Testing**: Is the test strategy sound? Are there gaps between what the features describe and what the step definitions will actually verify?
-
-Output a short list of findings — flag issues as **blocker** or **suggestion**.
-
-### 5. Security Engineer Review
-
-Adopt the perspective of a **security engineer** reviewing the design for vulnerabilities. Apply briefing materiality gate — calibrate severity to stage and data sensitivity. A missing CSRF check on an internal prototype with no PII is a suggestion; the same check missing on a customer-facing PCI-scoped change is a blocker. Don't flag generic OWASP items that don't threaten the briefing's threat surface.
-
-#### 5a. STRIDE Threat Analysis
-
-For each new endpoint, data flow, or trust boundary the change introduces, evaluate using STRIDE:
-
-| Threat             | Question                                                                                     |
-|--------------------|----------------------------------------------------------------------------------------------|
-| **S**poofing       | Can an attacker impersonate a user or service? Are auth checks present at every entry point?  |
-| **T**ampering      | Can input or data in transit be modified? Is integrity validated (checksums, signatures, CSRF)?|
-| **R**epudiation    | Are security-relevant actions logged? Could an attacker act without leaving a trace?          |
-| **I**nfo Disclosure| Could error messages, logs, or responses leak sensitive data (stack traces, PII, tokens)?     |
-| **D**enial of Service| Are there unbounded operations (large uploads, expensive queries, no rate limits)?          |
-| **E**levation of Privilege| Can a user escalate to admin? Are role/permission checks at the right layer?           |
-
-Skip STRIDE categories that don't apply to the change. Don't manufacture threats.
-
-#### 5b. Detailed Security Evaluation
-
-- **Input validation**: Do the features involve user input? Are there scenarios covering malicious or malformed input?
-- **Authentication/authorization**: Does the change touch auth boundaries? Are there missing access control checks?
-- **Data handling**: Does the change introduce new data storage, transmission, or processing? Are there privacy or compliance concerns?
-- **Dependencies**: Do the tasks introduce new dependencies? Are there known vulnerability concerns? Check that package names are real and correctly spelled — hallucinated or typosquatted package names are a supply chain attack vector.
-- **Vulnerable packages**: If the tasks add or upgrade dependencies, check for known vulnerabilities. Cross-reference against the project's dependency audit tool (configured in `.grimoire/config.yaml` under `dep_audit`). Flag any package without a clear provenance or with a very low download count.
-- **Attack surface**: Does this change expose new endpoints, APIs, or interfaces? What could an attacker target?
-- **Cross-service security**: If `context.yml` lists related services, does the change properly authenticate when calling them? Are service-to-service auth boundaries maintained? Is data from sibling services validated at the boundary?
-- **Secrets**: Are there hardcoded credentials, tokens, or keys in the design? Check that API keys, database credentials, and tokens are loaded from environment variables or secret stores, never inline.
-
-If the change has no security-relevant surface (e.g., a pure UI text change), say so briefly and move on. Not every change needs a deep security review.
-
-#### 5c. Compliance Review
-
-Check `.grimoire/config.yaml` under `project.compliance`. If configured, evaluate per `../references/security-compliance.md` (section "Compliance Framework Verification"). Missing compliance coverage on a tagged scenario is a **blocker**. If no compliance frameworks configured, skip.
-
-#### 5d. OWASP / CWE Classification
-
-Tag every security finding with:
-- **OWASP Top 10 (2021)** category — e.g., `A01:2021-Broken Access Control`, `A03:2021-Injection`
-- **CWE ID** — e.g., `CWE-89` (SQL Injection), `CWE-79` (XSS), `CWE-798` (Hardcoded Credentials)
-
-This makes findings actionable, searchable, and traceable to compliance frameworks.
-
-Tag findings with OWASP category and CWE ID. See `../references/security-compliance.md` for the CWE quick reference table.
-
-Output format:
-```markdown
-## Security Engineer
-### STRIDE Summary
-- **Spoofing**: [relevant finding or "N/A"]
-- **Tampering**: [relevant finding or "N/A"]
-- ... (only categories that apply)
-
-### Findings
-- **[blocker]** [A03:2021 / CWE-89] User search query is concatenated into SQL string in tasks — must use parameterized query
-- **[suggestion]** [A01:2021 / CWE-862] Add rate limiting scenario for login endpoint
-- No other security concerns for this change.
-```
-
-### 6. QA Engineer Review (Optional)
-
-**Skip this review if the change is purely internal (no user-facing behavior, no new inputs, no observable state changes).**
-
-If the change has user-facing behavior, adopt the perspective of a **QA engineer** focused on testability and real-world failure modes. Apply briefing materiality gate.
-
-Evaluate:
-- **Testability**: Can every scenario be verified automatically? Are there behaviors that require manual testing — and if so, is that documented? Are the Given/When/Then steps specific enough to implement as real tests?
-- **Edge cases**: What inputs, states, or timing conditions are not covered by the current scenarios? Think about empty states, concurrent users, interruptions, and boundary values.
-- **Negative scenarios**: For every happy path, is there at least one scenario covering what happens when things go wrong? Missing error scenarios are the #1 source of bug reports.
-- **Observability**: When this feature breaks in production, how will anyone know? Are there logs, metrics, or alerts? Can a tester distinguish between "feature is broken" and "feature is slow"?
-- **Regression risk**: What existing behavior could this change break? Are there integration points with other features that need cross-feature testing?
-- **Accessibility**: Does the change introduce new UI? If so, are there scenarios covering keyboard navigation, screen readers, or contrast requirements?
-
-Output a short list of findings — flag issues as **blocker** or **suggestion**.
-
-### 7. Data Engineer Review (Optional)
-
-**Skip this review if the change has no `data.yml` and doesn't touch data models, schemas, migrations, or external API integrations.**
-
-If the change touches data, adopt the perspective of a **data engineer** reviewing the schema design. Apply briefing materiality gate — calibrate to stage and data sensitivity. Schema lint on an internal prototype is suggestion-level; the same finding on a regulated/PII system is a blocker. Use feature inventory to spot relationships with existing data features.
-
-Read:
-- `.grimoire/changes/<change-id>/data.yml` — proposed schema changes
-- `.grimoire/docs/data/schema.yml` — current schema baseline (if it exists)
-
-Evaluate:
-- **Schema design**: Are field types appropriate? Are there missing constraints (not_null, unique, indexes) that will cause problems at scale? Are enums used where they should be?
-- **Migrations**: Will the proposed changes require a data migration? Is it safe to run on a live database (e.g., adding a nullable column is safe, renaming a column is not)?
-- **Relationships**: Are foreign keys and references correct? Are there missing indexes on foreign keys? Could any relationships create N+1 query problems?
-- **Naming**: Do new fields/models follow the existing naming conventions in schema.yml?
-- **Backwards compatibility**: Will the schema change break existing API consumers, queries, or reports? Are there downstream dependencies?
-- **External APIs**: If adding a new external API dependency, is the `schema_ref` pointing to a stable spec? Is there a fallback if the API is unavailable? Is the client wrapper in the right place?
-- **Contract breaking changes**: Compare `data.yml` against `schema.yml` for any external API with `action: modify`. If the change removes a required response field, changes a field type, renames a field, or adds a new required request field — it's a **breaking contract change**. Flag as **blocker** unless the change documents a migration path (versioned endpoint, fallback handling, or coordinated deployment). Adding optional response fields is safe. Adding optional request fields is safe if the API has a default.
-- **Data integrity**: Are there edge cases where data could end up in an inconsistent state? Should any changes be wrapped in a transaction?
-
-Output a short list of findings — flag issues as **blocker** or **suggestion**.
-
-### 8. Present Findings
-
-Compile all reviews into a single summary:
+### 6. Present Findings
+Compile into the standard report layout (§5 of the personas reference):
 
 ```markdown
 # Design Review: <change-id>
+
+## Project Briefing
+<briefing block>
 
 ## Product Manager
 - **[blocker]** Missing error scenario for invalid email format in registration feature
@@ -267,27 +100,27 @@ Compile all reviews into a single summary:
 - **[suggestion]** Reuse `validate_email()` from `utils/validators.py` instead of writing a new one
 
 ## Security Engineer
+### STRIDE
+- ...
+### Findings
 - **[suggestion]** Add rate limiting scenario for login attempts
-- No other security concerns for this change.
 
 ## QA Engineer
 - **[blocker]** No negative scenario for expired TOTP codes — testers can't verify error handling
-- **[suggestion]** Add scenario for what happens when 2FA service is unreachable
 (or: "No user-facing behavior changes — skipped.")
 
 ## Data Engineer
 - **[blocker]** Missing index on `profiles.user_id` — will cause full table scans on join queries
-- **[suggestion]** `avatar_url` should have a max_length constraint
 (or: "No data changes in this design — skipped.")
 
 ## Summary
-- **3 blockers** — must be addressed before coding
-- **3 suggestions** — consider addressing
+- **N blockers** — must be addressed before coding
+- **M suggestions** — consider addressing
 
 Recommendation: Fix blockers, then proceed to apply.
 ```
 
-### 9. Iterate
+### 7. Iterate
 - If there are **blockers**, tell the user which artifacts need updating (features, decisions, or tasks) and offer to help fix them
 - If only **suggestions**, present them and let the user decide which to address
 - If **no issues**, confirm the design is ready and suggest proceeding to `grimoire-apply`
@@ -299,9 +132,7 @@ Recommendation: Fix blockers, then proceed to apply.
 - A blocker means "if we code this as-is, we'll have to come back and redo work." A suggestion means "this would improve the design but isn't blocking."
 - Keep each persona's review focused and short. Three bullet points that matter are better than ten that don't.
 - If the change is trivial (e.g., rename a field, fix a typo in a feature), say so and don't manufacture issues.
-- **Materiality gate:** every finding must cite a briefing axis it threatens (stage, data sensitivity, active constraint, threat-surface tag) or a concrete feature-inventory gap. No anchor = drop the finding. Generic checklist hits without business-context anchor are noise.
-- **Decisions are constraints, not suggestions.** Treat accepted ADRs as given. If a persona thinks one is wrong, name the ADR by ID and propose superseding it — don't re-litigate silently.
-- **Coverage check via inventory:** before flagging a missing capability (rate limit, audit log, etc.), check the feature inventory for a sibling feature that already covers it. If covered, drop or downgrade to a cross-feature integration note.
+- All persona evaluation criteria, the materiality gate, the briefing structure, and the complexity-depth table live in `../references/review-personas.md`. Don't duplicate them here — read that file when running a persona.
 
 ## Done
 When findings are presented and blockers resolved (or accepted), the review is complete. Suggest proceeding to `grimoire-apply`.
