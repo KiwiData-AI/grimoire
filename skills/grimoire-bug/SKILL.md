@@ -114,12 +114,20 @@ When in doubt, ask the user one question: "This bug looks like it's [in / outsid
 Branch name format when creating new: `fix/<short-description>` (e.g. `fix/special-chars-password-reset`, `fix/null-pricing-response`).
 
 ### 6. Fix the Bug
-Now — and only now — modify production code:
+Now — and only now — modify production code. **Apply `../references/code-quality.md` while writing the fix, not after.** Inline rules:
+- Reuse existing utilities — grep / check the area doc before adding new helpers.
+- No new defensive guards inside the trust boundary — fix the real bug, don't paper over it with `if x is None` / `try-except`.
+- Specific names — no `data` / `result` / `temp` when a concrete name fits.
+- No new abstraction layer for a one-line bug fix.
+- Comments only for non-obvious *why* — one short note linking the bug + reproduction test is enough.
+
+Then:
 
 1. Make the smallest change that fixes the failing test
 2. Run the reproduction test — it should pass
 3. Run ALL existing tests — no regressions
 4. If the fix is more than a few lines, pause and consider whether the approach is the simplest one
+5. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix and re-run tests.
 
 **Escalation guard:** If the fix requires changes to more than 3 files, introduces new abstractions, modifies data models, or crosses service boundaries — STOP. This is not a bug fix, it's a change that needs design. Tell the user: "This fix is larger than a typical bug fix. I recommend routing to `grimoire-draft` to handle this as a proper change with specs and a plan." The user can override.
 
@@ -171,6 +179,10 @@ Report to the user:
 - **Feature requests disguised as bugs** — "it's broken because it doesn't do X" when X was never specified. Route to `grimoire-draft`.
 - **Performance issues** — these usually need profiling, not a repro test. Handle directly.
 - **Configuration errors** — wrong env vars, missing dependencies, bad setup. Just fix the config.
+
+## References
+
+**Before writing the fix**, read `../references/code-quality.md` — anti-slop rules to apply *while writing*: reuse before write, trust callers, names reveal intent, branching budget, function size, no premature abstraction, comments only for non-obvious why. Includes a seven-point quality gate to run before declaring the fix done.
 
 ## Important
 - **Reproduce before you fix.** No exceptions. If you can't reproduce it, you don't understand it, and your fix is a guess.

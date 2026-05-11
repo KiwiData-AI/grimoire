@@ -119,6 +119,14 @@ The parent agent is the **orchestrator only** — it does NOT implement tasks it
    You are implementing grimoire tasks. Read `.grimoire/changes/<change-id>/tasks.md`,
    find section <N>, and implement all unchecked tasks in that section.
    Follow the red-green BDD cycle for each task. Mark tasks [x] when done.
+
+   Before writing any production code, read `skills/references/code-quality.md`
+   and `skills/references/testing-contracts.md`. Apply the code-quality rules
+   WHILE you write (not after) — reuse before write, trust callers (no defensive
+   guards inside the trust boundary), specific names (no `data`/`result`/`temp`),
+   branching budget ~7, function size ~30 lines, no premature abstraction,
+   comments only for non-obvious WHY.
+
    When the section is complete, write a <!-- SESSION: ... --> handoff note
    under the last task and exit.
    ```
@@ -201,7 +209,14 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
    - Assertion against a mock/fixture that already satisfies the condition
    - Step wired to wrong function or missing the actual check
    - Overly broad assertion that matches anything
-5. Once confirmed red: write the production code to make it pass
+5. Once confirmed red: write the production code to make it pass. **While writing — not after — apply the rules in `../references/code-quality.md`. Do not write the slop version first and clean up later.** Inline rules:
+   - **Reuse first.** Grep / check area doc / read neighbors for an existing function before writing a new one. No re-implementation, no one-line wrappers.
+   - **Trust your callers.** No `if x is None` / `isinstance` / `try-except` guards inside the trust boundary. Validate at edges (user input, external APIs, file/network) only.
+   - **Names reveal intent.** No `data` / `result` / `temp` / `info` / `obj` when a specific name fits. Booleans read as yes/no questions (`is_expired`, `has_admin_role`).
+   - **Branching budget ~7.** If a function has more `if` / `else` / `case` / `&&` than that, split or drop dead guards.
+   - **Function size ~30 lines.** One job per function. If the name needs "and", split.
+   - **No premature abstraction.** Three near-identical copies is fine. No new `BaseX` / factory / strategy / config object for a single caller.
+   - **Comments only for *why*, never *what*.** Default: no comment. No comments referencing current task / PR / ticket — they rot.
 6. Run the step definitions again — they should PASS (green)
 7. If still red, fix the production code (not the test)
 8. **Test quality check:** Before marking done, verify your step definitions have strong assertions:
@@ -209,8 +224,9 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
    - No empty function bodies (`pass`, `...`, or no-op)
    - Assertions check behavior, not just types or existence — "response status is 302 and redirect URL is /dashboard/" not "response is not None"
    - If you wrote a test that would pass against a null/trivial implementation, strengthen it
-9. Mark complete: `- [ ]` → `- [x]`
-10. Move to next task
+9. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix code, re-run tests, re-check. Do not mark `[x]` while a check fails.
+10. Mark complete: `- [ ]` → `- [x]`
+11. Move to next task
 
 **This is strict red-green BDD.** A test that has never been red has never proven it can catch a failure. The red step is NOT a formality — it is the proof that the test works. If you skip it or the test passes immediately, you have a false positive that provides zero safety.
 
@@ -255,7 +271,9 @@ Present a brief summary:
 
 ## References
 
-**Before writing code**, read `../references/testing-contracts.md` — covers: verify-before-using rules (imports, packages, APIs), mocking strategy (HTTP boundary not client), fixture management, contract tests, and step definition quality checks.
+**Before writing code**, read both:
+- `../references/code-quality.md` — anti-slop rules to apply *while writing*: reuse before write, trust callers, names reveal intent, branching budget, function size, no premature abstraction, comments only for non-obvious why. Includes a seven-point quality gate to run before marking each task `[x]`.
+- `../references/testing-contracts.md` — verify-before-using rules (imports, packages, APIs), mocking strategy (HTTP boundary not client), fixture management, contract tests, and step definition quality checks.
 
 ## Important
 - **Tests are not optional.** Every task produces both production code and passing step definitions. No exceptions.
