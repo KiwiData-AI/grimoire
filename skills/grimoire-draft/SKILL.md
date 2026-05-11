@@ -35,7 +35,7 @@ Before doing anything, determine what kind of change this is:
 - **Refactoring** → STOP. No behavior change = no grimoire artifact. Suggest an ADR only if it's a significant architectural shift.
 - **Config/deps/formatting** → STOP. Not grimoire territory.
 
-If unclear, ask the user one clarifying question to route correctly.
+If unclear, ask the user one clarifying question to route correctly. **Do not guess the routing and proceed.** A wrong routing wastes both your context and the user's time — one question costs less.
 
 ### 2. Score Complexity
 
@@ -64,6 +64,9 @@ Before designing, research what already exists. Do not ask the user to research 
 Follow the methodology in `../references/build-vs-buy.md`. Present findings to the user and wait for agreement before proceeding.
 
 ### 4. Elicit Requirements
+
+**Interview, don't assume.** The most common drafting failure is filling in gaps with plausible-sounding guesses. Every unstated detail is either (a) something the user has an opinion on and you must ask, or (b) something project conventions answer unambiguously. Never a third option where you invent.
+
 Now that you know whether you're building, adopting, or going hybrid, surface the requirements the user hasn't specified.
 
 - **Level 1**: Skip this step.
@@ -73,6 +76,24 @@ The build-vs-buy outcome shapes which questions matter:
 - **Adopting**: Focus on integration — how it fits, what config is needed. Skip deep business-rule elicitation.
 - **Building custom**: Full elicitation — business rules, edge cases, data contracts, security, NFRs.
 - **Hybrid**: Elicit deeply for custom parts. For adopted parts, focus on integration boundaries.
+
+#### Interview protocol
+
+1. **Outcome & Non-goals first.** Always ask these two before any persona questions — they set scope. Restate the answers back to the user before continuing.
+2. **Batch questions, then wait.** Ask 3-5 questions at a time, grouped by persona. Stop. Wait for the user's reply. Do not draft scenarios until the batch is answered.
+3. **Ask the question; don't pre-answer it.** "Should locked accounts get an email?" — not "I'll assume locked accounts get an email, let me know if not." The pre-answered form lets the user nod through assumptions they'd otherwise correct.
+4. **One question per ambiguity, not a checklist dump.** If the user said "users can reset password", do not ask 12 generic questions. Ask the 3 that matter for *this* feature.
+5. **Disambiguate immediately.** If the user's answer is vague ("yeah, handle errors gracefully"), ask the specific follow-up ("for invalid tokens, do we redirect to login with a flash message, return a 400, or something else?"). Never leave a vague answer in the spec.
+6. **Capture, don't extrapolate.** If the user explicitly says "out of scope for now", note it as a non-goal and stop. Don't draft a scenario "just in case".
+7. **When the user pushes back on a question** ("just write something reasonable"), record their delegation explicitly: "Defaulting to <choice> per user delegation — flag in review if wrong." This makes the assumption visible later.
+
+#### Open-question discipline
+
+After the interview, list every open question that wasn't answered. These become:
+- **Manifest Assumptions** (level 3-4) — each open question becomes an unvalidated assumption with the reading you chose.
+- **Open questions in the Requirements Summary** — explicitly listed so the user sees what you guessed.
+
+Never silently fill in an open question. Either ask, defer to a non-goal, or record the inference.
 
 Present a Requirements Summary (template in the reference) and wait for user confirmation before proceeding.
 

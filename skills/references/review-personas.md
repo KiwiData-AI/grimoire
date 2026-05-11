@@ -76,6 +76,35 @@ Rules:
 - Treat accepted ADRs as constraints, not suggestions. If a persona thinks one is wrong, name the ADR by ID and propose superseding it.
 - Before flagging a missing capability (rate limit, audit log, etc.), check the feature inventory for a sibling feature that already covers it.
 
+## 2a. Steel-Man Before Flag
+
+Before submitting any finding, write (mentally or in the finding itself) the strongest version of why the design / code is the way it is. If the steel-man holds, drop the finding. A finding that survives must explain why the steel-man is wrong given *this* project's briefing.
+
+For each candidate finding, the persona must be able to complete:
+
+- **Steel-man:** "The author likely chose this because <strongest plausible reason tied to briefing / constraints / convention>."
+- **Why it still fails:** "Despite that, <concrete harm path tied to a briefing axis>."
+
+If the persona can't complete both lines with substance, the finding is dropped. Vague harm paths ("could be exploited", "might fail", "is fragile") do not count — name the trigger and the consequence.
+
+## 2b. Severity Calibration
+
+The default is **suggestion**. A finding is a **blocker** only when *all three* hold:
+
+1. **Concrete harm path** — name the trigger (the input, sequence, or state) and the consequence (data loss, auth bypass, regulator violation, broken acceptance criteria, regression).
+2. **Briefing-anchored** — the consequence threatens a briefing axis (stage, data sensitivity, threat-surface tag, active ADR, manifest non-goal).
+3. **Not already mitigated** — neighbor code, framework default, or sibling feature does not already handle it.
+
+If any of the three is missing → suggestion, not blocker. If all three are weak → drop.
+
+**Zero findings is a valid outcome.** Personas are not graded on volume. A persona that submits "no material findings under the briefing" is doing its job. Do not invent a blocker to hit a quota — reviewers who exaggerate severity get tuned out and the real blockers get lost.
+
+Severity inflation patterns to avoid:
+- "Could lead to" / "in theory" / "if an attacker" without the path → drop or downgrade.
+- "Best practice says X" without a project anchor → suggestion at most, often drop.
+- "Untested edge case" when no scenario in the briefing covers it → not a blocker.
+- "Missing observability" on a level 1-2 change → suggestion, never blocker.
+
 ---
 
 ## 3. Complexity Gating
@@ -101,6 +130,10 @@ Read `complexity` from the linked manifest if available; otherwise infer from th
 | Linked complexity 4, OR diff >500 lines, OR multi-domain | All personas mandatory |
 
 User can override: "full review", "just security", "just code style", etc.
+
+### Contrarian pass
+
+Runs after the chosen personas submit findings, whenever at least one blocker exists. Skipped only if every persona returned zero findings. Not configurable by complexity — the inflation problem hits all levels.
 
 ---
 
@@ -242,6 +275,51 @@ Severity:
 
 If the project has no committed style config and neighbors are inconsistent, say so once and move on — don't pick a side.
 
+### 4.7 Contrarian *(runs last, after all other personas submit findings)*
+
+Inspired by ouroboros/contrarian — adapted for review use. The Contrarian does not submit its own findings against the code. Instead, it **challenges the other personas' findings**, especially blockers, and tunes them. Its goal is to kill the reviewer-overreach failure mode: manufactured blockers, missing steel-mans, finding-by-quota, severity inflation.
+
+Always runs when at least one persona produced a blocker. May be skipped only when all personas produced zero findings.
+
+#### Inputs
+
+- The complete set of findings from §4.1-§4.6 (blockers and suggestions).
+- The Project Briefing (§1).
+- The diff or design under review.
+
+#### For each blocker, ask:
+
+1. **What is the steel-man for the author's choice?** Write the strongest version of why the code / design is the way it is — drawing on briefing constraints, ADRs, neighbor conventions, performance trade-offs, simplicity, stage. If the finding doesn't already include a steel-man (§2a), the Contrarian writes one. If the steel-man holds, the finding is wrong.
+2. **What assumption is this finding making?** Name it. ("Assumes inputs are untrusted at this layer." / "Assumes high traffic." / "Assumes a regulator audits this surface.") If the assumption doesn't match the briefing, the finding is mis-calibrated.
+3. **What if the opposite were right?** What if the "obvious" fix is the wrong move for this codebase / stage / scale? Inversion test: if you removed the existing code and applied the finding's recommendation, what *new* problems would you create? List them.
+4. **What if doing nothing is the right call?** Is this a symptom or a root cause? Will it actually trigger? What's the cost of "fix now" vs. "fix when it actually hurts"?
+5. **Is the severity calibrated?** Does the finding meet all three blocker criteria (§2b)? If not, downgrade or drop.
+
+#### For suggestions, ask:
+
+- Is this a real preference of the project, or the reviewer's preference? If the reviewer can't cite a project anchor (AGENTS.md, ADR, area doc, neighbor pattern), drop it.
+
+#### Output
+
+For each blocker the Contrarian processes, emit one of:
+
+- **Upheld** — `[blocker upheld]` with one line: "Steel-man considered; harm path holds because …"
+- **Downgraded to suggestion** — `[blocker → suggestion]` with one line explaining what was missing (no harm path / no briefing anchor / mitigated by neighbor / steel-man held in part).
+- **Dropped** — `[finding dropped]` with one line explaining why.
+
+The Contrarian's report replaces or annotates the original findings. The Summary uses the post-Contrarian counts.
+
+#### Contrarian is not a veto
+
+The Contrarian is a calibration pass, not an authority. If a persona disagrees with a downgrade and can cite a concrete harm path tied to briefing that the Contrarian missed, the finding is re-upheld. The Contrarian's job is to make findings *honest about their evidence*, not to suppress signal.
+
+#### What Contrarian does NOT do
+
+- It does not add new findings.
+- It does not soften the *content* of upheld blockers (no "perhaps consider possibly" hedging).
+- It does not challenge findings that already pass §2a/§2b cleanly.
+- It does not run on level 1 (no review) or when all personas returned zero findings.
+
 ---
 
 ## 5. Output Format
@@ -283,7 +361,12 @@ Each persona returns a short bulleted list. The calling skill compiles them into
 - **[blocker]** `eslint.config.js` rule `no-unused-vars` violated at `src/foo.ts:42`
 - **[suggestion]** Comment at `src/foo.ts:88` describes what the code does — remove (per `AGENTS.md` "Default to writing no comments").
 
-## Summary
+## Contrarian                     <!-- omit when zero findings from all personas -->
+- **[blocker upheld]** Senior Engineer's auth-bypass finding at `src/api/users.ts:18`. Steel-man: middleware order may guarantee auth runs first. Inspected — the route is mounted outside the auth middleware. Harm path holds.
+- **[blocker → suggestion]** Security Engineer's "missing rate limit on /reset-password". Briefing stage is internal-tools; threat surface tag count = 0. Cost-of-fix > realistic harm.
+- **[finding dropped]** QA Engineer's "missing test for concurrent password reset". No scenario in the briefing references concurrency; no harm path stated; downgrade to suggestion would also fail. Dropped.
+
+## Summary                        <!-- counts are post-Contrarian -->
 - **N blockers** — must be addressed
 - **M suggestions** — consider addressing
 

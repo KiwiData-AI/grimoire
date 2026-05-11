@@ -28,6 +28,26 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 
 ## Workflow
 
+### Operating Rules (apply to every step)
+
+**1. Verify, don't delegate.** Any claim that can be answered by reading the codebase is *your* job — do it now, do not punt it to the implementer or the user. Forbidden task shapes:
+
+- "Check whether `foo()` is already used somewhere"
+- "Verify if module X exists"
+- "Confirm the import path for Y"
+- "See if there's an existing utility for Z"
+- "TODO: check if this conflicts with…"
+
+Resolve each one yourself before writing the task. Tools: codebase-memory-mcp (`search_graph`, `trace_path`, `get_code_snippet`), `.grimoire/docs/<area>.md` reusable-code tables, `Grep`, neighbor files. The task should state the *answer* ("Reuse `parse_invoice` in `src/billing/parsing.py:42`" or "No existing utility — write new"), never the *question*.
+
+**2. Clarify or propose, never assume.** When the spec is ambiguous or silent on something you need to plan:
+
+- **Ambiguous** (spec contradicts itself, two readings are plausible) → ask the user one specific question. Do not pick a reading and proceed.
+- **Silent on a scenario you think is needed** (e.g., "what if the login attempt rate-limits?") → propose adding it. Route back to `grimoire-draft` for the spec update, or ask the user to confirm before you add a corresponding task. **Do not silently invent scenarios, edge cases, or tasks not derivable from approved features / ADRs / `data.yml` / manifest sections.**
+- **Confident** (spec is clear or the unstated detail follows obviously from project conventions) → plan, but note the inference in a `<!-- inferred: ... -->` comment so the user can override.
+
+The plan implements what's approved. It does not expand scope to hit a checklist.
+
 ### 1. Select Change
 - List active changes in `.grimoire/changes/`
 - If multiple, ask user which one to plan
@@ -69,41 +89,59 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 
 Before generating tasks, evaluate whether the specifications are detailed enough to plan against. Underspecified requirements produce vague tasks, which produce wrong code.
 
-Review the specs through each persona's lens and flag gaps. **Only check personas relevant to the change** — don't manufacture issues.
+**Flag real gaps only — do not manufacture issues to hit a checklist.** A "gap" exists when:
+- The spec contradicts itself (a scenario violates a non-goal; two scenarios disagree).
+- A scenario you need to plan against has missing detail you cannot infer from project conventions (e.g., "redirect to dashboard" — which dashboard URL?).
+- The manifest is missing a section the complexity level requires (Assumptions / Pre-Mortem / Prior Art on level 3-4).
+- A scenario references an external API or data model with no contract in `data.yml` / `schema.yml`.
+
+**Not a gap** (do not flag):
+- The spec doesn't include a scenario you personally would have added. The approved feature set is the scope. If you think a scenario is missing, see "Clarify or propose, never assume" in Operating Rules — propose it back to draft, do not silently add planning for it.
+- A negative path is unspecified but project conventions make it obvious (e.g., invalid input returns 400 — that's the framework default, not a spec gap).
+- A non-functional concern (perf, observability) is unspecified at level 1-2.
 
 #### Outcome & Scope check
 - Does the manifest have a clear **Why** that describes the outcome, not just the mechanism? ("Users can reset passwords" not "Add password reset endpoint.")
 - Does the manifest have a **Non-goals** section? If missing or empty on a level 3-4 change, flag it — without non-goals, scope creep is invisible during implementation.
 - Do any scenarios appear to implement something listed as a non-goal? Flag as **blocker** — the draft contradicts itself.
 
-Evaluate through each relevant persona's lens — see `../references/elicitation-personas.md` for the full question set. In plan, you're checking completeness, not asking questions. Flag gaps as issues.
+Persona lens (only those relevant to the change) — see `../references/elicitation-personas.md` for the full set:
 
-**Key checks per persona:**
-- **Outcome & Scope**: Does the manifest have a clear Why (outcome, not mechanism)? Does it have Non-goals? Do any scenarios contradict non-goals?
-- **PM**: Scenarios for success AND errors? User stories on every feature? Specific Given/When/Then (not vague)?
-- **Engineer**: Unvalidated assumptions on critical path? Prior art patterns documented (if building custom)? Scenarios specific enough for concrete file paths?
-- **Security**: Input/auth/sensitive-data scenarios have corresponding error/abuse scenarios? Quality Attribute targets not blank?
-- **Data**: External APIs or new models without `data.yml`? Data constraints specified (required, unique, nullable)?
-- **QA**: Negative scenario for every happy path? Boundary values specified?
+- **Outcome & Scope**: Why states outcome (not mechanism)? Non-goals exist? No scenario contradicts a non-goal?
+- **PM**: User stories present? Given/When/Then specific?
+- **Engineer**: Critical-path assumptions validated or flagged? Prior art documented (if building custom)?
+- **Security**: Scenarios with auth/input/sensitive-data tags have corresponding constraints? Quality Attribute targets not blank?
+- **Data**: External APIs or new models have `data.yml`? Constraints (required/unique/nullable) specified?
+- **QA**: Where the spec explicitly references an error path, is the expected behavior specified?
 
-**If issues are found:**
+**Response paths when a gap is found:**
 
-1. Present findings grouped by persona, with a specific question for each gap
-2. Ask the user to choose:
-   - **Clarify now** — answer the questions and update the draft before continuing to task generation
-   - **Proceed anyway** — acknowledge the gaps and plan around them (tasks will note where assumptions were made)
-   - **Return to draft** — go back to `grimoire-draft` to fill in the gaps
+1. **Ambiguous** (the spec is contradictory or admits two readings) → ask the user one specific question. Do not pick a reading.
+2. **Missing scenario the planner believes is required** → propose adding it via `grimoire-draft`. State the rationale ("this feature handles money — failure-path behavior should be in the spec"). Do not silently add a planning task for it.
+3. **Missing detail derivable from conventions** → infer, plan, and annotate the task with `<!-- inferred: ... -->` so the user can override.
+4. **Missing manifest section the complexity level requires** → ask the user; flag as a gate for level 3-4.
 
-This is not a gate — level 1-2 changes (from manifest `complexity`) can proceed with minor gaps. Level 3-4 changes with multiple signals should strongly recommend clarification before planning.
+If multiple gaps are found, batch them and present once. Wait for the user's response before generating tasks.
 
-**If no issues are found**, proceed directly to task generation.
+Level 1-2 changes with minor gaps may proceed; level 3-4 with multiple gaps should not.
+
+**If no real gaps**, proceed directly to task generation.
 
 ### 4. Generate Tasks
 Create `.grimoire/changes/<change-id>/tasks.md`. **Every scenario must produce both production code AND tests.** Tasks are structured as pairs: step definitions first, then production code.
 
+**THE PLAN'S SCOPE IS WHAT WAS APPROVED.** Tasks may only derive from:
+- Approved `.feature` scenarios in this change
+- Approved ADRs in this change (and their Confirmation sections)
+- `data.yml` entries in this change
+- The manifest's Assumptions, Pre-Mortem mitigations, and Prior Art borrowings
+- Verification tasks (run feature suite, run project suite, validate ADR confirmation)
+
+Do not add tasks for scenarios you wish existed, edge cases you imagine, observability you'd like, or refactors you'd prefer. If you think one is needed, see Operating Rules §2 — propose, don't insert.
+
 **THE PLAN MUST RESPECT NON-GOALS.** Read the manifest's Non-goals section. If a task would touch, implement, or extend something listed as a non-goal, do not include it. If you think a non-goal should be reconsidered, flag it to the user — don't silently include it.
 
-**THE PLAN MUST BE SPECIFIC ENOUGH TO EXECUTE WITHOUT FURTHER PLANNING.**
+**THE PLAN MUST BE SPECIFIC ENOUGH TO EXECUTE WITHOUT FURTHER PLANNING.** Specific means *answered*, not *delegated*: file paths resolved (not "find the right file"), reusable utilities named with exact symbol + path (not "check if one exists"), import paths verified (not "confirm the import"). See Operating Rules §1.
 
 **THE PLAN MUST PREFER SIMPLICITY.** For each task, choose the approach with the least code, fewest new files, and smallest surface area. If a task can be solved by adding a few lines to an existing file, don't create a new module. If a standard library function does the job, don't pull in a dependency. If three lines of inline code are clearer than a helper, keep them inline. Flag any task that introduces a new abstraction, utility, or pattern — it needs a reason.
 
