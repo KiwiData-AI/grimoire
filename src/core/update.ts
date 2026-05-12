@@ -41,6 +41,8 @@ export async function updateProject(
 
   console.log(chalk.bold("Updating grimoire...\n"));
 
+  await printUpgradeBanner();
+
   // 1. Migrate config if needed
   if (!options.skipConfig) {
     await migrateConfig(root);
@@ -195,4 +197,69 @@ async function writeVersionStamp(root: string): Promise<void> {
   } catch {
     // Non-critical — don't fail the update
   }
+}
+
+interface PackageJson {
+  name: string;
+  version: string;
+}
+
+async function readPackageJson(): Promise<PackageJson | null> {
+  try {
+    const raw = await readFile(join(PACKAGE_ROOT, "package.json"), "utf-8");
+    return JSON.parse(raw) as PackageJson;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compare two semver strings. Returns true if `a` is strictly newer than `b`.
+ * Tolerant to pre-release suffixes — compares only the numeric core.
+ */
+function isNewer(a: string, b: string): boolean {
+  const parse = (v: string): number[] =>
+    v.replace(/[^\d.].*$/, "").split(".").map((n) => Number(n) || 0);
+  const [aMajor, aMinor, aPatch] = parse(a);
+  const [bMajor, bMinor, bPatch] = parse(b);
+  if (aMajor !== bMajor) return aMajor > bMajor;
+  if (aMinor !== bMinor) return aMinor > bMinor;
+  return aPatch > bPatch;
+}
+
+async function fetchLatestVersion(name: string): Promise<string | null> {
+  const url = `https://registry.npmjs.org/${name}/latest`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1500);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { version?: string };
+    return body.version ?? null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Print an update-available banner when the npm registry has a newer version
+ * than the one currently installed. Network failures are silent — the banner
+ * is a hint, not a gate.
+ */
+async function printUpgradeBanner(): Promise<void> {
+  if (process.env.GRIMOIRE_NO_UPDATE_CHECK) return;
+  const pkg = await readPackageJson();
+  if (!pkg?.name || !pkg.version) return;
+  const latest = await fetchLatestVersion(pkg.name);
+  if (!latest || !isNewer(latest, pkg.version)) return;
+  console.log(
+    chalk.yellow(
+      `  Update available: ${pkg.version} → ${latest}. Run: npm i -g ${pkg.name}@latest\n`
+    )
+  );
 }

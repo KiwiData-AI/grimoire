@@ -11,6 +11,17 @@ vi.mock("node:fs/promises", async () => {
     mkdir: vi.fn().mockResolvedValue(undefined),
     access: vi.fn(),
     chmod: vi.fn().mockResolvedValue(undefined),
+    readdir: vi.fn().mockImplementation(async (path: any) => {
+      const p = String(path);
+      // Each skill source dir contains a SKILL.md
+      if (p.includes("/skills/grimoire-")) {
+        return [
+          { name: "SKILL.md", isFile: () => true, isDirectory: () => false },
+        ];
+      }
+      return [];
+    }),
+    stat: vi.fn().mockRejectedValue(new Error("ENOENT")),
   };
 });
 
@@ -55,6 +66,7 @@ const NONE_SKIPPED = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "log").mockImplementation(() => {});
+  process.env.GRIMOIRE_NO_UPDATE_CHECK = "1";
 });
 
 // Helper: set up mockFileExists to say .grimoire exists but nothing else by default
@@ -134,6 +146,46 @@ describe("updateProject", () => {
     expect(mockCopyFile.mock.calls.length).toBeGreaterThan(0);
     const skillPaths = mockCopyFile.mock.calls.map((c) => String(c[1]));
     expect(skillPaths.some((p) => p.includes("grimoire-draft"))).toBe(true);
+  });
+
+  it("installs grimoire-precommit-review skill", async () => {
+    setupBasicFs();
+    await updateProject(".", { ...ALL_SKIPPED, skipSkills: false });
+    const skillPaths = mockCopyFile.mock.calls.map((c) => String(c[1]));
+    expect(skillPaths.some((p) => p.includes("grimoire-precommit-review"))).toBe(true);
+  });
+
+  it("installs shared references directory when present", async () => {
+    const fsMod = await import("node:fs/promises");
+    const mockReaddir = vi.mocked(fsMod.readdir);
+    const mockStat = vi.mocked(fsMod.stat);
+
+    setupBasicFs();
+    mockStat.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("/skills/references")) {
+        return { isDirectory: () => true } as any;
+      }
+      throw new Error("ENOENT");
+    });
+    mockReaddir.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("/skills/references")) {
+        return [
+          { name: "review-personas.md", isFile: () => true, isDirectory: () => false },
+        ] as any;
+      }
+      if (p.includes("/skills/grimoire-")) {
+        return [
+          { name: "SKILL.md", isFile: () => true, isDirectory: () => false },
+        ] as any;
+      }
+      return [] as any;
+    });
+
+    await updateProject(".", { ...ALL_SKIPPED, skipSkills: false });
+
+    const skillPaths = mockCopyFile.mock.calls.map((c) => String(c[1]));
+    expect(skillPaths.some((p) => p.includes("references/review-personas.md"))).toBe(true);
   });
 
   // --- Hooks ---

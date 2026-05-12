@@ -1,5 +1,5 @@
-import { readFile, writeFile, copyFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, writeFile, copyFile, mkdir, readdir, stat } from "node:fs/promises";
+import { join, relative } from "node:path";
 import chalk from "chalk";
 import { fileExists, escapeRegex } from "../utils/fs.js";
 import type { CavemanLevel } from "../utils/config.js";
@@ -50,9 +50,12 @@ export const SKILL_NAMES = [
   "grimoire-commit",
   "grimoire-pr",
   "grimoire-pr-review",
+  "grimoire-precommit-review",
   "grimoire-refactor",
   "grimoire-branch-guard",
 ];
+
+export const SKILL_SHARED_DIRS = ["references"];
 
 /**
  * Build a managed block from the package AGENTS.md content.
@@ -261,8 +264,34 @@ export async function detectAgentFiles(root: string): Promise<string[]> {
 }
 
 /**
- * Copy SKILL.md files from the package into each selected agent's skill directory.
- * Unknown agents (cursor, copilot) are ignored — they use instruction files, not skills.
+ * Recursively copy every file under srcDir into destDir, preserving structure.
+ * Returns the relative paths of files that were copied (for logging).
+ */
+async function copyDirRecursive(srcDir: string, destDir: string): Promise<string[]> {
+  const copied: string[] = [];
+  const walk = async (src: string, dest: string): Promise<void> => {
+    const entries = await readdir(src, { withFileTypes: true });
+    await mkdir(dest, { recursive: true });
+    for (const entry of entries) {
+      const srcPath = join(src, entry.name);
+      const destPath = join(dest, entry.name);
+      if (entry.isDirectory()) {
+        await walk(srcPath, destPath);
+      } else if (entry.isFile()) {
+        await copyFile(srcPath, destPath);
+        copied.push(relative(srcDir, srcPath));
+      }
+    }
+  };
+  await walk(srcDir, destDir);
+  return copied;
+}
+
+/**
+ * Copy every file in each skill directory (SKILL.md plus any sibling references)
+ * into each selected agent's skill directory. Also copies shared dirs (e.g.
+ * skills/references/) once per agent. Unknown agents (cursor, copilot) are
+ * ignored — they use instruction files, not skills.
  */
 export async function installSkillFiles(
   root: string,
@@ -275,18 +304,40 @@ export async function installSkillFiles(
   const targets = agents.filter((a) => a in SKILL_AGENTS);
   if (targets.length === 0) return;
 
+  const color = verb === "created" ? chalk.green : chalk.blue;
+
   for (const agent of targets) {
     const relDir = SKILL_AGENTS[agent];
     const skillsDir = join(root, relDir);
-    for (const skill of skillNames) {
-      const destDir = join(skillsDir, skill);
-      await mkdir(destDir, { recursive: true });
 
-      const src = join(sourceSkillsDir, skill, "SKILL.md");
-      const dest = join(destDir, "SKILL.md");
-      await copyFile(src, dest);
-      const color = verb === "created" ? chalk.green : chalk.blue;
-      console.log(`  ${color(verb)} ${relDir}/${skill}/SKILL.md`);
+    for (const skill of skillNames) {
+      const srcSkillDir = join(sourceSkillsDir, skill);
+      const destSkillDir = join(skillsDir, skill);
+      let copied: string[];
+      try {
+        copied = await copyDirRecursive(srcSkillDir, destSkillDir);
+      } catch {
+        console.log(`  ${chalk.yellow("missing")} skill source ${skill}`);
+        continue;
+      }
+      for (const file of copied) {
+        console.log(`  ${color(verb)} ${relDir}/${skill}/${file}`);
+      }
+    }
+
+    for (const shared of SKILL_SHARED_DIRS) {
+      const srcShared = join(sourceSkillsDir, shared);
+      try {
+        const s = await stat(srcShared);
+        if (!s.isDirectory()) continue;
+      } catch {
+        continue;
+      }
+      const destShared = join(skillsDir, shared);
+      const copied = await copyDirRecursive(srcShared, destShared);
+      for (const file of copied) {
+        console.log(`  ${color(verb)} ${relDir}/${shared}/${file}`);
+      }
     }
   }
 }

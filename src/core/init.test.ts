@@ -9,6 +9,16 @@ vi.mock("node:fs/promises", async () => {
     writeFile: vi.fn().mockResolvedValue(undefined),
     copyFile: vi.fn().mockResolvedValue(undefined),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    readdir: vi.fn().mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("/skills/grimoire-")) {
+        return [
+          { name: "SKILL.md", isFile: () => true, isDirectory: () => false },
+        ];
+      }
+      return [];
+    }),
+    stat: vi.fn().mockRejectedValue(new Error("ENOENT")),
   };
 });
 
