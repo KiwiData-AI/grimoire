@@ -1,0 +1,93 @@
+# Grimoire Project Context
+# Captures the deployment environment, related services, and infrastructure
+# that this project depends on or interacts with.
+#
+# This file is NOT a decision record — it describes what IS.
+# Update it when the environment changes (new service, migration, etc.)
+#
+# Created by: grimoire init
+# Last updated: 2026-05-17
+
+# --- Deployment ---
+# How and where this project is deployed.
+
+deployment:
+  target: npm-registry
+  regions: []
+  environments:
+    production:
+      url: https://www.npmjs.com/package/@kiwidata/grimoire
+      notes: "Published as @kiwidata/grimoire; users install via npm/npx"
+  scripts:
+    - path: .github/workflows/release.yml
+      type: github-actions
+      notes: "Build matrix (Node 20, 22) on PR + main; publishes to npm on main when package.json version differs from registry"
+
+# --- Related Services ---
+# Sibling services this project communicates with at runtime.
+# Grimoire is a standalone CLI — it has no sibling services it depends on.
+services: []
+
+# --- Infrastructure ---
+# Runtime dependencies: databases, caches, queues, storage, etc.
+# Grimoire has no runtime infrastructure dependencies. It is a local CLI
+# that reads/writes files under .grimoire/ and shells out to user-configured
+# tools (git, gh, jscpd, eslint, Claude/Codex CLIs, etc.).
+infrastructure: []
+
+# --- CI/CD ---
+ci_cd:
+  platform: github-actions
+  workflows:
+    - path: .github/workflows/release.yml
+      purpose: "Lint, test, build on every PR (Node 20+22 matrix); publish to npm + tag on push to main"
+  deploy_trigger: "push to main with bumped version in package.json"
+
+# --- Observability ---
+# Grimoire runs locally on user machines; no centralised observability.
+# Errors surface to the user's terminal and to GitHub Actions logs for CI runs.
+observability: {}
+
+# --- External Tooling (consumed at runtime) ---
+# Optional CLIs that grimoire shells out to when present.
+# These are not "services" in the deploy sense; they are local executables.
+external_tools:
+  - name: git
+    required: true
+    used_by: [trace, pr, branch-check, hooks]
+  - name: gh
+    required: false
+    used_by: [pr]
+    purpose: "Open the PR after generating title/body"
+  - name: jscpd
+    required: false
+    used_by: [map, health]
+    purpose: "Duplicate code detection during map/health"
+  - name: eslint
+    required: false
+    used_by: [check]
+    purpose: "Complexity step (eslint --rule complexity)"
+  - name: radon
+    required: false
+    used_by: [check]
+    purpose: "Python complexity step"
+  - name: claude / codex / cursor-agent / etc.
+    required: false
+    used_by: [check, pr, draft, plan, apply, review]
+    purpose: "LLM steps — invoked via spawnWithStdin with the configured thinking/coding agent command"
+
+# --- Package & distribution ---
+package:
+  registry: npm
+  name: "@kiwidata/grimoire"
+  bin: grimoire
+  entry: bin/grimoire.js
+  publish_files:
+    - .claude-plugin/
+    - dist/
+    - bin/
+    - templates/
+    - skills/
+    - AGENTS.md
+    - README.md
+  node_engine: ">=20.0.0"

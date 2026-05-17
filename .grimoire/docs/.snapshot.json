@@ -1,22 +1,27 @@
 {
-  "generatedAt": "2026-04-05T21:27:26.808Z",
-  "projectRoot": "<repo>",
+  "generatedAt": "2026-05-17T15:51:24.765Z",
+  "projectRoot": ".",
   "directories": [
     {
       "path": ".",
-      "fileCount": 7,
+      "fileCount": 12,
       "extensions": {
         ".gitignore": 1,
-        ".md": 3,
-        ".json": 3
+        ".json": 5,
+        ".md": 4,
+        ".js": 1,
+        ".ts": 1
       },
       "keyFiles": [
+        "eslint.config.js",
         "package.json",
-        "tsconfig.json"
+        "tsconfig.json",
+        "vitest.config.ts"
       ],
       "subdirs": [
         ".grimoire",
         "bin",
+        "features",
         "skills",
         "src",
         "templates"
@@ -24,18 +29,86 @@
     },
     {
       "path": ".grimoire",
-      "fileCount": 0,
-      "extensions": {},
+      "fileCount": 6,
+      "extensions": {
+        ".version": 1,
+        ".yaml": 1,
+        ".yml": 1,
+        "dupignore": 1,
+        "mapignore": 1,
+        "mapkeys": 1
+      },
       "keyFiles": [],
       "subdirs": [
+        "archive",
+        "brand",
+        "bugs",
+        "changes",
+        "decisions",
         "docs"
       ]
     },
     {
-      "path": ".grimoire/docs",
+      "path": ".grimoire/archive/2026-05-17-add-ui-ux-design-workflow",
+      "fileCount": 2,
+      "extensions": {
+        ".md": 2
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": ".grimoire/archive/2026-05-17-audit-cli-commands",
       "fileCount": 1,
       "extensions": {
-        ".json": 1
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": ".grimoire/archive/2026-05-17-audit-decisions",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": ".grimoire/archive/2026-05-17-audit-skills",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": ".grimoire/archive/2026-05-17-remove-symbol-extraction",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": ".grimoire/decisions",
+      "fileCount": 30,
+      "extensions": {
+        ".md": 30
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": ".grimoire/docs",
+      "fileCount": 11,
+      "extensions": {
+        ".json": 2,
+        ".md": 7,
+        ".yml": 2
       },
       "keyFiles": [],
       "subdirs": []
@@ -50,6 +123,114 @@
       "subdirs": []
     },
     {
+      "path": "features",
+      "fileCount": 0,
+      "extensions": {},
+      "keyFiles": [],
+      "subdirs": [
+        "brand",
+        "bug",
+        "cli",
+        "design",
+        "design-consult",
+        "draft",
+        "intelligence",
+        "onboarding",
+        "review",
+        "workflow"
+      ]
+    },
+    {
+      "path": "features/brand",
+      "fileCount": 1,
+      "extensions": {
+        ".feature": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "features/bug",
+      "fileCount": 5,
+      "extensions": {
+        ".feature": 5
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "features/cli",
+      "fileCount": 17,
+      "extensions": {
+        ".feature": 17
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "features/design",
+      "fileCount": 4,
+      "extensions": {
+        ".feature": 4
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "features/design-consult",
+      "fileCount": 1,
+      "extensions": {
+        ".feature": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "features/draft",
+      "fileCount": 1,
+      "extensions": {
+        ".feature": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "features/intelligence",
+      "fileCount": 1,
+      "extensions": {
+        ".feature": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "features/onboarding",
+      "fileCount": 5,
+      "extensions": {
+        ".feature": 5
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "features/review",
+      "fileCount": 5,
+      "extensions": {
+        ".feature": 5
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "features/workflow",
+      "fileCount": 8,
+      "extensions": {
+        ".feature": 8
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
       "path": "skills",
       "fileCount": 0,
       "extensions": {},
@@ -57,11 +238,26 @@
       "subdirs": [
         "grimoire-apply",
         "grimoire-audit",
+        "grimoire-branch-guard",
+        "grimoire-bug",
+        "grimoire-bug-explore",
+        "grimoire-bug-report",
+        "grimoire-bug-session",
+        "grimoire-bug-triage",
+        "grimoire-commit",
+        "grimoire-design",
+        "grimoire-design-consult",
         "grimoire-discover",
         "grimoire-draft",
         "grimoire-plan",
+        "grimoire-pr",
+        "grimoire-pr-review",
+        "grimoire-precommit-review",
+        "grimoire-refactor",
         "grimoire-remove",
-        "grimoire-verify"
+        "grimoire-review",
+        "grimoire-verify",
+        "references"
       ]
     },
     {
@@ -75,6 +271,87 @@
     },
     {
       "path": "skills/grimoire-audit",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-branch-guard",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-bug",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-bug-explore",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-bug-report",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-bug-session",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-bug-triage",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-commit",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-design",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-design-consult",
       "fileCount": 1,
       "extensions": {
         ".md": 1
@@ -110,7 +387,52 @@
       "subdirs": []
     },
     {
+      "path": "skills/grimoire-pr",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-pr-review",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-precommit-review",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-refactor",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
       "path": "skills/grimoire-remove",
+      "fileCount": 1,
+      "extensions": {
+        ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/grimoire-review",
       "fileCount": 1,
       "extensions": {
         ".md": 1
@@ -123,6 +445,15 @@
       "fileCount": 1,
       "extensions": {
         ".md": 1
+      },
+      "keyFiles": [],
+      "subdirs": []
+    },
+    {
+      "path": "skills/references",
+      "fileCount": 15,
+      "extensions": {
+        ".md": 15
       },
       "keyFiles": [],
       "subdirs": []
@@ -156,36 +487,39 @@
     },
     {
       "path": "src/commands",
-      "fileCount": 7,
+      "fileCount": 17,
       "extensions": {
-        ".ts": 7
+        ".ts": 17
       },
       "keyFiles": [],
       "subdirs": []
     },
     {
       "path": "src/core",
-      "fileCount": 7,
+      "fileCount": 42,
       "extensions": {
-        ".ts": 7
+        ".ts": 42
       },
       "keyFiles": [],
       "subdirs": []
     },
     {
       "path": "src/utils",
-      "fileCount": 1,
+      "fileCount": 8,
       "extensions": {
-        ".ts": 1
+        ".ts": 8
       },
       "keyFiles": [],
       "subdirs": []
     },
     {
       "path": "templates",
-      "fileCount": 5,
+      "fileCount": 11,
       "extensions": {
-        ".md": 2,
+        ".json": 1,
+        ".md": 4,
+        ".yml": 2,
+        "dupignore": 1,
         ".feature": 1,
         "mapignore": 1,
         "mapkeys": 1
@@ -196,12 +530,20 @@
   ],
   "keyFiles": [
     {
+      "path": "eslint.config.js",
+      "type": "linter-config"
+    },
+    {
       "path": "package.json",
       "type": "node-package"
     },
     {
       "path": "tsconfig.json",
       "type": "typescript-config"
+    },
+    {
+      "path": "vitest.config.ts",
+      "type": "test-config"
     },
     {
       "path": "src/index.ts",
@@ -214,15 +556,47 @@
   ],
   "undocumented": [
     ".",
+    ".grimoire",
+    ".grimoire/archive/2026-05-17-add-ui-ux-design-workflow",
+    ".grimoire/archive/2026-05-17-audit-cli-commands",
+    ".grimoire/archive/2026-05-17-audit-decisions",
+    ".grimoire/archive/2026-05-17-audit-skills",
+    ".grimoire/archive/2026-05-17-remove-symbol-extraction",
+    ".grimoire/decisions",
     ".grimoire/docs",
     "bin",
+    "features/brand",
+    "features/bug",
+    "features/cli",
+    "features/design",
+    "features/design-consult",
+    "features/draft",
+    "features/intelligence",
+    "features/onboarding",
+    "features/review",
+    "features/workflow",
     "skills/grimoire-apply",
     "skills/grimoire-audit",
+    "skills/grimoire-branch-guard",
+    "skills/grimoire-bug",
+    "skills/grimoire-bug-explore",
+    "skills/grimoire-bug-report",
+    "skills/grimoire-bug-session",
+    "skills/grimoire-bug-triage",
+    "skills/grimoire-commit",
+    "skills/grimoire-design",
+    "skills/grimoire-design-consult",
     "skills/grimoire-discover",
     "skills/grimoire-draft",
     "skills/grimoire-plan",
+    "skills/grimoire-pr",
+    "skills/grimoire-pr-review",
+    "skills/grimoire-precommit-review",
+    "skills/grimoire-refactor",
     "skills/grimoire-remove",
+    "skills/grimoire-review",
     "skills/grimoire-verify",
+    "skills/references",
     "src",
     "src/cli",
     "src/commands",
@@ -231,87 +605,5 @@
     "templates"
   ],
   "removed": [],
-  "duplicates": {
-    "clones": [
-      {
-        "firstFile": "src/core/list.ts",
-        "firstStartLine": 20,
-        "firstEndLine": 27,
-        "secondFile": "src/core/validate.ts",
-        "secondStartLine": 29,
-        "secondEndLine": 35,
-        "lines": 8,
-        "tokens": 0,
-        "fragment": "const changesDir = join(root, \".grimoire\", \"changes\");\n\n  try {\n    const entries = await readdir(changesDir, { withFileTypes: true });\n    const changes = entries.filter((e) => e.isDirectory());\n\n   "
-      },
-      {
-        "firstFile": "src/core/init.ts",
-        "firstStartLine": 1,
-        "firstEndLine": 9,
-        "secondFile": "src/core/update.ts",
-        "secondStartLine": 1,
-        "secondEndLine": 9,
-        "lines": 9,
-        "tokens": 0,
-        "fragment": ", access } from \"node:fs/promises\";\nimport { join, dirname } from \"node:path\";\nimport { fileURLToPath } from \"node:url\";\nimport chalk from \"chalk\";\n\nconst __dirname = dirname(fileURLToPath(import.meta"
-      },
-      {
-        "firstFile": "src/core/init.ts",
-        "firstStartLine": 106,
-        "firstEndLine": 121,
-        "secondFile": "src/core/update.ts",
-        "secondStartLine": 43,
-        "secondEndLine": 58,
-        "lines": 16,
-        "tokens": 0,
-        "fragment": "(root: string): Promise<void> {\n  const agentsPath = join(root, \"AGENTS.md\");\n  const grimoireAgents = await readFile(\n    join(PACKAGE_ROOT, \"AGENTS.md\"),\n    \"utf-8\"\n  );\n\n  const marker = \"<!-- GRI"
-      },
-      {
-        "firstFile": "src/core/init.ts",
-        "firstStartLine": 122,
-        "firstEndLine": 129,
-        "secondFile": "src/core/update.ts",
-        "secondStartLine": 58,
-        "secondEndLine": 67,
-        "lines": 8,
-        "tokens": 0,
-        "fragment": "const updated = existing.replace(\n        new RegExp(`${escapeRegex(marker)}[\\\\s\\\\S]*?${escapeRegex(endMarker)}`),\n        managedBlock\n      );\n      await writeFile(agentsPath, updated);\n      conso"
-      },
-      {
-        "firstFile": "src/core/init.ts",
-        "firstStartLine": 130,
-        "firstEndLine": 139,
-        "secondFile": "src/core/update.ts",
-        "secondStartLine": 67,
-        "secondEndLine": 76,
-        "lines": 10,
-        "tokens": 0,
-        "fragment": "await writeFile(agentsPath, existing + \"\\n\\n\" + managedBlock + \"\\n\");\n      console.log(`  ${chalk.blue(\"appended\")} AGENTS.md (grimoire section)`);\n    }\n  } else {\n    await writeFile(agentsPath, ma"
-      },
-      {
-        "firstFile": "src/core/init.ts",
-        "firstStartLine": 139,
-        "firstEndLine": 160,
-        "secondFile": "src/core/update.ts",
-        "secondStartLine": 76,
-        "secondEndLine": 97,
-        "lines": 22,
-        "tokens": 0,
-        "fragment": "(root: string): Promise<void> {\n  const skillsDir = join(root, \".claude\", \"skills\");\n  const sourceSkillsDir = join(PACKAGE_ROOT, \"skills\");\n\n  const skillNames = [\n    \"grimoire-draft\",\n    \"grimoire"
-      },
-      {
-        "firstFile": "src/core/init.ts",
-        "firstStartLine": 160,
-        "firstEndLine": 175,
-        "secondFile": "src/core/update.ts",
-        "secondStartLine": 97,
-        "secondEndLine": 112,
-        "lines": 16,
-        "tokens": 0,
-        "fragment": ")} .claude/skills/${skill}/SKILL.md`);\n  }\n}\n\nasync function exists(path: string): Promise<boolean> {\n  try {\n    await access(path);\n    return true;\n  } catch {\n    return false;\n  }\n}\n\nfunction esc"
-      }
-    ],
-    "totalDuplicatedLines": 82,
-    "percentDuplicated": 1.9556403529692346
-  }
+  "duplicates": null
 }
