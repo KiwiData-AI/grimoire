@@ -1,11 +1,11 @@
 import { readFile, writeFile, copyFile, mkdir, readdir, stat } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import chalk from "chalk";
 import { fileExists, escapeRegex } from "../utils/fs.js";
 import type { CavemanLevel } from "../utils/config.js";
 
-export const GRIMOIRE_START_MARKER = "<!-- GRIMOIRE:START -->";
-export const GRIMOIRE_END_MARKER = "<!-- GRIMOIRE:END -->";
+const GRIMOIRE_START_MARKER = "<!-- GRIMOIRE:START -->";
+const GRIMOIRE_END_MARKER = "<!-- GRIMOIRE:END -->";
 
 export const GRIMOIRE_DIRS = [
   "features",
@@ -26,13 +26,13 @@ export const TEMPLATE_FILES: Array<[string, string]> = [
   ["dupignore", ".grimoire/dupignore"],
 ];
 
-export const SKILL_AGENTS: Record<string, string> = {
+const SKILL_AGENTS: Record<string, string> = {
   claude: ".claude/skills",
   opencode: ".opencode/skills",
   codex: ".agents/skills",
 };
 
-export const DEFAULT_SKILL_AGENT = "claude";
+const DEFAULT_SKILL_AGENT = "claude";
 
 export const SKILL_NAMES = [
   "grimoire-draft",
@@ -58,12 +58,12 @@ export const SKILL_NAMES = [
   "grimoire-branch-guard",
 ];
 
-export const SKILL_SHARED_DIRS = ["references"];
+const SKILL_SHARED_DIRS = ["references"];
 
 /**
  * Build a managed block from the package AGENTS.md content.
  */
-export function buildManagedBlock(content: string): string {
+function buildManagedBlock(content: string): string {
   return `${GRIMOIRE_START_MARKER}\n${content}\n${GRIMOIRE_END_MARKER}`;
 }
 
@@ -73,7 +73,7 @@ export function buildManagedBlock(content: string): string {
  * If the file exists without markers, append the managed section.
  * If the file doesn't exist, create it with the managed section.
  */
-export async function upsertManagedBlock(
+async function upsertManagedBlock(
   filePath: string,
   managedBlock: string,
   verb: "created" | "updated",
@@ -152,6 +152,10 @@ export async function upsertAgentsFile(
   caveman: CavemanLevel = "none"
 ): Promise<void> {
   const agentsPath = join(root, "AGENTS.md");
+  if (resolve(root) === resolve(packageRoot)) {
+    await upsertInPlaceAgentsFile(agentsPath, verb, caveman);
+    return;
+  }
   const grimoireAgents = await readFile(
     join(packageRoot, "AGENTS.md"),
     "utf-8"
@@ -160,6 +164,36 @@ export async function upsertAgentsFile(
   const content = cavemanBlock ? cavemanBlock + grimoireAgents : grimoireAgents;
   const managedBlock = buildManagedBlock(content);
   await upsertManagedBlock(agentsPath, managedBlock, verb, "AGENTS.md");
+}
+
+async function upsertInPlaceAgentsFile(
+  agentsPath: string,
+  verb: "created" | "updated",
+  caveman: CavemanLevel
+): Promise<void> {
+  const cavemanBlock = buildCavemanDirective(caveman);
+  if (cavemanBlock) {
+    const managedBlock = buildManagedBlock(cavemanBlock);
+    await upsertManagedBlock(agentsPath, managedBlock, verb, "AGENTS.md");
+    return;
+  }
+  if (!(await fileExists(agentsPath))) {
+    console.log(`  ${chalk.dim("skipped")} AGENTS.md (in-place — no caveman directive to install)`);
+    return;
+  }
+  const existing = await readFile(agentsPath, "utf-8");
+  if (!existing.includes(GRIMOIRE_START_MARKER)) {
+    console.log(`  ${chalk.dim("skipped")} AGENTS.md (in-place — no caveman directive, no managed block)`);
+    return;
+  }
+  const stripped = existing.replace(
+    new RegExp(
+      `\\n*${escapeRegex(GRIMOIRE_START_MARKER)}[\\s\\S]*?${escapeRegex(GRIMOIRE_END_MARKER)}\\n*`
+    ),
+    "\n"
+  );
+  await writeFile(agentsPath, stripped);
+  console.log(`  ${chalk.blue(verb)} AGENTS.md (in-place — stripped stale managed block)`);
 }
 
 /**

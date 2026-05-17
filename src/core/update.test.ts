@@ -35,8 +35,14 @@ vi.mock("./hooks.js", () => ({
 }));
 
 import { readFile, writeFile, copyFile, mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileExists } from "../utils/fs.js";
 import { setupHooks } from "./hooks.js";
+
+// Portable path guaranteed to differ from PACKAGE_ROOT — used by tests that
+// need to exercise the "package → project" branch of upsertAgentsFile.
+const TEST_PROJECT_ROOT = join(tmpdir(), "grimoire-update-test-project");
 
 const mockReadFile = vi.mocked(readFile);
 const mockWriteFile = vi.mocked(writeFile);
@@ -95,7 +101,10 @@ describe("updateProject", () => {
 
   it("creates AGENTS.md when it doesn't exist", async () => {
     setupBasicFs();
-    await updateProject(".", { ...ALL_SKIPPED, skipAgents: false });
+    // Use an absolute path distinct from PACKAGE_ROOT so upsertAgentsFile
+    // takes the normal "package → project" branch, not the in-place branch
+    // that's guarded for grimoire-on-itself usage.
+    await updateProject(TEST_PROJECT_ROOT, { ...ALL_SKIPPED, skipAgents: false });
 
     const agentsWrite = mockWriteFile.mock.calls.find((c) =>
       String(c[0]).includes("AGENTS.md")
@@ -118,13 +127,27 @@ describe("updateProject", () => {
       return "# New Agent Instructions" as any;
     });
 
-    await updateProject(".", { ...ALL_SKIPPED, skipAgents: false });
+    await updateProject(TEST_PROJECT_ROOT, { ...ALL_SKIPPED, skipAgents: false });
 
     const agentsWrite = mockWriteFile.mock.calls.find((c) =>
       String(c[0]).includes("AGENTS.md")
     );
     expect(agentsWrite).toBeDefined();
     expect(String(agentsWrite![1])).toContain("# Other");
+  });
+
+  it("skips in-place AGENTS.md write when root === packageRoot and caveman is none", async () => {
+    setupBasicFs();
+    // When the test runs from inside the grimoire repo, `updateProject(".")`
+    // resolves root to the same absolute path as PACKAGE_ROOT (computed from
+    // update.ts's own __dirname). That is the in-place case the guard handles.
+    // With no caveman directive there is nothing to write, so the upsert is a no-op.
+    await updateProject(".", { ...ALL_SKIPPED, skipAgents: false });
+
+    const agentsWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("AGENTS.md")
+    );
+    expect(agentsWrite).toBeUndefined();
   });
 
   it("skips agents update when skipAgents is true", async () => {

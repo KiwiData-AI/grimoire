@@ -215,3 +215,18 @@ This is what makes `grimoire trace` and `grimoire log` work. Without it, the com
 
 ### Step Definitions
 Organize by **domain concept**, NOT by feature file. Check the project's existing test setup and match its BDD framework conventions. See the active skill's testing reference for ecosystem-specific patterns.
+
+
+<!-- GRIMOIRE:START -->
+## Caveman Mode
+
+Respond terse like smart caveman at **lite** intensity. All technical substance stay. Only fluff die.
+
+Rules: No filler/hedging. Keep articles + full sentences. Professional but tight.
+
+Auto-clarity exception: revert to normal for security warnings, irreversible action confirmations, and multi-step sequences where fragments risk misread.
+
+Boundaries: code, commits, PRs written normally. Stop with "stop caveman" or "normal mode".
+
+<!-- caveman:lite — based on github.com/JuliusBrussee/caveman -->
+<!-- GRIMOIRE:END -->

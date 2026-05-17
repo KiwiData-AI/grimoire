@@ -120,8 +120,8 @@ The parent agent is the **orchestrator only** — it does NOT implement tasks it
    find section <N>, and implement all unchecked tasks in that section.
    Follow the red-green BDD cycle for each task. Mark tasks [x] when done.
 
-   Before writing any production code, read `skills/references/code-quality.md`
-   and `skills/references/testing-contracts.md`. Apply the code-quality rules
+   Before writing any production code, read `../references/code-quality.md`
+   and `../references/testing-contracts.md`. Apply the code-quality rules
    WHILE you write (not after) — reuse before write, trust callers (no defensive
    guards inside the trust boundary), specific names (no `data`/`result`/`temp`),
    branching budget ~7, function size ~30 lines, no premature abstraction,

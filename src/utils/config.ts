@@ -14,7 +14,7 @@ export type CavemanLevel = "none" | "lite" | "full" | "ultra";
 
 export const CURRENT_CONFIG_VERSION = 2;
 
-export interface DesignToolConfig {
+interface DesignToolConfig {
   name: string;
   path?: string;
   url?: string;
@@ -31,7 +31,7 @@ const PROJECT_SURFACES: readonly ProjectSurface[] = [
   "mixed",
 ] as const;
 
-export interface ProjectConfig {
+interface ProjectConfig {
   language?: string;
   package_manager?: string;
   commit_style: string;
@@ -47,22 +47,22 @@ export interface ProjectConfig {
   brand_dir?: string;
 }
 
-export interface PrecommitReviewConfig {
+interface PrecommitReviewConfig {
   depth?: "quick" | "full";
   block_on?: "blocker" | "none";
 }
 
-export interface IntegrationsConfig {
+interface IntegrationsConfig {
   codebase_memory_mcp?: boolean;
   caveman_plugin?: boolean;
 }
 
-export interface LlmAgentConfig {
+interface LlmAgentConfig {
   command: string;
   model?: string;
 }
 
-export interface LlmConfig {
+interface LlmConfig {
   thinking: LlmAgentConfig;
   coding: LlmAgentConfig;
 }

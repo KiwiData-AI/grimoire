@@ -17,7 +17,7 @@ interface ValidateOptions {
   json: boolean;
 }
 
-export interface ValidationResult {
+interface ValidationResult {
   file: string;
   errors: string[];
   warnings: string[];
@@ -188,7 +188,7 @@ function getScenarios(doc: GherkinDocument): GherkinScenario[] {
   return scenarios;
 }
 
-export function validateFeatureFile(
+function validateFeatureFile(
   filePath: string,
   content: string,
   strict: boolean
@@ -265,7 +265,7 @@ export function validateFeatureFile(
   return { file: filePath, errors, warnings };
 }
 
-export function validateDecisionFile(
+function validateDecisionFile(
   filePath: string,
   content: string,
   strict: boolean
@@ -322,7 +322,7 @@ const VALID_MANIFEST_STATUSES = [
   "complete",
 ];
 
-export function validateManifest(
+function validateManifest(
   filePath: string,
   content: string,
   strict: boolean

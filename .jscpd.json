@@ -1,7 +1,15 @@
 {
   "threshold": 5,
   "reporters": ["console"],
-  "ignore": ["node_modules", "dist", "**/*.test.ts"],
+  "format": ["typescript", "javascript"],
+  "ignore": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    ".grimoire/archive/**",
+    ".claude/**",
+    ".claude-plugin/**"
+  ],
   "absolute": false,
   "gitignore": true
 }
