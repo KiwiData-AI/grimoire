@@ -18,7 +18,18 @@ export interface DesignToolConfig {
   name: string;
   path?: string;
   url?: string;
+  mcp?: McpServer;
 }
+
+export type ProjectSurface = "tui" | "web" | "mobile" | "api" | "mixed";
+
+const PROJECT_SURFACES: readonly ProjectSurface[] = [
+  "tui",
+  "web",
+  "mobile",
+  "api",
+  "mixed",
+] as const;
 
 export interface ProjectConfig {
   language?: string;
@@ -32,6 +43,8 @@ export interface ProjectConfig {
   agents?: string[];
   integrations?: IntegrationsConfig;
   precommit_review?: PrecommitReviewConfig;
+  surface?: ProjectSurface;
+  brand_dir?: string;
 }
 
 export interface PrecommitReviewConfig {
@@ -149,6 +162,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
       name: String(dt.name ?? ""),
       path: str(dt.path),
       url: str(dt.url),
+      mcp: parseMcpServer(dt),
     };
   }
 
@@ -180,6 +194,11 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     };
   }
 
+  const surfaceRaw = str(projectRaw.surface);
+  const surface = PROJECT_SURFACES.includes(surfaceRaw as ProjectSurface)
+    ? (surfaceRaw as ProjectSurface)
+    : undefined;
+
   return {
     language: str(projectRaw.language ?? raw.language),
     package_manager: str(projectRaw.package_manager),
@@ -198,6 +217,8 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
       : undefined,
     integrations,
     precommit_review,
+    surface,
+    brand_dir: str(projectRaw.brand_dir),
   };
 }
 

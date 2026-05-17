@@ -63,6 +63,16 @@ Before designing, research what already exists. Do not ask the user to research 
 
 Follow the methodology in `../references/build-vs-buy.md`. Present findings to the user and wait for agreement before proceeding.
 
+### 4.0 Design Input Check
+
+Before interviewing, check whether design artifacts already exist for this change. If so, the interview is grounded in real components and states rather than imagined ones.
+
+- **Existing design output**: If `.grimoire/changes/<change-id>/designs/` is already populated (a prior `grimoire-design` run produced `problem.md`, `variants.md`, `variant-{n}.html`, or `figma-snapshot.json`), read those artifacts now. Treat them as authoritative for component shape, states, and visual tokens — do not re-query Figma.
+- **Figma MCP available, no design folder**: If `project.design_tool.mcp` is configured and `designs/` is absent, ask: "Figma file URL or node ID? (or skip)". On a URL or node reference, query the Figma MCP for frame data and cache the response at `.grimoire/changes/<change-id>/designs/figma-snapshot.json` per `../references/design-input-formats.md` §1 Cache. On "skip" or empty input, continue to standard elicitation.
+- **No MCP and no design folder**: skip this step silently. Fall back to the standard interview elicitation in step 4 below.
+
+When design input is consumed (either path), carry the extracted component list, states, and any token references into the elicitation in step 4 — these become concrete anchors for the questions you ask the user, replacing generic prompts.
+
 ### 4. Elicit Requirements
 
 **Interview, don't assume.** The most common drafting failure is filling in gaps with plausible-sounding guesses. Every unstated detail is either (a) something the user has an opinion on and you must ask, or (b) something project conventions answer unambiguously. Never a third option where you invent.
@@ -103,6 +113,7 @@ Present a Requirements Summary (template in the reference) and wait for user con
 - Read `.grimoire/docs/context.yml` (if it exists) to understand the deployment environment, related services, and infrastructure — this tells you what's available (caches, queues, sibling services) and what constraints apply (deployment target, environments)
 - Check `.grimoire/changes/` for any in-progress changes that might overlap
 - If there's a conflict with an active change, flag it
+- If `.grimoire/changes/<change-id>/consult.md` exists (from a prior `grimoire-design-consult` run), parse the `## Inferred assumptions` and `## Inferred givens` sections verbatim. Copy the contents of `## Inferred assumptions` into the manifest's Assumptions section, and copy `## Inferred givens` into a new Givens section at the same heading level (Givens applies to level 3-4 only — skip for level 1-2). The H2 headers `## Inferred assumptions` and `## Inferred givens` are load-bearing — they are the exact section names `grimoire-design-consult` writes; do not paraphrase, retitle, or fuzzy-match. Open questions from `consult.md` are NOT copied — they remain in `consult.md` as designer follow-up items.
 
 ### 6. Scaffold the Change
 - Choose a `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`)
@@ -118,6 +129,19 @@ Present a Requirements Summary (template in the reference) and wait for user con
   - One scenario per behavior
   - Given/When/Then — describe WHAT, never HOW
   - No implementation details in feature files
+
+**When design data was provided (step 4.0):**
+- If a Figma snapshot or `grimoire-design` output is available, propose Gherkin scenarios per (component × state) grounded in those artifacts. Walk the component list and the enumerated states; emit one Scenario per pair.
+- Present the proposed scenarios for user review before writing to `.feature` files — accept all / accept some / edit / reject any. Rejected scenarios are not written.
+- If `grimoire-design` already produced user-accepted scenarios under `.grimoire/changes/<change-id>/features/`, do NOT re-propose them; treat them as the baseline and only fill gaps (e.g., new components not yet covered).
+
+**Brand-tokens grounding:**
+- When Figma variables map to tokens that also appear in `.grimoire/brand/tokens.json`, scenarios referencing visual properties must use token names, not hex values. Example: write `Then the submit button uses color.primary` not `Then the submit button is #0066ff`.
+- Hardcoded hex values in scenarios drift silently when tokens change. Token names stay correct across re-skins.
+
+**Component-library awareness:**
+- When `.grimoire/docs/components.md` exists, prefer references to existing components by name in scenarios (e.g., `Then a Button with variant="primary" is rendered` over `Then a blue button appears`).
+- Flag net-new components explicitly: emit "new component required — confirm before plan stage" alongside any scenario that introduces a component not listed in `components.md`. The plan stage will then decide whether to add it to the inventory or reuse an existing variant.
 
 **Security tags on scenarios:**
 Apply Gherkin tags per `../references/security-compliance.md` (section "Security Tags"). Tags drive stricter checks in plan, review, and verify stages. Apply compliance-specific tags only when `project.compliance` is configured. If no compliance frameworks and no security surface, don't add tags.
@@ -216,6 +240,7 @@ This is the contract. Downstream skills (plan, review, verify) use it to generat
 - Features describe behavior, not implementation. If you catch yourself writing step-level implementation details, you've gone too far.
 - The manifest is lightweight glue — don't over-document. Just enough to capture why.
 - Always check if a capability/feature already exists before creating a new one.
+- **Figma access token is read from `FIGMA_ACCESS_TOKEN` env var by the MCP server.** Never log the token, never write it to config, never include it in `manifest.md`, `consult.md`, `figma-snapshot.json`, or any other artifact. The MCP server handles authentication transparently — grimoire-draft never needs to see the token value.
 
 ## Done
 When the user approves the draft, the workflow is complete. Present the change directory path and suggest next steps:

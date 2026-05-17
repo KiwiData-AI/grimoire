@@ -1,4 +1,4 @@
-import { mkdir, writeFile, copyFile } from "node:fs/promises";
+import { mkdir, writeFile, copyFile, readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stringify as yamlStringify } from "yaml";
@@ -10,6 +10,7 @@ import type {
   CavemanLevel,
   BugTrackerConfig,
   TestingToolConfig,
+  ProjectSurface,
 } from "../utils/config.js";
 import { setupHooks } from "./hooks.js";
 import { fileExists } from "../utils/fs.js";
@@ -102,6 +103,7 @@ export async function initProject(
     codebaseMemoryMcp: options.installCodebaseMemoryMcp,
     cavemanPlugin: options.installCavemanPlugin,
   };
+  let figmaMcpConfigured = false;
   if (!(await fileExists(configPath))) {
     const config = options.noDetect
       ? buildMinimalConfig()
@@ -116,7 +118,10 @@ export async function initProject(
         integrationFlags.cavemanPlugin ??
         config.project.integrations?.caveman_plugin,
     };
-    await writeFile(configPath, yamlStringify(config));
+    const serialized = yamlStringify(config);
+    scanForSecrets(serialized);
+    figmaMcpConfigured = config.project.design_tool?.mcp?.name === "figma-dev-mode";
+    await writeFile(configPath, serialized);
     console.log(`  ${chalk.green("created")} .grimoire/config.yaml`);
   } else {
     console.log(`  ${chalk.yellow("exists")}  .grimoire/config.yaml`);
@@ -183,14 +188,15 @@ export async function initProject(
   console.log("  Edit .grimoire/docs/context.yml to describe your deployment,");
   console.log("  related services, and infrastructure.\n");
 
-  printIntegrationInstructions(integrationFlags);
+  printIntegrationInstructions({ ...integrationFlags, figmaMcp: figmaMcpConfigured });
 }
 
 function printIntegrationInstructions(flags: {
   codebaseMemoryMcp?: boolean;
   cavemanPlugin?: boolean;
+  figmaMcp?: boolean;
 }): void {
-  if (!flags.codebaseMemoryMcp && !flags.cavemanPlugin) return;
+  if (!flags.codebaseMemoryMcp && !flags.cavemanPlugin && !flags.figmaMcp) return;
 
   console.log(chalk.bold("Recommended integrations to install:\n"));
 
@@ -222,6 +228,40 @@ function printIntegrationInstructions(flags: {
     console.log("    In Claude Code:");
     console.log(`      ${chalk.dim("/plugin marketplace add JuliusBrussee/caveman")}`);
     console.log(`      ${chalk.dim("/plugin install caveman@JuliusBrussee/caveman")}\n`);
+  }
+
+  if (flags.figmaMcp) {
+    console.log(
+      `  ${chalk.cyan("Figma Dev Mode MCP")} — read Figma frames, variables, and components from the AI agent`
+    );
+    console.log("    Set your access token in your shell environment:");
+    console.log(`      ${chalk.dim("export FIGMA_ACCESS_TOKEN=...")}`);
+    console.log(
+      "    Install the Figma desktop app and enable Dev Mode for full feature access."
+    );
+    console.log(
+      `    Restart your agent. The MCP server will spawn via the command in config.yaml.\n`
+    );
+  }
+}
+
+const SECRET_PATTERN = /(.*_TOKEN|.*_KEY|.*_SECRET|.*_PASSWORD)\s*[:=]\s*[^$\s].*/i;
+
+/**
+ * Reject serialized config containing literal secret values (token, key,
+ * secret, password) on the right of `:` / `=`. `${VAR}` env-var references
+ * are allowed. Throws to abort write; caller surfaces the message.
+ */
+export function scanForSecrets(serialized: string): void {
+  for (const line of serialized.split("\n")) {
+    const m = line.match(SECRET_PATTERN);
+    if (!m) continue;
+    const value = line.slice(line.search(/[:=]/) + 1).trim();
+    if (value.startsWith("${")) continue;
+    throw new Error(
+      `Refusing to write a secret to .grimoire/config.yaml: ${line.trim()}\n` +
+        `Use \${ENV_VAR} references instead, then export the value in your shell.`
+    );
   }
 }
 
@@ -257,6 +297,7 @@ function buildMinimalConfig(): GrimoireConfig {
 interface IntegrationPrefill {
   codebaseMemoryMcp?: boolean;
   cavemanPlugin?: boolean;
+  detectedSurface?: ProjectSurface;
 }
 
 async function buildDetectedConfig(
@@ -271,6 +312,7 @@ async function buildDetectedConfig(
   if (detections.length === 0) {
     console.log(chalk.dim("  No tools detected. Using minimal config.\n"));
     return await askPreferences(config, root, prefill);
+    // prefill.detectedSurface stays undefined → askPreferences uses greenfield prompt
   }
 
   // Group detections by category and pick highest confidence per category
@@ -311,10 +353,13 @@ async function buildDetectedConfig(
     "  Accept detected tools? (Y/n/edit) "
   );
 
+  const detectedSurface = surfaceFromDetection(byCategory.get("surface"));
+  const prefillWithSurface: IntegrationPrefill = { ...prefill, detectedSurface };
+
   if (answer.toLowerCase() === "n") {
     rl.close();
     console.log(chalk.dim("  Skipping tool detection.\n"));
-    return await askPreferences(config, root, prefill);
+    return await askPreferences(config, root, prefillWithSurface);
   }
 
   if (answer.toLowerCase() === "edit") {
@@ -405,7 +450,16 @@ async function buildDetectedConfig(
     };
   }
 
-  return await askPreferences(config, root);
+  return await askPreferences(config, root, prefillWithSurface);
+}
+
+const PROMPT_SURFACES: readonly ProjectSurface[] = ["tui", "web", "mobile", "api", "mixed"];
+
+function surfaceFromDetection(d: Detection | undefined): ProjectSurface | undefined {
+  if (!d) return undefined;
+  return PROMPT_SURFACES.includes(d.name as ProjectSurface)
+    ? (d.name as ProjectSurface)
+    : undefined;
 }
 
 async function editDetections(
@@ -500,6 +554,10 @@ async function askPreferences(
 
   config.project.integrations = integrations;
 
+  // Project surface — drives review-persona selection. Detected value (if any)
+  // is offered as the default; "skip" omits the field entirely.
+  await askSurface(rl, config, prefill.detectedSurface);
+
   console.log(chalk.bold("\n  Project preferences:\n"));
 
   const currentCaveman = config.project.caveman ?? "lite";
@@ -544,26 +602,15 @@ async function askPreferences(
   console.log(chalk.dim("    designs during requirements elicitation.\n"));
 
   const designToolAnswer = await rl.question(
-    `    Design tool? (figma/storybook/sketch/zeplin/none) [none]: `
+    `    Design tool? (figma/sketch/penpot/framer/storybook/zeplin/none) [none]: `
   );
   const designTool = designToolAnswer.trim().toLowerCase();
   if (designTool && designTool !== "none") {
-    const designPathAnswer = await rl.question(
-      `    Local design assets path? (e.g., designs/, docs/wireframes/) [none]: `
-    );
-    const designUrlAnswer = await rl.question(
-      `    Design project URL? (e.g., Figma project link) [none]: `
-    );
-    config.project.design_tool = {
-      name: designTool,
-      path: designPathAnswer.trim() && designPathAnswer.trim() !== "none"
-        ? designPathAnswer.trim()
-        : undefined,
-      url: designUrlAnswer.trim() && designUrlAnswer.trim() !== "none"
-        ? designUrlAnswer.trim()
-        : undefined,
-    };
+    await configureDesignTool(rl, config, root, designTool);
   }
+
+  // Brand capture — optional, written to .grimoire/brand/
+  await askBrandCapture(rl, root);
 
   // LLM agent preferences
   console.log(chalk.bold("\n  AI agent preferences:\n"));
@@ -725,6 +772,247 @@ const TESTING_TOOL_MCP: Record<string, { display: string; command: string; args:
     args: ["-y", "@playwright/mcp@latest"],
   },
 };
+
+const DESIGN_TOOL_MCP: Record<string, { display: string; mcpName: string; command: string; args: string[] }> = {
+  figma: {
+    display: "Figma Dev Mode",
+    mcpName: "figma-dev-mode",
+    command: "npx",
+    args: ["-y", "figma-developer-mcp@latest"],
+  },
+};
+
+async function configureDesignTool(
+  rl: import("node:readline/promises").Interface,
+  config: GrimoireConfig,
+  root: string,
+  designTool: string
+): Promise<void> {
+  const mcp = DESIGN_TOOL_MCP[designTool];
+  let mcpServer: import("../utils/config.js").McpServer | undefined;
+
+  if (mcp) {
+    const installAnswer = await rl.question(
+      `    Install ${mcp.display} MCP server? (Y/n) `
+    );
+    if (installAnswer.trim().toLowerCase() !== "n") {
+      mcpServer = {
+        name: mcp.mcpName,
+        command: mcp.command,
+        args: mcp.args,
+      };
+      console.log(chalk.green(`    ✓ ${mcp.display} MCP configured`));
+      console.log(
+        chalk.dim(
+          "    Reminder: set FIGMA_ACCESS_TOKEN in your shell. Never paste it here."
+        )
+      );
+    }
+  } else {
+    await writeDesignToolStub(root, designTool);
+    console.log(
+      chalk.dim(
+        `    ${designTool} lacks a first-class MCP — see .grimoire/docs/design-tool-setup.md`
+      )
+    );
+  }
+
+  const designPathAnswer = await rl.question(
+    `    Local design assets path? (e.g., designs/, docs/wireframes/) [none]: `
+  );
+  const designUrlAnswer = await rl.question(
+    `    Design project URL? (e.g., Figma project link) [none]: `
+  );
+  config.project.design_tool = {
+    name: designTool,
+    path: stripNone(designPathAnswer),
+    url: stripNone(designUrlAnswer),
+    mcp: mcpServer,
+  };
+}
+
+function stripNone(answer: string): string | undefined {
+  const trimmed = answer.trim();
+  return trimmed && trimmed !== "none" ? trimmed : undefined;
+}
+
+async function writeDesignToolStub(root: string, designTool: string): Promise<void> {
+  const stubSrc = join(PACKAGE_ROOT, "templates", "design-tool-setup-stub.md");
+  const stubDest = join(root, ".grimoire", "docs", "design-tool-setup.md");
+  const template = await readFile(stubSrc, "utf-8");
+  const rendered = template.replace(/\{\{tool\}\}/g, designTool);
+  await writeFile(stubDest, rendered);
+  console.log(`  ${chalk.green("created")} .grimoire/docs/design-tool-setup.md`);
+}
+
+async function askSurface(
+  rl: import("node:readline/promises").Interface,
+  config: GrimoireConfig,
+  detected: ProjectSurface | undefined
+): Promise<void> {
+  const prompt = detected
+    ? `    Project surface: ${detected} — confirm or override (tui/web/mobile/api/mixed/Enter to accept): `
+    : `    Project surface? (tui/web/mobile/api/mixed/skip) `;
+  const answer = (await rl.question(prompt)).trim().toLowerCase();
+
+  if (!answer) {
+    if (detected) config.project.surface = detected;
+    return;
+  }
+  if (answer === "skip") return;
+  if (PROMPT_SURFACES.includes(answer as ProjectSurface)) {
+    config.project.surface = answer as ProjectSurface;
+  }
+}
+
+const HEX_PATTERN = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+async function askHex(
+  rl: import("node:readline/promises").Interface,
+  label: string
+): Promise<string> {
+  while (true) {
+    const answer = (await rl.question(`    ${label} (hex, e.g., #0066ff): `)).trim();
+    if (HEX_PATTERN.test(answer)) return answer;
+    console.log(chalk.yellow(`    Invalid hex color "${answer}". Use #RGB or #RRGGBB.`));
+  }
+}
+
+async function askBrandCapture(
+  rl: import("node:readline/promises").Interface,
+  root: string
+): Promise<void> {
+  console.log(chalk.bold("\n  Brand guidelines:\n"));
+
+  const existing = await findExistingTokens(root);
+  if (existing) {
+    const useExisting = await rl.question(
+      `    Use existing tokens file at ${existing}? (Y/n) `
+    );
+    if (useExisting.trim().toLowerCase() !== "n") {
+      await copyFile(existing, join(root, ".grimoire", "brand", "tokens.json"));
+      console.log(`  ${chalk.green("created")} .grimoire/brand/tokens.json (copied)`);
+      return;
+    }
+  }
+
+  const captureAnswer = await rl.question(
+    `    Capture brand guidelines now? (y/N) `
+  );
+  if (captureAnswer.trim().toLowerCase() !== "y") {
+    console.log(
+      chalk.dim(
+        "    Run `grimoire-design --capture-brand` later to add brand tokens."
+      )
+    );
+    return;
+  }
+
+  const primary = await askHex(rl, "Primary color");
+  const secondary = await askHex(rl, "Secondary color");
+  const accent = await askHex(rl, "Accent color");
+  const fontFamily = (await rl.question(
+    "    Font family (e.g., Inter, sans-serif): "
+  )).trim();
+  const fontSize = (await rl.question("    Base font size (px, e.g., 16): ")).trim();
+  const spacing = (await rl.question("    Base spacing unit (px, e.g., 8): ")).trim();
+  const logo = (await rl.question("    Logo path (optional, Enter to skip): ")).trim();
+  const favicon = (await rl.question(
+    "    Favicon path (optional, Enter to skip): "
+  )).trim();
+  const voiceDo = (await rl.question("    Voice — one do-example: ")).trim();
+  const voiceDont = (await rl.question("    Voice — one don't-example: ")).trim();
+
+  const tokens = buildBrandTokens({
+    primary,
+    secondary,
+    accent,
+    fontFamily,
+    fontSize,
+    spacing,
+    logo,
+    favicon,
+  });
+  await writeFile(
+    join(root, ".grimoire", "brand", "tokens.json"),
+    JSON.stringify(tokens, null, 2) + "\n"
+  );
+  console.log(`  ${chalk.green("created")} .grimoire/brand/tokens.json`);
+
+  await writeFile(
+    join(root, ".grimoire", "brand", "voice.md"),
+    renderVoiceFile(voiceDo, voiceDont)
+  );
+  console.log(`  ${chalk.green("created")} .grimoire/brand/voice.md`);
+}
+
+async function findExistingTokens(root: string): Promise<string | null> {
+  for (const candidate of ["tokens.json", "design-tokens.json"]) {
+    const path = join(root, candidate);
+    if (await fileExists(path)) return path;
+  }
+  return null;
+}
+
+interface BrandInput {
+  primary: string;
+  secondary: string;
+  accent: string;
+  fontFamily: string;
+  fontSize: string;
+  spacing: string;
+  logo: string;
+  favicon: string;
+}
+
+function buildBrandTokens(input: BrandInput): Record<string, unknown> {
+  const tokens: Record<string, unknown> = {
+    color: {
+      primary: { $value: input.primary, $type: "color" },
+      secondary: { $value: input.secondary, $type: "color" },
+      accent: { $value: input.accent, $type: "color" },
+    },
+  };
+  if (input.fontFamily) {
+    tokens.font = {
+      family: { base: { $value: input.fontFamily, $type: "fontFamily" } },
+      ...(input.fontSize
+        ? { size: { base: { $value: `${input.fontSize}px`, $type: "dimension" } } }
+        : {}),
+    };
+  }
+  if (input.spacing) {
+    tokens.spacing = {
+      base: { $value: `${input.spacing}px`, $type: "dimension" },
+    };
+  }
+  if (input.logo || input.favicon) {
+    tokens.asset = {
+      ...(input.logo ? { logo: { $value: input.logo, $type: "asset" } } : {}),
+      ...(input.favicon
+        ? { favicon: { $value: input.favicon, $type: "asset" } }
+        : {}),
+    };
+  }
+  return tokens;
+}
+
+function renderVoiceFile(voiceDo: string, voiceDont: string): string {
+  return [
+    "# Brand Voice & Tone",
+    "",
+    "Captured at `grimoire init`. Edit freely.",
+    "",
+    "## Do",
+    "",
+    `- ${voiceDo}`,
+    "",
+    "## Don't",
+    "",
+    `- ${voiceDont}`,
+    "",
+  ].join("\n");
+}
 
 async function askBugTrackers(
   rl: import("node:readline/promises").Interface

@@ -14,6 +14,7 @@ export const GRIMOIRE_DIRS = [
   ".grimoire/changes",
   ".grimoire/archive",
   ".grimoire/bugs",
+  ".grimoire/brand",
 ];
 
 export const TEMPLATE_FILES: Array<[string, string]> = [
@@ -48,6 +49,8 @@ export const SKILL_NAMES = [
   "grimoire-bug-explore",
   "grimoire-bug-session",
   "grimoire-commit",
+  "grimoire-design",
+  "grimoire-design-consult",
   "grimoire-pr",
   "grimoire-pr-review",
   "grimoire-precommit-review",

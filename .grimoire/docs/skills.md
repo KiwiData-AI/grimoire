@@ -1,5 +1,5 @@
 # Skills
-> Last updated: 2026-04-11
+> Last updated: 2026-05-17
 
 ## Purpose
 Claude Code skill definitions that provide the AI-driven workflow. Each skill is a `SKILL.md` file that Claude Code loads as a slash command (e.g., `/grimoire:draft`). Skills are the primary interface between users and the grimoire workflow.
@@ -28,6 +28,8 @@ Claude Code skill definitions that provide the AI-driven workflow. Each skill is
 | `skills/grimoire-commit/SKILL.md` | Generate contextual commit messages with change trailers |
 | `skills/grimoire-pr/SKILL.md` | Generate PR descriptions from grimoire artifacts |
 | `skills/grimoire-pr-review/SKILL.md` | Review a teammate's PR with multi-persona lens against the actual diff |
+| `skills/grimoire-design/SKILL.md` | Generate UI/UX designs grounded in a user problem — variants, states, brand-token compliance, derived Gherkin |
+| `skills/grimoire-design-consult/SKILL.md` | Pre-design Q&A with security and data personas; distills assumptions, givens, and open questions for handoff |
 
 ## Patterns
 

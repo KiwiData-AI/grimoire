@@ -126,4 +126,118 @@ checks: not-an-array
     expect(config.checks).toContain("lint");
     expect(config.checks).toContain("security");
   });
+
+  it("parses project.surface enum value", async () => {
+    const yaml = `
+version: 2
+project:
+  surface: web
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.surface).toBe("web");
+  });
+
+  it("drops project.surface when value is not in the enum", async () => {
+    const yaml = `
+version: 2
+project:
+  surface: spaceship
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.surface).toBeUndefined();
+  });
+
+  it("parses project.brand_dir override", async () => {
+    const yaml = `
+version: 2
+project:
+  brand_dir: design/brand
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.brand_dir).toBe("design/brand");
+  });
+
+  it("leaves project.brand_dir undefined when absent", async () => {
+    const yaml = `
+version: 2
+project:
+  language: typescript
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.brand_dir).toBeUndefined();
+  });
+
+  it("parses project.design_tool.mcp with command and args", async () => {
+    const yaml = `
+version: 2
+project:
+  design_tool:
+    name: figma
+    mcp:
+      name: figma-dev-mode
+      command: npx
+      args:
+        - "-y"
+        - figma-developer-mcp@latest
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.design_tool?.name).toBe("figma");
+    expect(config.project.design_tool?.mcp?.name).toBe("figma-dev-mode");
+    expect(config.project.design_tool?.mcp?.command).toBe("npx");
+    expect(config.project.design_tool?.mcp?.args).toEqual(["-y", "figma-developer-mcp@latest"]);
+  });
+
+  it("round-trips a config with surface, brand_dir, and design_tool.mcp", async () => {
+    const yaml = `
+version: 2
+project:
+  language: typescript
+  commit_style: conventional
+  surface: mixed
+  brand_dir: .grimoire/brand
+  design_tool:
+    name: figma
+    url: https://figma.com/file/abc
+    mcp:
+      name: figma-dev-mode
+      command: npx
+      args: ["-y", "figma-developer-mcp@latest"]
+      transport: stdio
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project).toMatchObject({
+      language: "typescript",
+      commit_style: "conventional",
+      surface: "mixed",
+      brand_dir: ".grimoire/brand",
+      design_tool: {
+        name: "figma",
+        url: "https://figma.com/file/abc",
+        mcp: {
+          name: "figma-dev-mode",
+          command: "npx",
+          args: ["-y", "figma-developer-mcp@latest"],
+          transport: "stdio",
+        },
+      },
+    });
+  });
 });
