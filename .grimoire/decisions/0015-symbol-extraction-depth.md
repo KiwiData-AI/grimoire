@@ -1,10 +1,15 @@
 ---
-status: accepted
+status: superseded
 date: 2026-04-03
 decision-makers: [Fred]
+superseded-by: 0029-delegate-symbol-intelligence-to-codebase-memory-mcp
+superseded-on: 2026-05-17
 ---
 
 # Symbol extraction limited to signatures (no call graphs)
+
+> **Superseded by [ADR-0029](./0029-delegate-symbol-intelligence-to-codebase-memory-mcp.md) on 2026-05-17.**
+> The in-house extractor described here was removed in favour of delegating symbol/call-graph intelligence entirely to the external `codebase-memory-mcp` MCP server. This ADR is retained for historical context — the original reasoning is below.
 
 ## Context and Problem Statement
 Grimoire's `map --symbols` extracts code symbols for area docs and the plan skill. ADR-0005 decided on regex over tree-sitter for extraction. This decision addresses *what* to extract — should grimoire build call graphs and data flow analysis, or stop at function signatures?
