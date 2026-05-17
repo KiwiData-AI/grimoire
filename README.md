@@ -464,6 +464,8 @@ Grimoire's security capabilities are **AI-mediated at design time**, not static 
 
 This means security coverage depends on: (1) configuring the right tools in your check pipeline, and (2) the AI following its own instructions. Projects that run `grimoire init` with detection get solid defaults. Projects that skip detection should configure `tools.security`, `tools.dep_audit`, and `tools.secrets` in `.grimoire/config.yaml`.
 
+**Supply chain defense.** For apps and services, the review and verify skills treat any dependency add/upgrade without a committed lockfile (and integrity hashes, where the ecosystem supports them) as a **blocker** — motivated by recent npm / PyPI / RubyGems / Cargo maintainer-account compromises that auto-installed through floating version ranges. Per-ecosystem rules cover `package.json` + lockfile (no `^`/`~`/`*`/`latest` for apps), `uv.lock` / `poetry.lock` / `pip-compile --generate-hashes`, `Gemfile.lock` with `CHECKSUMS` (Bundler 2.5+), `Cargo.lock` for binaries, and `go.mod` + `go.sum`. CI must install from the lockfile (`npm ci`, `pnpm install --frozen-lockfile`, `yarn install --immutable`, `uv sync --frozen`, `pip install --require-hashes`, `bundle install --deployment`, `cargo build --locked`, `go build` with `-mod=readonly`). Libraries published to a registry are out of scope — keep compatible ranges in your published manifest. Full ruleset in `skills/references/security-compliance.md`.
+
 Grimoire does not provide compliance framework enforcement (OWASP ASVS checklists, CWE mapping), SBOM generation, artifact signing, or DAST. These require dedicated security tooling.
 
 ## Features
@@ -653,6 +655,7 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | `/grimoire:commit` | Contextual commit messages with change trailers |
 | `/grimoire:pr` | Generate PR description + optional diff review |
 | `/grimoire:pr-review` | Review a teammate's PR with the multi-persona lens |
+| `/grimoire:precommit-review` | Multi-persona review of your own staged/unstaged diff before commit |
 | `/grimoire:design` | Generate UI/UX designs — problem → variants → states → derived Gherkin |
 | `/grimoire:design-consult` | Pre-design Q&A with security and data personas before any artifacts exist |
 
@@ -805,6 +808,16 @@ testing_tools:
 </details>
 
 ## Contributing
+
+Issues and pull requests welcome at [github.com/kiwi-data/grimoire](https://github.com/kiwi-data/grimoire). Grimoire dogfoods itself — `.grimoire/` in this repo is built using grimoire skills, so contributions are expected to go through the same `draft → plan → apply → verify → pr` workflow described above.
+
+**Before opening a PR:**
+
+- `npm run build && npm test && npm run lint` — all green
+- `grimoire check` — pre-commit pipeline green
+- New behavior has a Gherkin scenario in `features/` (or a decision record under `.grimoire/decisions/` if it's an architectural choice)
+- Commit messages include a `Change:` trailer when the work is part of a tracked change
+- For dependency adds/upgrades: lockfile committed, no floating version ranges in `package.json` (see Security model above)
 
 <details>
 <summary>Development setup and project structure</summary>
