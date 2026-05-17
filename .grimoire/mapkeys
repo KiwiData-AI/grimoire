@@ -1,0 +1,65 @@
+# Key files that indicate what a directory is for
+# Format: filename = type
+# Lines starting with # are comments
+
+# Node / JavaScript / TypeScript
+package.json = node-package
+tsconfig.json = typescript-config
+index.ts = module-entry
+index.js = module-entry
+routes.ts = api-routes
+routes.js = api-routes
+middleware.ts = middleware
+middleware.js = middleware
+eslint.config.js = linter-config
+.eslintrc.js = linter-config
+.eslintrc.json = linter-config
+jest.config.js = test-config
+jest.config.ts = test-config
+vitest.config.ts = test-config
+
+# Python
+pyproject.toml = python-package
+setup.py = python-package
+setup.cfg = python-config
+requirements.txt = python-deps
+Pipfile = python-deps
+__init__.py = python-module
+conftest.py = pytest-fixtures
+pytest.ini = test-config
+
+# Django
+urls.py = django-urls
+views.py = django-views
+models.py = django-models
+serializers.py = drf-serializers
+admin.py = django-admin
+apps.py = django-app
+settings.py = django-settings
+manage.py = django-management
+middleware.py = middleware
+
+# FastAPI / Flask
+main.py = app-entry
+app.py = app-entry
+
+# Background tasks
+tasks.py = background-tasks
+celery.py = task-queue
+
+# Database
+alembic.ini = db-migrations
+schema.prisma = db-schema
+
+# Build / Deploy
+Dockerfile = container
+docker-compose.yml = container-orchestration
+docker-compose.yaml = container-orchestration
+Makefile = build-system
+Procfile = deployment
+
+# Go
+go.mod = go-module
+
+# Rust
+Cargo.toml = rust-package

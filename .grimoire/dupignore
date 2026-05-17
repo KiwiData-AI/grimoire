@@ -1,0 +1,93 @@
+# Glob patterns excluded from duplicate detection (jscpd).
+# Matched against paths relative to project root. One glob per line.
+# Lines starting with # are comments.
+#
+# This file is independent of .grimoire/mapignore (structure scan).
+# Edit here to silence duplicate-detection noise without hiding
+# directories from the project map.
+
+# Version control
+**/.git/**
+
+# Dependencies
+**/node_modules/**
+**/.venv/**
+**/venv/**
+**/env/**
+**/vendor/**
+**/bower_components/**
+**/third_party/**
+**/external/**
+**/libs/**
+**/Pods/**
+**/Carthage/**
+**/site-packages/**
+**/deps/**
+**/.pnpm-store/**
+**/.yarn/**
+
+# Build output
+**/dist/**
+**/build/**
+**/.next/**
+**/.nuxt/**
+**/out/**
+**/target/**
+**/.gradle/**
+**/bin/**
+**/obj/**
+
+# Caches
+**/__pycache__/**
+**/.pytest_cache/**
+**/.mypy_cache/**
+**/.ruff_cache/**
+**/.tox/**
+**/.cache/**
+**/.parcel-cache/**
+**/.turbo/**
+
+# Coverage and test artifacts
+**/coverage/**
+**/.nyc_output/**
+**/htmlcov/**
+
+# Generated code — Protobuf, gRPC
+**/*_pb2.py
+**/*_pb2_grpc.py
+**/*.pb.go
+**/*.pb.cc
+**/*.pb.h
+**/*_pb.js
+**/*_pb.d.ts
+**/*.pb.dart
+
+# Generated code — OpenAPI / Swagger clients
+**/generated/**
+**/*_generated.*
+**/*.generated.*
+**/openapi/**
+**/swagger/**
+
+# Generated code — GraphQL
+**/__generated__/**
+**/graphql.schema.json
+
+# Minified / bundled assets
+**/*.min.js
+**/*.min.css
+**/*.bundle.js
+**/*.chunk.js
+
+# Database migrations (often near-duplicate boilerplate)
+**/migrations/**
+**/alembic/versions/**
+
+# Lock files and compiled artifacts
+**/*.lock
+**/*.map
+
+# Snapshots / fixtures (duplication here is intentional)
+**/__snapshots__/**
+**/fixtures/**
+**/testdata/**

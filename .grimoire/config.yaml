@@ -1,0 +1,61 @@
+version: 1
+project:
+  commit_style: conventional
+  language: typescript
+  package_manager: npm
+  doc_tool: sphinx
+  comment_style: sphinx
+  agents:
+    - claude
+  integrations:
+    codebase_memory_mcp: true
+    caveman_plugin: true
+  surface: tui
+  caveman: lite
+features_dir: features
+decisions_dir: .grimoire/decisions
+tools:
+  lint:
+    name: eslint
+    command: npx eslint .
+  unit_test:
+    name: vitest
+    command: npx vitest run
+  security:
+    name: npm audit
+    command: npm audit
+  dep_audit:
+    name: npm audit
+    check_command: npm audit --audit-level=high
+  dead_code:
+    name: knip
+    command: npx knip
+  secrets:
+    name: gitleaks
+    check_command: gitleaks detect --no-git
+  best_practices:
+    name: llm
+    prompt: Review these changed files for best practices violations
+  duplicates:
+    name: jscpd
+    command: npx jscpd --reporters console
+checks:
+  - lint
+  - format
+  - duplicates
+  - complexity
+  - dead_code
+  - unit_test
+  - bdd_test
+  - security
+  - dep_audit
+  # - secrets  # disabled: gitleaks not installed on this machine; re-enable when present
+  - best_practices
+llm:
+  thinking:
+    command: claude
+  coding:
+    command: claude
+bug_trackers:
+  - name: none
+testing_tools: []
