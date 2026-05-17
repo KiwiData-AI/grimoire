@@ -174,6 +174,66 @@ Scan the codebase for data models, ORM definitions, migration files, and schema 
 
 If `.grimoire/docs/data/` already exists, update it rather than regenerating. Diff against existing schema.yml to flag new models or removed fields.
 
+### 5.5 Component Inventory (optional)
+
+Scan the codebase for an existing UI component library, then produce `.grimoire/docs/components.md` documenting reusable components. This inventory lets `grimoire-design` reuse what exists instead of generating duplicate components.
+
+**Detection — component library:**
+
+| Signal | What it tells you |
+|--------|------------------|
+| `components.json` | shadcn/ui — components live under the configured `aliases.components` path (typically `components/ui/`) |
+| `tailwind.config.{js,ts}` | Tailwind project — utility-first; components are project-local |
+| `package.json` deps: `@mui/material` | Material UI — components imported from `@mui/material/*` |
+| `package.json` deps: `@chakra-ui/react` | Chakra UI — components imported from `@chakra-ui/react` |
+| `package.json` deps: `@mantine/core` (or any `mantine` package) | Mantine |
+| `package.json` deps: `@radix-ui/*` | Radix primitives — usually wrapped by shadcn or project components |
+
+**Detection — Storybook:**
+
+| Signal | What it tells you |
+|--------|------------------|
+| `.storybook/main.{ts,js}` | Storybook configured — stories define canonical component variants |
+| `*.stories.{ts,tsx,jsx,js}` | Story files — each story is a documented component variant |
+
+**Skip condition:** If no library signal and no story files are found, emit a single-line note ("No UI component signals detected — skipping component inventory.") and continue to §6. Do not create `components.md`.
+
+**Workflow:**
+1. Detect the library (or libraries) using the signals above
+2. Locate component source files — for shadcn, walk `components/ui/`; for project-local components, look under `src/components/`, `app/components/`, or wherever the convention places them
+3. For each component file, extract: name, file path, exported variants (e.g., `variant="primary|secondary"`), and notable props (especially required ones)
+4. If Storybook is present, walk `*.stories.*` files to harvest the canonical variant list per component — stories are the source of truth for which variants exist
+5. Write `.grimoire/docs/components.md` listing each component with file path, variants, and key props
+
+**`components.md` format:**
+
+```markdown
+# Component Inventory
+> Last updated: YYYY-MM-DD
+> Library: <shadcn | MUI | Chakra | Mantine | project-local | mixed>
+
+## Components
+
+| Component | Location | Variants | Key Props | Notes |
+|-----------|----------|----------|-----------|-------|
+| `Button` | `components/ui/button.tsx` | `default`, `destructive`, `outline`, `ghost`, `link` | `variant`, `size`, `asChild` | Wraps Radix Slot when `asChild` |
+| `Dialog` | `components/ui/dialog.tsx` | — | `open`, `onOpenChange` | Compound: `Dialog`, `DialogTrigger`, `DialogContent` |
+
+## Stories
+<Only if Storybook detected. List story files and the variants they document.>
+
+| Story File | Component | Documented Variants |
+|------------|-----------|---------------------|
+| `Button.stories.tsx` | `Button` | Primary, Secondary, Destructive, Loading |
+```
+
+**Rules:**
+- Document what exists in code, not what should exist. If the project has both shadcn and ad-hoc components, list both and note the inconsistency.
+- Point to source files; do not duplicate component code into the doc.
+- Variants come from prop unions in the type signature OR from the canonical Storybook stories — prefer Storybook when present.
+- Only list components meant for reuse. Skip one-off page-level components (e.g., `LoginPage`) unless they're imported elsewhere.
+- If `.grimoire/docs/components.md` already exists, update it — diff against existing entries to flag new or removed components.
+
 ### 6. Generate Project Context
 
 Scan the codebase for deployment and infrastructure artifacts, then populate `.grimoire/docs/context.yml`. This file captures the project's ecosystem — how it's deployed, what services it talks to, and what infrastructure it depends on. If `context.yml` doesn't exist, copy it from the template first (`grimoire init` creates it, but this handles projects initialized before this feature).
@@ -280,6 +340,7 @@ These are read by `grimoire map` and affect the snapshot this skill consumes.
 - The **plan** skill should read `.grimoire/docs/` before generating tasks — look for existing utilities in the reuse inventory, follow documented patterns
 - The **verify** skill can check new code against documented patterns
 - The **audit** skill can trigger a discover pass as part of onboarding
+- The **design** skill reads `.grimoire/docs/components.md` first to avoid generating duplicate components
 - Run `grimoire map --refresh` periodically to detect new undocumented areas, then `/grimoire:discover` to fill the gaps
 
 ## Important

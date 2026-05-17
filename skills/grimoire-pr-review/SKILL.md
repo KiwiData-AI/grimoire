@@ -92,6 +92,12 @@ Persona scope for PR review:
 - 4.4 QA Engineer — skip if pure internal
 - 4.5 Data Engineer — skip if no migrations / models / schema / external API client touched
 - 4.6 Code Style Reviewer — always
+- 4.7 Adversarial User — engage per matrix in `../references/adversarial-personas.md` when the diff touches a user-facing surface
+- 4.8 Contrarian — runs last when any persona produced a blocker; calibrates other personas' findings post-hoc
+
+### 7.5 Visual Fidelity (cheap tier)
+
+Follow `../references/visual-fidelity.md` for the code-phase invocation (PR diff scope, auto-invoked when `.grimoire/brand/tokens.json` exists). Skip silently when tokens.json is absent and the diff has no styling-surface changes. Fold the engine's output under the "Visual Fidelity" section of the report.
 
 ### 8. Present Findings
 Compile into the standard report layout (§5 of the personas reference):

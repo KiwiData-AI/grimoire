@@ -109,6 +109,12 @@ Persona scope for pre-commit review:
 - 4.4 QA Engineer — only when diff touches user-facing behavior or adds/removes tests
 - 4.5 Data Engineer — only when diff touches migrations / models / schema / external API client
 - 4.6 Code Style Reviewer — always (the highest-value, lowest-cost persona for pre-commit)
+- 4.7 Adversarial User — engage per matrix in `../references/adversarial-personas.md` when the diff touches a user-facing surface
+- 4.8 Contrarian — runs last when any persona produced a blocker; calibrates other personas' findings post-hoc
+
+### 6.5 Visual Fidelity (cheap tier)
+
+Follow `../references/visual-fidelity.md` for the code-phase invocation (staged diff scope, auto-invoked when `.grimoire/brand/tokens.json` exists). Skip silently when tokens.json is absent and the diff has no styling-surface changes. Fold the engine's output under the "Visual Fidelity" section of the report.
 
 ### 7. Present Findings
 

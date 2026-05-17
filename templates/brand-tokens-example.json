@@ -1,0 +1,13 @@
+{
+  "color": {
+    "primary": { "$value": "#0066ff", "$type": "color" }
+  },
+  "font": {
+    "family": {
+      "base": { "$value": "Inter, sans-serif", "$type": "fontFamily" }
+    }
+  },
+  "spacing": {
+    "base": { "$value": "8px", "$type": "dimension" }
+  }
+}

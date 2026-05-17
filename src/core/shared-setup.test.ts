@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCavemanDirective } from "./shared-setup.js";
+import { buildCavemanDirective, SKILL_NAMES } from "./shared-setup.js";
 
 describe("buildCavemanDirective", () => {
   it("returns empty string for none", () => {
@@ -39,5 +39,21 @@ describe("buildCavemanDirective", () => {
   it("includes attribution comment", () => {
     const result = buildCavemanDirective("full");
     expect(result).toContain("github.com/JuliusBrussee/caveman");
+  });
+});
+
+describe("SKILL_NAMES", () => {
+  it("includes grimoire-design and grimoire-design-consult", () => {
+    expect(SKILL_NAMES).toContain("grimoire-design");
+    expect(SKILL_NAMES).toContain("grimoire-design-consult");
+  });
+
+  it("places grimoire-design and grimoire-design-consult adjacently after grimoire-commit", () => {
+    const commitIndex = SKILL_NAMES.indexOf("grimoire-commit");
+    const designIndex = SKILL_NAMES.indexOf("grimoire-design");
+    const consultIndex = SKILL_NAMES.indexOf("grimoire-design-consult");
+    expect(commitIndex).toBeGreaterThanOrEqual(0);
+    expect(designIndex).toBe(commitIndex + 1);
+    expect(consultIndex).toBe(designIndex + 1);
   });
 });

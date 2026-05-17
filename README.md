@@ -157,6 +157,17 @@ For each task:
 
 `grimoire archive` syncs features to baseline, accepts decisions, updates data schema, and archives the manifest.
 
+## For UI/UX designers
+
+Grimoire treats design as a first-class spec input, not an afterthought.
+
+- **Brand capture at init** — `grimoire init` offers to capture colors, type, spacing, and voice into `.grimoire/brand/` (DTCG tokens). Skip-able; can be added later via `grimoire-design --capture-brand`.
+- **Consult (optional)** — `/grimoire:design-consult` runs a pre-design Q&A. Security and data personas interview the designer about the proposed change *before* any artifacts exist, surfacing assumptions and constraints early. No findings, no blockers — just questions whose answers will shape the design.
+- **Design** — `/grimoire:design` walks: problem statement → user flow & pain points → variants (Figma MCP, static HTML, or ASCII) → required component states (default/loading/empty/error) → proposed Gherkin scenarios for each (component × state).
+- **Handoff** — accepted scenarios feed `/grimoire:draft` (manifest + ADRs), then `/grimoire:plan` (tasks), then `/grimoire:review` — **mandatory at complexity 4** with surface-conditional adversarial personas (keyboard, screen-reader, contrast on web; touch + gesture on mobile; keyboard-only on TUI).
+
+Brand-drift lint (`grimoire-design --lint`) cross-references hardcoded colors / px / fonts against `.grimoire/brand/tokens.json` and suggests token replacements. Wired into precommit-review when tokens exist.
+
 ## Walkthrough
 
 Full grimoire cycle end-to-end — adding two-factor authentication to an existing login feature.
@@ -642,6 +653,8 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | `/grimoire:commit` | Contextual commit messages with change trailers |
 | `/grimoire:pr` | Generate PR description + optional diff review |
 | `/grimoire:pr-review` | Review a teammate's PR with the multi-persona lens |
+| `/grimoire:design` | Generate UI/UX designs — problem → variants → states → derived Gherkin |
+| `/grimoire:design-consult` | Pre-design Q&A with security and data personas before any artifacts exist |
 
 </details>
 

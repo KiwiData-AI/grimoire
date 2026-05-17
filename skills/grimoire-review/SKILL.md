@@ -71,6 +71,18 @@ Use the **Design review** table in `../references/review-personas.md` §3 (Compl
 
 User can always override: "run full review" on a level 2, or "just senior engineer" on a level 4.
 
+#### Surface-conditional personas
+
+After complexity gating, filter the adversarial-persona set by project surface:
+
+- Read `project.surface` from `.grimoire/config.yaml`. If absent, default to `mixed` (better to over-engage than silently skip).
+- Apply the activation matrix in `../references/adversarial-personas.md` §Activation Matrix. Engage only the modes whose row matches the surface; skip the rest by default.
+  - Example: `surface: tui` engages keyboard-only and hostile-actor; skips screen-reader, low-vision, touch-target, responsive-breakpoint, low-bandwidth.
+  - Example: `surface: web` engages keyboard-only, screen-reader, low-vision, responsive-breakpoint, low-bandwidth, hostile-actor; skips touch-target.
+  - Example: `surface: api` engages api-conventions and hostile-actor; skips the UI-shaped personas.
+- **Conditional** rows (e.g., RTL / i18n) engage only when a briefing axis flags them — `i18n=N` count > 0 in the feature inventory, or `project.compliance` lists a region requiring RTL.
+- **User override** is always available via conversational invocation: "skip <persona>" drops a default-engaged persona; "just keyboard" engages only that persona; "add <persona>" force-engages a default-skipped one; `--personas=keyboard,low-vision` syntax also accepted. Per ADR-0010 these are AI-interpreted from natural language, not CLI flags.
+
 ### 5. Run Personas
 For each selected persona, follow its evaluation criteria in `../references/review-personas.md` §4 against the **specs and tasks** (no diff exists yet). Apply the materiality gate (§2) — every finding cites a briefing axis or feature-inventory gap, or is dropped.
 
@@ -81,6 +93,12 @@ Persona scope for design review:
 - 4.4 QA Engineer — testability and edge cases (skip if purely internal)
 - 4.5 Data Engineer — schema/migration design (skip if no data.yml and no models touched)
 - 4.6 Code Style Reviewer — **skip** (no code yet; runs only on diff reviews)
+- 4.7 Adversarial User — engage per matrix; criteria in `../references/adversarial-personas.md`
+- 4.8 Contrarian — runs last when any persona produced a blocker; calibrates other personas' findings post-hoc
+
+### 5.5 Visual Fidelity (cheap tier)
+
+Engage when `.grimoire/brand/tokens.json` exists OR the change has design artifacts under `.grimoire/changes/<change-id>/designs/`. Follow `../references/visual-fidelity.md` for the design-phase invocation (HTML preview scope — `designs/preview.html` and any `variant-{n}.html`). Skip silently when neither condition holds.
 
 ### 6. Present Findings
 Compile into the standard report layout (§5 of the personas reference):
@@ -113,7 +131,25 @@ Compile into the standard report layout (§5 of the personas reference):
 - **[blocker]** Missing index on `profiles.user_id` — will cause full table scans on join queries
 (or: "No data changes in this design — skipped.")
 
-## Summary
+## Adversarial User                <!-- omit when no surface-matched personas engaged -->
+- **[blocker]** [keyboard-only] Submit button in `designs/variant-2.html:84` is `<div onclick>` — not focusable
+- **[suggestion]** [low-vision] Body text contrast 4.2:1 in `designs/variant-2.html:120` — below WCAG AA 4.5:1
+
+## Visual Fidelity                 <!-- omit when not engaged (no tokens.json + no design artifacts) -->
+### Token Compliance
+- **[suggestion]** `designs/preview.html:42` hardcoded `#0066ff` — replace with `var(--color-primary)`
+(or: "No brand drift detected across N files scanned.")
+
+### Accessibility (axe-core)
+- **[suggestion]** [axe-color-contrast] `designs/preview.html` — Element has insufficient color contrast 3.8. Impact: serious.
+(or: "axe-core: no violations." / "axe-core not installed — install `@axe-core/cli` for accessibility checks.")
+
+## Contrarian                      <!-- omit when zero findings from all personas -->
+- **[blocker upheld]** ...
+- **[blocker → suggestion]** ...
+- **[finding dropped]** ...
+
+## Summary                         <!-- counts are post-Contrarian -->
 - **N blockers** — must be addressed before coding
 - **M suggestions** — consider addressing
 

@@ -288,4 +288,170 @@ describe("detectTools", () => {
     expect(cs?.name).toBe("sphinx");
     expect(cs?.confidence).toBe("medium");
   });
+
+  // --- Surface detection ---
+
+  it.each([
+    {
+      label: "react",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { react: "^18" } }) },
+    },
+    {
+      label: "vue",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { vue: "^3" } }) },
+    },
+    {
+      label: "svelte",
+      contents: { "package.json": JSON.stringify({ name: "t", devDependencies: { svelte: "^4" } }) },
+    },
+    {
+      label: "next",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { next: "^14" } }) },
+    },
+    {
+      label: "angular",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { "@angular/core": "^17" } }) },
+    },
+    {
+      label: "nuxt",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { nuxt: "^3" } }) },
+    },
+    {
+      label: "astro",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { astro: "^4" } }) },
+    },
+    {
+      label: "remix",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { "@remix-run/react": "^2" } }) },
+    },
+  ])("detects web surface from $label dependency", async ({ contents }) => {
+    withFileContents(contents);
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface?.name).toBe("web");
+    expect(surface?.confidence).toBe("high");
+  });
+
+  it("detects mobile surface from pubspec.yaml (Flutter)", async () => {
+    withFiles(["pubspec.yaml"]);
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface?.name).toBe("mobile");
+  });
+
+  it("detects mobile surface from ios/ + android/ directories (React Native)", async () => {
+    withFiles(["ios", "android"]);
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface?.name).toBe("mobile");
+  });
+
+  it.each([
+    {
+      label: "react-native",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { "react-native": "0.73" } }) },
+    },
+    {
+      label: "expo",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { expo: "^50" } }) },
+    },
+  ])("detects mobile surface from $label dependency", async ({ contents }) => {
+    withFileContents(contents);
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface?.name).toBe("mobile");
+  });
+
+  it.each([
+    {
+      label: "ink",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { ink: "^4" } }) },
+    },
+    {
+      label: "blessed",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { blessed: "^0.1" } }) },
+    },
+    {
+      label: "textual (python)",
+      contents: { "requirements.txt": "textual\n" },
+    },
+    {
+      label: "rich (python)",
+      contents: { "pyproject.toml": "[project]\ndependencies = ['rich']\n" },
+    },
+    {
+      label: "ratatui (rust)",
+      contents: { "Cargo.toml": "[dependencies]\nratatui = '0.26'\n" },
+    },
+    {
+      label: "tui-rs (rust)",
+      contents: { "Cargo.toml": "[dependencies]\ntui-rs = '0.19'\n" },
+    },
+  ])("detects tui surface from $label dependency", async ({ contents }) => {
+    withFileContents(contents);
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface?.name).toBe("tui");
+  });
+
+  it.each([
+    {
+      label: "fastapi",
+      contents: { "requirements.txt": "fastapi\n" },
+    },
+    {
+      label: "flask",
+      contents: { "requirements.txt": "flask\n" },
+    },
+    {
+      label: "django-rest-framework",
+      contents: { "requirements.txt": "djangorestframework\n" },
+    },
+    {
+      label: "express",
+      contents: { "package.json": JSON.stringify({ name: "t", dependencies: { express: "^4" } }) },
+    },
+  ])("detects api surface from $label when no front-end signal", async ({ contents }) => {
+    withFileContents(contents);
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface?.name).toBe("api");
+  });
+
+  it("detects mixed surface for React + Express (web + api)", async () => {
+    withFileContents({
+      "package.json": JSON.stringify({
+        name: "t",
+        dependencies: { react: "^18", express: "^4" },
+      }),
+    });
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface?.name).toBe("mixed");
+  });
+
+  it("treats express alongside react-native as mobile + api → mixed", async () => {
+    withFileContents({
+      "package.json": JSON.stringify({
+        name: "t",
+        dependencies: { "react-native": "0.73", express: "^4" },
+      }),
+    });
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface?.name).toBe("mixed");
+  });
+
+  it("returns no surface detection for a bare directory (greenfield)", async () => {
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface).toBeUndefined();
+  });
+
+  it("returns no surface detection when package.json has no surface signals", async () => {
+    withFileContents({
+      "package.json": JSON.stringify({ name: "t", dependencies: { lodash: "^4" } }),
+    });
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface).toBeUndefined();
+  });
+
+  it("classifies react-native alone as mobile, not web", async () => {
+    withFileContents({
+      "package.json": JSON.stringify({ name: "t", dependencies: { "react-native": "0.73" } }),
+    });
+    const surface = find(await detectTools("/fake"), "surface");
+    expect(surface?.name).toBe("mobile");
+  });
 });

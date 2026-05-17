@@ -71,6 +71,7 @@ export async function detectTools(root: string): Promise<Detection[]> {
     detectDocTool,
     detectCommentStyle,
     detectDeadCode,
+    detectSurface,
   ];
 
   for (const check of checks) {
@@ -441,6 +442,80 @@ async function detectDeadCode(pf: ProjectFiles): Promise<Detection[]> {
   }
 
   return [];
+}
+
+const WEB_DEPS = ["react", "vue", "svelte", "next", "@angular/core", "nuxt", "astro", "@remix-run/react", "remix"];
+const MOBILE_DEPS = ["react-native", "expo"];
+const TUI_NODE_DEPS = ["ink", "blessed"];
+const TUI_PYTHON_PATTERNS = ["textual", "rich"];
+const TUI_RUST_PATTERNS = ["ratatui", "tui-rs"];
+const API_NODE_DEPS = ["express"];
+const API_PYTHON_PATTERNS = ["fastapi", "flask", "djangorestframework", "django-rest-framework"];
+
+function hasAnyDep(pkg: Record<string, unknown>, names: string[]): string | null {
+  for (const name of names) {
+    if (hasDep(pkg, name)) return name;
+  }
+  return null;
+}
+
+function findPattern(haystack: string, needles: string[]): string | null {
+  for (const needle of needles) {
+    if (haystack.includes(needle)) return needle;
+  }
+  return null;
+}
+
+async function detectSurface(pf: ProjectFiles): Promise<Detection[]> {
+  const surfaces = new Map<string, string>();
+
+  if (pf.pkg) {
+    const mobileDep = hasAnyDep(pf.pkg, MOBILE_DEPS);
+    if (mobileDep) surfaces.set("mobile", `${mobileDep} in package.json`);
+
+    // react-native pulls in react; only count "web" deps that aren't already explained by mobile.
+    if (!mobileDep) {
+      const webDep = hasAnyDep(pf.pkg, WEB_DEPS);
+      if (webDep) surfaces.set("web", `${webDep} in package.json`);
+    }
+
+    const tuiNodeDep = hasAnyDep(pf.pkg, TUI_NODE_DEPS);
+    if (tuiNodeDep) surfaces.set("tui", `${tuiNodeDep} in package.json`);
+
+    const apiNodeDep = hasAnyDep(pf.pkg, API_NODE_DEPS);
+    if (apiNodeDep) surfaces.set("api", `${apiNodeDep} in package.json`);
+  }
+
+  if (!surfaces.has("mobile")) {
+    if (await fileExists(join(pf.root, "pubspec.yaml"))) {
+      surfaces.set("mobile", "pubspec.yaml");
+    } else if (
+      (await fileExists(join(pf.root, "ios"))) &&
+      (await fileExists(join(pf.root, "android")))
+    ) {
+      surfaces.set("mobile", "ios/ and android/ directories");
+    }
+  }
+
+  const tuiPython = findPattern(pf.pythonDeps, TUI_PYTHON_PATTERNS);
+  if (tuiPython) surfaces.set("tui", `${tuiPython} in Python dependencies`);
+
+  const cargo = await readFileOrNull(join(pf.root, "Cargo.toml"));
+  const tuiRust = cargo ? findPattern(cargo, TUI_RUST_PATTERNS) : null;
+  if (tuiRust) surfaces.set("tui", `${tuiRust} in Cargo.toml`);
+
+  const apiPython = findPattern(pf.pythonDeps, API_PYTHON_PATTERNS);
+  if (apiPython) surfaces.set("api", `${apiPython} in Python dependencies`);
+
+  if (surfaces.size === 0) return [];
+
+  if (surfaces.size > 1) {
+    const signals = [...surfaces.entries()].map(([s, sig]) => `${s} (${sig})`).join(", ");
+    return [{ category: "surface", name: "mixed", confidence: "high", signal: signals }];
+  }
+
+  const [name, signal] = [...surfaces.entries()][0];
+  return [{ category: "surface", name, confidence: "high", signal }];
 }
 
 async function detectCommentStyle(pf: ProjectFiles): Promise<Detection[]> {

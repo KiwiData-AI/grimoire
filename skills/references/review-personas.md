@@ -20,8 +20,12 @@ Build once, inject as preface to every persona. Findings that don't threaten any
 ### Sources
 
 - `README.md` — first 50 lines or up to first H2 (product framing, audience, stage signals)
-- `.grimoire/config.yaml` — `project.compliance`, `project.language`, `project.comment_style`, `dep_audit`
+- `.grimoire/config.yaml` — `project.compliance`, `project.language`, `project.comment_style`, `project.surface`, `dep_audit`
 - `.grimoire/docs/context.yml` — deployment env, related services (if exists)
+- `.grimoire/docs/components.md` — component-library inventory (if exists)
+- `.grimoire/brand/tokens.json` and `.grimoire/brand/voice.md` — brand axis (if exist; see `./brand-tokens-format.md`)
+- `.grimoire/changes/<id>/consult.md` — pre-design consult assumptions + givens (if exists)
+- `.grimoire/changes/<id>/designs/problem.md` — design problem statement (if exists)
 - Tag histogram across `.grimoire/changes/**/*.feature` + `.grimoire/archive/**/*.feature`
 - All `.grimoire/decisions/*.md` with `status: accepted` — extract ID, title, top Decision Driver
 - Linked manifest's `Why` and `Non-goals` (if a Change trailer / active manifest exists); else PR body or commit messages
@@ -44,9 +48,13 @@ If missing or <200 chars: design review prompts the user once; PR/pre-commit rev
 
 **Product:** <one-line from README>
 **Stage:** <prototype | internal | customer-facing | regulated — inferred from compliance config + README>
+**Surface:** <tui | web | mobile | api | mixed | unknown — from `project.surface`; drives adversarial-persona filtering>
 **Users:** <who, scale, trust level>
 **Data sensitivity:** <none | pii | financial | phi — derived from tag histogram + compliance>
 **Threat surface:** <only tags with count >0, e.g. auth=4, pii=3, payment=2>
+**Brand:** <captured | none — one-line summary of `.grimoire/brand/tokens.json` presence + key tokens>
+**Component library:** <name + path to `.grimoire/docs/components.md` | none documented>
+**Problem statement:** <one-line from `designs/problem.md` | n/a>
 
 **Active constraints (accepted decisions):**
 - ADR-XXXX — <title>
@@ -67,8 +75,11 @@ Total: <N> features across <M> areas.
 ## 2. Materiality Gate
 
 Apply to every persona. Every finding must cite either:
-- A briefing axis it threatens (stage, data sensitivity, active constraint, threat-surface tag), OR
-- A concrete feature-inventory gap
+- A briefing axis it threatens (stage, data sensitivity, active constraint, threat-surface tag, surface), OR
+- A concrete feature-inventory gap, OR
+- A **brand axis** mismatch (e.g., design uses `#FF0000` not in `tokens.json`), OR
+- A **component-inventory gap** (e.g., design introduces a new Button despite an existing variant in `components.md`), OR
+- A **problem-statement mismatch** (e.g., scenario doesn't address the user problem articulated in `designs/problem.md`)
 
 Rules:
 - If the inventory shows the concern is already covered elsewhere, drop the finding or downgrade to a cross-feature integration note.
@@ -119,6 +130,8 @@ Read `complexity` from the linked manifest if available; otherwise infer from th
 | 2 (Simple) | Senior Engineer only; skip others unless touching security or data |
 | 3 (Moderate) | All relevant personas (skip Data if no data changes, skip QA if no user-facing change) |
 | 4 (Complex) | All personas mandatory |
+
+Note: When `project.surface` is set, adversarial personas auto-filter per the activation matrix in `./adversarial-personas.md`. Surface-irrelevant personas (e.g., touch-target on a TUI surface) are skipped by default; the user can still force-engage them via `--personas=...`.
 
 ### Diff review (PR + pre-commit)
 
@@ -275,7 +288,11 @@ Severity:
 
 If the project has no committed style config and neighbors are inconsistent, say so once and move on — don't pick a side.
 
-### 4.7 Contrarian *(runs last, after all other personas submit findings)*
+### 4.7 Adversarial User *(engaged when `project.surface` matches the persona's activation row)*
+
+Surface-conditional personas inhabit users the design might fail: keyboard-only, screen-reader, low-vision / color-blind, touch-target, responsive-breakpoint, RTL / i18n, low-bandwidth / offline, hostile-actor, API-conventions. Full criteria, persona catalog, activation matrix (persona × surface), severity calibration, and steel-man requirement live in `./adversarial-personas.md`. Engagement is gated by `project.surface` — see the activation matrix there. Findings inherit §1 briefing, §2 / §2a / §2b materiality and severity rules. The Contrarian pass (§4.8) calibrates adversarial findings post-hoc on the same terms as the other personas.
+
+### 4.8 Contrarian *(runs last, after all other personas submit findings)*
 
 Inspired by ouroboros/contrarian — adapted for review use. The Contrarian does not submit its own findings against the code. Instead, it **challenges the other personas' findings**, especially blockers, and tunes them. Its goal is to kill the reviewer-overreach failure mode: manufactured blockers, missing steel-mans, finding-by-quota, severity inflation.
 
@@ -283,7 +300,7 @@ Always runs when at least one persona produced a blocker. May be skipped only wh
 
 #### Inputs
 
-- The complete set of findings from §4.1-§4.6 (blockers and suggestions).
+- The complete set of findings from §4.1-§4.7 (blockers and suggestions).
 - The Project Briefing (§1).
 - The diff or design under review.
 
@@ -360,6 +377,10 @@ Each persona returns a short bulleted list. The calling skill compiles them into
 ## Code Style                     <!-- omit on design review -->
 - **[blocker]** `eslint.config.js` rule `no-unused-vars` violated at `src/foo.ts:42`
 - **[suggestion]** Comment at `src/foo.ts:88` describes what the code does — remove (per `AGENTS.md` "Default to writing no comments").
+
+## Adversarial User                <!-- omit when no surface-matched personas engaged -->
+- **[blocker]** [keyboard-only] Submit button at `designs/variant-2.html:84` is `<div onclick>` — not focusable. Steel-man considered (custom styling); harm path holds (user cannot tab to submit).
+- **[suggestion]** [low-vision] Body text contrast 4.2:1 at `designs/variant-2.html:120` — below WCAG AA 4.5:1.
 
 ## Contrarian                     <!-- omit when zero findings from all personas -->
 - **[blocker upheld]** Senior Engineer's auth-bypass finding at `src/api/users.ts:18`. Steel-man: middleware order may guarantee auth runs first. Inspected — the route is mounted outside the auth middleware. Harm path holds.
