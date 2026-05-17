@@ -75,7 +75,7 @@ For changed files, do a lightweight scan:
 | A03: Injection | String concatenation in SQL/commands/templates, `eval()`, `innerHTML` with user data |
 | A04: Insecure Design | Missing rate limiting on auth endpoints, no account lockout |
 | A05: Security Misconfiguration | Debug mode enabled, default credentials, overly permissive CORS |
-| A06: Vulnerable Components | New dependencies without version pins, known-vulnerable packages |
+| A06: Vulnerable Components | Unpinned dependencies (ranges like `^`, `~`, `>=`, `*`), missing/uncommitted lockfile, known-vulnerable packages, recently-transferred or newly-maintained packages (supply-chain attack vector) |
 | A07: Auth Failures | Weak password requirements, session tokens in URLs |
 | A08: Data Integrity Failures | Insecure deserialization (`pickle`, `yaml.load`), missing integrity checks |
 | A09: Logging Failures | Security events not logged, PII/secrets in log output |
@@ -95,6 +95,27 @@ Tag each finding with OWASP category and CWE ID.
 | Hardcoded secrets | A07:2021 / CWE-798 |
 | SSRF | A10:2021 / CWE-918 |
 | Insecure deserialization | A08:2021 / CWE-502 |
+| Unpinned / unverified dependency | A06:2021 / CWE-1357, CWE-829 |
+
+## Supply Chain Defense
+
+Applies to any change that adds or upgrades a dependency, regardless of tags. Recent ecosystem incidents (npm, PyPI, RubyGems, Cargo) show attackers compromising maintainer accounts or transferring packages to push malicious patch releases. Floating version ranges let those releases auto-install on the next build.
+
+**Scope:** these rules apply to **applications and services** (the thing that gets deployed). Libraries published to a registry should keep compatible ranges in their manifest so consumers can resolve — apply pinning only in the library's own dev/test lockfile, not its published manifest.
+
+- **Pin resolved versions via a committed lockfile.** The build must always install the same exact versions and transitive tree that were reviewed.
+  - **npm / pnpm / yarn:** lockfile committed; no `^`, `~`, `>=`, `*`, or `latest` resolving wider than intended in `package.json` for an app.
+  - **Python (pip / uv / poetry):** committed lockfile with hashes (`uv.lock`, `poetry.lock`, or `requirements.txt` generated via `pip-compile --generate-hashes`). Avoid unpinned `requirements.txt`.
+  - **Ruby:** committed `Gemfile.lock`. `Gemfile` may use pessimistic operators; lockfile gates the resolution.
+  - **Cargo:** committed `Cargo.lock` (mandatory for binaries; opt in for libraries used as apps). Caret in `Cargo.toml` is idiomatic — the lockfile is the source of truth.
+  - **Go:** `go.mod` already records exact minimum versions (Minimum Version Selection — no range operators exist), and `go.sum` carries module hashes. Both must be committed.
+- **Install from the lockfile in CI and prod.** `npm ci`, `pnpm install --frozen-lockfile`, `yarn install --frozen-lockfile` (Classic / v1) or `yarn install --immutable` (Berry / v2+), `uv sync --frozen`, `pip install --require-hashes -r requirements.txt`, `bundle install --deployment` (or `bundle config set --local frozen true && bundle install`), `cargo build --locked`, `go build` with `GOFLAGS=-mod=readonly`. Never run a resolver that can mutate the lockfile silently (`npm install`, `bundle install` without frozen, etc.).
+- **Verify integrity hashes** are present in the lockfile (npm `integrity:`, pip `--hash` entries, Cargo `checksum`, Go `h1:`, `Gemfile.lock` `CHECKSUMS` section — opt-in via `bundle lock --add-checksums` on Bundler 2.5+). Reject lockfile entries without them on ecosystems that support hashing.
+- **Vet new packages** — real name (typosquat check against the popular package), non-trivial download count, established maintainers, no ownership transfer in the last ~90 days, no sudden new-maintainer publish.
+- **Run `dep_audit`** (if `config.tools.dep_audit` is configured) against the lockfile before merge. Vulnerable transitive dep = **blocker** unless an override is justified in the change manifest.
+- **Avoid post-install / build scripts** from untrusted packages where possible. Use `--ignore-scripts` (npm) or equivalent in CI when feasible.
+
+A change that adds or upgrades a dependency in an app/service without a committed lockfile (and, for ecosystems that support it, integrity hashes) is a **blocker**. Treat dependency additions as a change to the trust boundary — they execute with the same privileges as your code.
 
 ## Compliance Framework Verification
 

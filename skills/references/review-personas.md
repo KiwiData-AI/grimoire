@@ -211,7 +211,7 @@ Skip categories that don't apply.
 - **Injection**: Raw SQL with string concatenation, shell-exec with user input, `eval`/`exec`, unsafe deserialization. Tag OWASP + CWE.
 - **Input validation**: New endpoints without schema validation, file uploads without size/type limits, path params used directly in filesystem calls.
 - **Auth**: New routes/handlers missing auth decorators / middleware. Compare against neighbors in same file.
-- **Dependencies**: New packages — check name is real (typosquat risk), check `dep_audit` output if committed. Flag packages with zero downloads or suspicious maintainers.
+- **Dependencies**: New packages — pinned to exact version (no `^`/`~`/`>=`/`*`), lockfile updated and committed with integrity hashes, name is real (typosquat risk), `dep_audit` output clean if committed. Flag packages with zero downloads, recent ownership transfer (~90 days), suspicious new maintainers, or post-install scripts. Unpinned dep or missing lockfile entry on a new package = **blocker** (see `./security-compliance.md` § Supply Chain Defense).
 - **PII**: New logging that could emit PII; new storage of personal data without encryption.
 - **Cross-service auth**: If `context.yml` lists related services, are service-to-service calls authenticated?
 
