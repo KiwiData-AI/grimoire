@@ -234,11 +234,9 @@ The debt register is a living document. Recommend:
 
 ## Integration with Other Skills
 
-- **grimoire-health** — the health score reflects some debt dimensions (coverage, complexity, duplicates). Refactoring should improve health scores.
 - **grimoire-audit** — audit finds undocumented features/decisions. Refactor finds code quality issues. They're complementary — run audit first to understand what the code does, then refactor to improve how it does it.
 - **grimoire-discover** — area docs provide context for refactoring. After refactoring, run discover to update docs.
 - **grimoire-review** — the senior engineer persona already checks for simplicity and reuse. Refactor findings can inform review criteria.
-- **grimoire-check** — the commit-time checks prevent new debt. Refactor addresses existing debt.
 
 ## Important
 - **Don't boil the ocean.** Tech debt reduction is incremental. Pick the highest-impact items and make measurable progress. A codebase with zero debt is not the goal — a codebase where debt doesn't slow you down is.
