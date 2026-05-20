@@ -80,11 +80,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockLoadConfig.mockResolvedValue({ ...baseConfig } as any);
   mockExecFileAsync().mockResolvedValue({ stdout: "OK", stderr: "" });
+  vi.spyOn(console, "log").mockImplementation(() => {});
 });
 
 describe("runCheck", () => {
   it("passes all configured steps that succeed", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     // lint, format, unit_test pass via shell; security passes via builtin LLM fallback
     expect(result.passed).toBe(4);
@@ -97,7 +97,6 @@ describe("runCheck", () => {
       ...baseConfig,
       checks: ["lint", "format", "unit_test", "custom_step"],
     } as any);
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.skipped).toBeGreaterThan(0);
   });
@@ -115,7 +114,6 @@ describe("runCheck", () => {
       return { stdout: "OK", stderr: "" };
     });
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: true, changed: false, json: true });
     expect(result.failed).toBe(1);
   });
@@ -133,27 +131,23 @@ describe("runCheck", () => {
       return { stdout: "OK", stderr: "" };
     });
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.failed).toBe(1);
     expect(result.passed).toBe(0);
   });
 
   it("respects skip option", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, skip: ["lint"], json: true });
     // format, unit_test pass via shell; security passes via builtin LLM fallback
     expect(result.passed).toBe(3);
   });
 
   it("runs only specified steps", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ steps: ["lint"], continueOnFail: false, changed: false, json: true });
     expect(result.passed).toBe(1);
   });
 
   it("returns correct summary counts", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: true, changed: false, json: true });
     expect(result.passed + result.failed + result.skipped + result.errored).toBe(4);
   });
@@ -221,9 +215,48 @@ describe("runCheck", () => {
       return { stdout: "OK", stderr: "" };
     });
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.skipped).toBe(1);
+  });
+
+  it("passes LLM step when response has PASS on first line with explanation after", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      tools: { review: { name: "llm", prompt: "Review code" } },
+      checks: ["review"],
+    } as any);
+
+    mockExecFileAsync().mockImplementation(async (cmd: any) => {
+      if (cmd === "which") return { stdout: "/usr/bin/claude", stderr: "" };
+      return { stdout: "OK", stderr: "" };
+    });
+
+    const { spawnWithStdin } = await import("../utils/spawn.js");
+    vi.mocked(spawnWithStdin).mockResolvedValueOnce("PASS\nNo issues found in the changed files.");
+
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.passed).toBe(1);
+  });
+
+  it("fails LLM step when PASS appears only at end of response (not first line)", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      tools: { review: { name: "llm", prompt: "Review code" } },
+      checks: ["review"],
+    } as any);
+
+    mockExecFileAsync().mockImplementation(async (cmd: any) => {
+      if (cmd === "which") return { stdout: "/usr/bin/claude", stderr: "" };
+      return { stdout: "OK", stderr: "" };
+    });
+
+    const { spawnWithStdin } = await import("../utils/spawn.js");
+    vi.mocked(spawnWithStdin).mockResolvedValueOnce(
+      "Referenced file exists. No issues found.\n\n**PASS**"
+    );
+
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.failed).toBe(1);
   });
 
   it("passes LLM step when no changed files to review", async () => {
@@ -239,7 +272,6 @@ describe("runCheck", () => {
     });
     mockGitDiff.mockResolvedValue("");
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: true, json: true });
     expect(result.passed).toBe(1);
   });
@@ -258,7 +290,6 @@ describe("runCheck", () => {
       summary: { critical: 0, warning: 0, suggestion: 0 },
     });
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.passed).toBe(1);
     expect(result.failed).toBe(0);
@@ -279,7 +310,6 @@ describe("runCheck", () => {
       summary: { critical: 1, warning: 0, suggestion: 0 },
     });
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.failed).toBe(1);
   });
@@ -292,7 +322,6 @@ describe("runCheck", () => {
     } as any);
     mockFg.mockResolvedValue([] as any);
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.passed).toBe(1);
     expect(result.skipped).toBe(0);
@@ -307,7 +336,6 @@ describe("runCheck", () => {
       checks: ["doc_style"],
     } as any);
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.skipped).toBe(1);
   });
@@ -321,7 +349,6 @@ describe("runCheck", () => {
     } as any);
     mockCheckDocStyle.mockResolvedValue({ filesChecked: 10, issues: [] });
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.passed).toBe(1);
   });
@@ -338,7 +365,6 @@ describe("runCheck", () => {
       issues: [{ file: "src/app.py", line: 10, severity: "critical" as const, message: "wrong style" }],
     });
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.failed).toBe(1);
   });
@@ -359,7 +385,6 @@ describe("runCheck", () => {
       return { stdout: "OK", stderr: "" };
     });
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     expect(result.skipped).toBe(1);
   });
@@ -371,7 +396,6 @@ describe("runCheck", () => {
       checks: ["complexity"],
     } as any);
 
-    vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     // Should use the configured tool (which our mock makes succeed)
     expect(result.passed).toBe(1);

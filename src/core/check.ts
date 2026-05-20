@@ -1,9 +1,5 @@
-import { writeFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
 import fg from "fast-glob";
@@ -99,7 +95,8 @@ async function runStep(
   if (step === "doc_style") return runDocStyleStep(root, config);
 
   // Complexity: use built-in auto-detect unless an explicit tool is configured
-  if (step === "complexity" && !config.tools[step]?.command && !config.tools[step]?.check_command) {
+  const complexityTool = step === "complexity" ? config.tools[step] : undefined;
+  if (step === "complexity" && !complexityTool?.command && !complexityTool?.check_command && complexityTool?.name !== "llm") {
     return runComplexityStep(root, config);
   }
 
@@ -203,16 +200,17 @@ async function runLlmStep(
     };
   }
 
-  const fileList = files.length > 0 ? `\n\nFiles to review:\n${files.join("\n")}` : "";
-  const fullPrompt = `${prompt}${fileList}\n\nRespond with PASS if no issues found, or FAIL followed by the issues.`;
+  // Strip newlines and backticks from each filename before embedding in the prompt
+  // to prevent a maliciously named file from injecting instructions.
+  const safeFiles = files.map((f) => `\`${f.replace(/[\n\r`]/g, "")}\``).filter((f) => f.length > 2);
+  const fileList = safeFiles.length > 0 ? `\n\nFiles to review:\n${safeFiles.join("\n")}` : "";
+  const fullPrompt = `${prompt}${fileList}\n\nFirst line of your response must be exactly PASS or FAIL (no other text on that line). Then explain any issues on subsequent lines.`;
 
-  const tmpFile = join(tmpdir(), `grimoire-prompt-${randomUUID()}.txt`);
   try {
-    await writeFile(tmpFile, fullPrompt);
-
     const output = await spawnWithStdin(llmCommand, ["--print"], fullPrompt, root);
 
-    const passed = output.toUpperCase().startsWith("PASS");
+    const firstLine = output.trim().split("\n")[0].trim().toUpperCase();
+    const passed = firstLine === "PASS";
 
     return {
       step,
@@ -228,8 +226,6 @@ async function runLlmStep(
       output: err instanceof Error ? err.message : String(err),
       reason: "LLM command failed",
     };
-  } finally {
-    await unlink(tmpFile).catch(() => {});
   }
 }
 
@@ -407,10 +403,12 @@ async function tryEslintComplexity(root: string): Promise<{ output: string; hasW
     await execFileAsync("which", ["npx"]);
     const { stdout, stderr } = await execFileAsync("sh", [
       "-c",
-      "npx eslint --no-eslintrc --rule 'complexity: [warn, 10]' --ext .ts,.tsx,.js,.jsx src/ 2>&1 || true",
+      "npx eslint --rule 'complexity: [warn, 10]' --ext .ts,.tsx,.js,.jsx src/ 2>&1 || true",
     ], { cwd: root, timeout: 60_000 });
     const output = (stdout + stderr).trim();
-    const hasWarnings = output.includes("warning") || output.includes("error");
+    // Match ESLint complexity rule output ("  complexity" at end of warning line).
+    // Avoids false positives from parsing errors or unrelated warnings.
+    const hasWarnings = / complexity$/.test(output);
     return { output, hasWarnings };
   } catch {
     return null;
