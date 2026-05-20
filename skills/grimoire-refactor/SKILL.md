@@ -34,7 +34,7 @@ Each debt item in the register follows a structured format influenced by the Cod
 
 **Required fields:**
 - `id` — unique identifier (debt-NNN, monotonically increasing)
-- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `dead_code`, `test_debt`
+- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `dead_code`, `test_debt`, `pattern_divergence`
 - `severity` — `high`, `medium`, or `low`
 - `location` — file path (with optional `:line`), or `path ↔ path` for relationships
 - `title` — short human-readable summary
@@ -116,6 +116,7 @@ Run applicable scans from the categories in `../references/refactor-scan-categor
 - **Duplication** — uses `.snapshot.json` duplicates or `config.tools.duplicates`
 - **Dead code** — uses `config.tools.dead_code` or `codebase-memory-mcp` graph queries
 - **Test debt** — high complexity + low coverage
+- **Pattern divergence** — code that contradicts established codebase patterns; uses `codebase-memory-mcp` peer group analysis + hallucinated reference detection (skip if graph not indexed)
 
 ### 3. Load Exceptions
 

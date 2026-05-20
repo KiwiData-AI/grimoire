@@ -100,3 +100,75 @@ TODO/FIXME/HACK/XXX comments that have aged.
 - Check for over-mocked tests (testing mocks, not behavior)
 
 **Severity:** high = complex code (top quartile) with <30% coverage, medium = moderate complexity with <50%, low = simple code with low coverage
+
+## 2j. Pattern Divergence
+
+Code that solves a problem in a way that contradicts how the codebase already solves the same class of problem. The primary AI slop signal — structurally valid code that ignores established conventions and accumulates architectural drift.
+
+**Requires:** `codebase-memory-mcp` indexed. Skip this category if graph is not available.
+
+**How to scan:**
+
+**Step 1 — Identify peer groups**
+
+A peer group is a set of nodes in the graph that share the same role. Use `search_graph` to find them:
+
+| Peer group | Query |
+|---|---|
+| API/route handlers | `search_graph(label="Function", name_pattern="(handle|view|endpoint|route|controller)")` |
+| Service methods | `search_graph(label="Function", name_pattern="(service|use_case|interactor)")` |
+| Repository/data access | `search_graph(label="Function", name_pattern="(repo|repository|store|dao|query)")` |
+| Test files | `search_graph(label="Module", name_pattern="(test_|_test|spec)")` |
+| Error handlers | `search_graph(label="Function", name_pattern="(error|exception|fail|catch)")` |
+
+Supplement with area docs if available — each area doc lists files by role.
+
+**Step 2 — Extract modal pattern per peer group**
+
+For each peer group with ≥3 members, sample 3-5 established members (oldest by `git log`, not recently changed):
+- `get_code_snippet(qualified_name)` for each sample
+- Identify the modal pattern across: error handling style, dependency access (injected vs imported), abstraction depth (business logic in handler vs delegated to service), naming convention, return type shape
+
+This is the **baseline** — what the codebase already does.
+
+**Step 3 — Compare recent code against baseline**
+
+Scope: files changed in the last 60 days (`git log --since="60 days ago" --name-only --format=`). Cross-reference with the peer groups from step 1.
+
+For each recently changed file that belongs to a peer group:
+1. `get_code_snippet` for the changed function/class
+2. Compare against the modal pattern from step 2
+3. Flag if it diverges on any of the four critical seams (see below)
+
+**Step 4 — Flag divergences**
+
+Only flag divergence on seams that matter architecturally. Cosmetic drift (whitespace, docstring style) is not a debt item.
+
+| Seam | Divergence signal | Example |
+|---|---|---|
+| **Error handling** | Mix of exception-raise vs return-value-error in same layer | Most handlers raise `ValueError`; new one returns `{"error": ...}` |
+| **Data access** | Bypass of established access layer | Most services call `repo.get()`; new one imports ORM model directly |
+| **Abstraction depth** | Business logic at wrong layer | All handlers delegate; new handler contains domain logic inline |
+| **Dependency wiring** | Injected vs hardcoded import for same dependency | All services receive `db` via constructor; new one calls `get_db()` directly |
+| **Test structure** | Different test strategy in same area | All tests in area use factory fixtures; new tests use heavy mocks |
+
+**Step 5 — Check for hallucinated or non-existent references**
+
+Use `search_graph` to verify function calls in recently changed files:
+- Extract all function calls in the diff using `search_code(pattern)` or `get_code_snippet`
+- For each called function/method: `search_graph(name_pattern=<name>)` — does it exist?
+- Missing = hallucinated API, deprecated method, or invented config option
+
+Flag as `pattern_divergence` with detail: "Called `foo.bar()` — no matching node in graph."
+
+**Severity:**
+- high = divergence at a core architectural seam (data access, error handling, auth) OR hallucinated reference
+- medium = wrong abstraction layer or dependency wiring inconsistency
+- low = test strategy divergence or naming/convention drift
+
+**Suggested action (per seam):**
+- Error handling: align to codebase's exception or result pattern
+- Data access: route through established repository/service layer
+- Abstraction: extract domain logic to service, slim the handler
+- Dependency: adopt constructor injection or established DI pattern
+- Hallucinated ref: replace with actual existing function (use `search_graph` to find it)

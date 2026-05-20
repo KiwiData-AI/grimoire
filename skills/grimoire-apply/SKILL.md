@@ -120,12 +120,17 @@ The parent agent is the **orchestrator only** — it does NOT implement tasks it
    find section <N>, and implement all unchecked tasks in that section.
    Follow the red-green BDD cycle for each task. Mark tasks [x] when done.
 
-   Before writing any production code, read `../references/code-quality.md`
-   and `../references/testing-contracts.md`. Apply the code-quality rules
-   WHILE you write (not after) — reuse before write, trust callers (no defensive
-   guards inside the trust boundary), specific names (no `data`/`result`/`temp`),
-   branching budget ~7, function size ~30 lines, no premature abstraction,
-   comments only for non-obvious WHY.
+   Before writing any production code, read `../references/code-quality.md`,
+   `../references/testing-contracts.md`, and `../references/pattern-guard.md`.
+   Apply the code-quality rules WHILE you write (not after) — reuse before write,
+   trust callers (no defensive guards inside the trust boundary), specific names
+   (no `data`/`result`/`temp`), branching budget ~7, function size ~30 lines,
+   no premature abstraction, comments only for non-obvious WHY.
+   Before writing the test for each task, run the pattern-guard brief (Steps 1–4):
+   classify the code type, find 3–5 peers via search_graph, extract the modal
+   pattern, write a brief. Write code that matches the brief. After writing
+   production code, run the hallucination check (Step 6): verify every called
+   external function exists in the graph before running tests.
 
    When the section is complete, write a <!-- SESSION: ... --> handoff note
    under the last task and exit.
@@ -202,6 +207,7 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
 
 **For each task:**
 1. Announce which task you're working on
+   - **Pattern brief** (before writing anything): classify code type → `search_graph` for 3–5 peers (excluding last 60 days) → `get_code_snippet` → extract modal pattern across the four critical seams (error handling, dependency access, abstraction depth, return shape) → write a 5–8 rule brief. Skip if graph not indexed or < 3 peers. Full instructions in `../references/pattern-guard.md`.
 2. Write the step definitions FIRST (the test that will verify this task)
 3. Run the step definitions — **they MUST FAIL (red)**
 4. If the test passes immediately, STOP. The test is broken — it's not actually testing anything. Fix the step definition so it makes a real assertion that fails without production code. Common causes:
@@ -209,7 +215,7 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
    - Assertion against a mock/fixture that already satisfies the condition
    - Step wired to wrong function or missing the actual check
    - Overly broad assertion that matches anything
-5. Once confirmed red: write the production code to make it pass. **While writing — not after — apply the rules in `../references/code-quality.md`. Do not write the slop version first and clean up later.** Inline rules:
+5. Once confirmed red: write the production code to make it pass. **While writing — not after — apply the rules in `../references/code-quality.md` and the pattern brief from step 1. Do not write the slop version first and clean up later.** Inline rules:
    - **Reuse first.** Grep / check area doc / read neighbors for an existing function before writing a new one. No re-implementation, no one-line wrappers.
    - **Trust your callers.** No `if x is None` / `isinstance` / `try-except` guards inside the trust boundary. Validate at edges (user input, external APIs, file/network) only.
    - **Names reveal intent.** No `data` / `result` / `temp` / `info` / `obj` when a specific name fits. Booleans read as yes/no questions (`is_expired`, `has_admin_role`).
@@ -219,14 +225,15 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
    - **Comments only for *why*, never *what*.** Default: no comment. No comments referencing current task / PR / ticket — they rot.
 6. Run the step definitions again — they should PASS (green)
 7. If still red, fix the production code (not the test)
-8. **Test quality check:** Before marking done, verify your step definitions have strong assertions:
+8. **Hallucination check:** Before running tests, verify every external function/method your new code calls actually exists in the graph: `search_graph(name_pattern="<name>")` for each. If not found: find the correct function or stop and flag to user. Do not run tests against calls to non-existent functions. (Full instructions in `../references/pattern-guard.md` Step 6.)
+9. **Test quality check:** Before marking done, verify your step definitions have strong assertions:
    - Every Then step has a specific `assert` or `expect` with an exact expected value (not `assert True`, not `toBeDefined()`)
    - No empty function bodies (`pass`, `...`, or no-op)
    - Assertions check behavior, not just types or existence — "response status is 302 and redirect URL is /dashboard/" not "response is not None"
    - If you wrote a test that would pass against a null/trivial implementation, strengthen it
-9. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix code, re-run tests, re-check. Do not mark `[x]` while a check fails.
-10. Mark complete: `- [ ]` → `- [x]`
-11. Move to next task
+10. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix code, re-run tests, re-check. Do not mark `[x]` while a check fails.
+11. Mark complete: `- [ ]` → `- [x]`
+12. Move to next task
 
 **This is strict red-green BDD.** A test that has never been red has never proven it can catch a failure. The red step is NOT a formality — it is the proof that the test works. If you skip it or the test passes immediately, you have a false positive that provides zero safety.
 
@@ -271,7 +278,8 @@ Present a brief summary:
 
 ## References
 
-**Before writing code**, read both:
+**Before writing code**, read all three:
+- `../references/pattern-guard.md` — run before each task: classify code type, find peers via `search_graph`, extract modal pattern across four seams (error handling, dependency, abstraction depth, return shape), write a pattern brief. Apply the brief while writing. Run hallucination check after writing (verify called functions exist in graph). Skip if graph not indexed.
 - `../references/code-quality.md` — anti-slop rules to apply *while writing*: reuse before write, trust callers, names reveal intent, branching budget, function size, no premature abstraction, comments only for non-obvious why. Includes a seven-point quality gate to run before marking each task `[x]`.
 - `../references/testing-contracts.md` — verify-before-using rules (imports, packages, APIs), mocking strategy (HTTP boundary not client), fixture management, contract tests, and step definition quality checks.
 
