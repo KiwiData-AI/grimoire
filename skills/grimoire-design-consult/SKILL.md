@@ -42,17 +42,28 @@ These are **conversational invocations** the AI interprets, not commander.js sub
 ## Workflow
 
 ### 1. Collect Minimal Input
-Ask the user for these in one focused prompt — do not interrogate:
+Open with a brief orientation so the designer knows what to expect — display this verbatim before asking anything:
 
-| Input | Required | Notes |
-|---|---|---|
-| Problem statement | yes | One paragraph: what user pain or business need this addresses |
-| Proposed user flow | optional | 1-2 sentences. Skip-with-Enter accepted |
-| Data the design will touch | optional | Free text: "user profiles", "payment methods", "none" all valid |
+> **Design consult** — two expert personas (Security Engineer + Data Engineer) will ask you questions about your idea before any design work begins. Their goal is to surface constraints and assumptions early, not find problems with a finished design.
+>
+> We'll start with your problem statement, then the personas take turns. Each asks **one question at a time** — you'll see `[Persona — Q N/total]` so you always know where you are.
 
-If the user provides only a problem statement, proceed — do not gate on the optional inputs. The personas will ask about the missing pieces themselves; that is the point.
+Collect inputs in three sequential turns — not a combined prompt:
 
-Resolve or create `change-id`. If the user hasn't named one, propose a slug from the problem statement and confirm.
+**Turn 1:** Ask only for the problem statement.
+> What user problem or business need does this design address? (One paragraph is enough.)
+
+If the user provides a clear problem statement, proceed. Do not gate on optional inputs.
+
+**Turn 2:** Derive a change-id slug from the problem statement and confirm in one line.
+> I'll track this change as `<slug>` — OK, or would you prefer a different name? (A "change ID" is just a short folder name we use to group your design artifacts.)
+
+On confirm or no reply, use the slug. On correction, use the user's name.
+
+**Turn 3 (optional context):** Ask for user flow and data together — these are supplementary and the personas will cover what's missing.
+> Two optional questions — type "none" or skip with Enter for either:
+> 1. Proposed user flow (1–2 sentences — e.g. "user taps X → sees Y → confirms Z"). Note: this should describe an existing journey or rough idea, not a solution — the design will derive the flow.
+> 2. What data will this design touch? (e.g. "user profiles", "payment methods", "none")
 
 ### 2. Build the Mini-Briefing
 Follow the briefing pattern in `../references/review-personas.md` §1, but **pared down** for pre-design context. Skip the feature inventory (the change has no features yet) and focus on the axes that matter for security / data Q&A:
@@ -89,11 +100,14 @@ Default personas: **Security Engineer** + **Data Engineer**. Add others only whe
 For each engaged persona:
 - Read the persona's section in `../references/review-personas.md` §4 to understand its concerns (what it cares about, what it would flag in a review).
 - Translate those concerns into clarifying questions for the designer, using the interview patterns in `../references/elicitation-personas.md` for that persona.
-- Ask 5-8 questions per persona by default (3 in "quick consult" mode). One at a time or batched 3-5 per turn — match the user's pace.
+- Determine a question count for this persona: 5 by default; 3 in "quick consult" mode; fewer if the problem statement or briefing already answers likely questions. Announce the count once before the first question: e.g. `Security Engineer — 5 questions.`
+- Ask **one question per turn**. Never list multiple questions in a single message. Prefix every question with its progress marker: `[Security — Q 1/5]`, `[Security — Q 2/5]`, etc.
+- Wait for the answer before asking the next question. Do not hint at or pre-list upcoming questions.
+- Skip questions whose answers are already obvious from the problem statement, briefing, or a prior answer — decrement the count and note it inline: `[Security — Q 3/5 skipped — covered above]`.
 - Questions are conversational. Examples:
   - Security: "What user data flows through this screen?", "Does any of it leave the boundary of our service?", "Is this surface authenticated, or public?", "Are there compliance frameworks (GDPR, HIPAA) that apply to this data?"
   - Data: "What entities does this design touch?", "Are you reading from existing tables or creating new ones?", "If new fields are needed, what's the cardinality and nullability?", "Are there migrations implied?"
-- Do **not** dump a checklist. Skip questions whose answers are already obvious from the problem statement or briefing.
+- Do **not** dump a checklist.
 - Do **not** produce blocker/suggestion findings. If a persona spots a real risk, frame it as a question ("Have you considered what happens if X?") not a verdict ("[blocker] X is wrong").
 
 Record the transcript verbatim for `consult.md` — questions asked, designer's answers, follow-up questions.

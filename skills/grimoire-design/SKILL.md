@@ -120,7 +120,7 @@ If the user attempts to mark the design complete with a required state missing, 
 > Missing `<state>` state. Most "the design didn't work in production"
 > complaints trace to missing error / loading / empty handling.
 
-Ask "Skip `<state>` state? (y/N)". On confirm, log the skip as an unvalidated assumption in `manifest.md`. Infer conditional state upgrades from change context — a form submission upgrades `success` to required; a rate-limited action upgrades `over-limit` to required.
+Ask "Skip `<state>` state? (y/N)". On confirm, log the skip as an unvalidated assumption in `problem.md` under a `## Skipped States` section (created if absent). Infer conditional state upgrades from change context — a form submission upgrades `success` to required; a rate-limited action upgrades `over-limit` to required.
 
 ### 8. Render Preview
 For HTML output, write a single `.grimoire/changes/<change-id>/designs/preview.html` showing each component in each state, side-by-side. Each state is labeled and visually distinct (loading shimmer, error banner, empty placeholder, etc.). Designer opens the file directly in a browser — no `grimoire preview` CLI command exists in v1.
@@ -146,6 +146,39 @@ When the user accepts proposed scenarios, the change folder is populated. Sugges
 > Run `grimoire-draft` to refine the manifest and ADRs, or `grimoire-plan` to break into tasks.
 
 Skill is done.
+
+## Revision Mode
+
+Triggers: user says "revise", "iterate", "refine", "update variant", "change the design", "I want to try again with variant N", "add a state", "update the scenarios", or `--revise`.
+
+Revision mode re-enters an **existing** change without restarting the full workflow. Steps 1–5 (problem statement, user flow, component inventory, brand grounding) are already done — skip them unless the user says the problem itself has changed.
+
+**Revision workflow:**
+
+1. Read the existing artifacts for the change-id: `problem.md`, `designs/variants.md` or `variant-*.html`, `features/`. Show a brief summary of what exists:
+   > Current design: 3 variants (wizard, inline, progressive). Accepted variant: 2. 8 Gherkin scenarios. 4 component states documented.
+
+2. Ask one question: "What would you like to change?"
+
+3. Based on the answer, identify the minimum affected steps and run only those:
+
+   | User says | Re-run |
+   |---|---|
+   | "redo variant 2 with a different pattern" | Step 6 — single variant only |
+   | "add empty state to the search field" | Step 7 — state enumeration for that component |
+   | "the problem is actually X not Y" | Update `problem.md`, re-run step 3 (user flow + pain points), then step 6 for all variants |
+   | "make it more accessible" | Step 9 — re-derive adversarial Gherkin scenarios |
+   | "show me 2 more variants" | Step 6 — additive, do not overwrite existing variants |
+   | "the preview looks wrong" | Step 8 — regenerate preview only |
+
+4. Leave all other artifacts unchanged.
+
+5. If Gherkin scenarios from a prior pass were already accepted, ask before overwriting:
+   > These scenarios were previously accepted — overwrite with revised versions? (y/N)
+
+6. On completion, suggest `grimoire-draft` or `grimoire-plan` if not yet run, or `grimoire-verify` if implementation is already in progress.
+
+**Revision is not a full restart.** If the design direction has fundamentally changed (different surface, new user, different problem), start a new change-id via `grimoire-design` fresh rather than revising.
 
 ## Modes
 

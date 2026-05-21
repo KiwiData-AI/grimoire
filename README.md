@@ -31,7 +31,7 @@ npm install -g @kiwidata/grimoire
 ```
 
 <details>
-<summary>Install from source</summary>
+<summary>Install from source (contributors / development only)</summary>
 
 Requires Node.js 20+ and git.
 
@@ -165,6 +165,7 @@ Grimoire treats design as a first-class spec input, not an afterthought.
 - **Consult (optional)** — `/grimoire:design-consult` runs a pre-design Q&A. Security and data personas interview the designer about the proposed change *before* any artifacts exist, surfacing assumptions and constraints early. No findings, no blockers — just questions whose answers will shape the design.
 - **Design** — `/grimoire:design` walks: problem statement → user flow & pain points → variants (Figma MCP, static HTML, or ASCII) → required component states (default/loading/empty/error) → proposed Gherkin scenarios for each (component × state).
 - **Handoff** — accepted scenarios feed `/grimoire:draft` (manifest + ADRs), then `/grimoire:plan` (tasks), then `/grimoire:review` — **mandatory at complexity 4** with surface-conditional adversarial personas (keyboard, screen-reader, contrast on web; touch + gesture on mobile; keyboard-only on TUI).
+- **Revision** — `/grimoire:design --revise` re-enters an existing design without restarting. Shows current variants and Gherkin, asks what to change, regenerates only the affected artifacts. Previously-accepted scenarios are not overwritten without confirmation.
 
 Brand-drift lint (`grimoire-design --lint`) cross-references hardcoded colors / px / fonts against `.grimoire/brand/tokens.json` and suggests token replacements. Wired into precommit-review when tokens exist.
 
