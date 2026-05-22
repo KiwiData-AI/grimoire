@@ -33,33 +33,60 @@ interface ChangeTrace {
   archived: boolean;
 }
 
+function printChangeEntry(ch: ChangeTrace): void {
+  const status = ch.archived ? chalk.green("archived") : chalk.yellow("active");
+  console.log(`  ${chalk.cyan(ch.changeId)}  ${chalk.dim(ch.date)}  ${status}`);
+  console.log(`  ${ch.summary}`);
+  if (ch.why) console.log(`  ${chalk.dim("Why:")} ${ch.why}`);
+  if (ch.features.length > 0) console.log(`  ${chalk.dim("Features:")} ${ch.features.join(", ")}`);
+  if (ch.decisions.length > 0) console.log(`  ${chalk.dim("Decisions:")} ${ch.decisions.join(", ")}`);
+  console.log();
+}
+
+function printTraceOutput(
+  relFile: string,
+  line: number | undefined,
+  commits: CommitTrace[],
+  changes: ChangeTrace[],
+  changeIds: Set<string>,
+): void {
+  console.log(chalk.bold(`\nTrace: ${relFile}${line ? `:${line}` : ""}\n`));
+
+  console.log(chalk.bold.underline("Commits\n"));
+  for (const c of commits.slice(0, 20)) {
+    const changeTag = c.changeId ? chalk.cyan(` [${c.changeId}]`) : "";
+    console.log(`  ${chalk.dim(c.hash.slice(0, 8))}  ${chalk.dim(c.date)}  ${c.subject}${changeTag}`);
+  }
+  if (commits.length > 20) console.log(chalk.dim(`  ... and ${commits.length - 20} more`));
+
+  if (changes.length > 0) {
+    console.log(chalk.bold.underline("\nLinked Changes\n"));
+    for (const ch of changes) printChangeEntry(ch);
+  } else if (changeIds.size === 0) {
+    console.log(chalk.dim("\nNo grimoire change IDs found in commit trailers.\nCommits without a Change: trailer are not linked to grimoire changes.\n"));
+  }
+}
+
 export async function traceFile(
   target: string,
   options: TraceOptions
 ): Promise<void> {
   const root = await findProjectRoot();
-
-  // Parse target: could be "file.ts", "file.ts:42", or "file.ts:10-20"
   const { file, line } = parseTarget(target);
   const relFile = relative(root, join(process.cwd(), file));
 
-  // Step 1: Get commits that touched this file/line
   const commits = await getCommits(root, relFile, line);
-
   if (commits.length === 0) {
     console.log(chalk.dim(`No git history found for ${relFile}`));
     return;
   }
 
-  // Step 2: Extract change IDs from commit trailers
   const changeIds = new Set<string>();
   for (const c of commits) {
     if (c.changeId) changeIds.add(c.changeId);
   }
 
-  // Step 3: Look up change details from archive and active changes
   const changes = await lookupChanges(root, changeIds);
-
   const result: TraceResult = { file: relFile, line, commits, changes };
 
   if (options.json) {
@@ -67,56 +94,7 @@ export async function traceFile(
     return;
   }
 
-  // Pretty output
-  console.log(chalk.bold(`\nTrace: ${relFile}${line ? `:${line}` : ""}\n`));
-
-  // Show commits
-  console.log(chalk.bold.underline("Commits\n"));
-  for (const c of commits.slice(0, 20)) {
-    const changeTag = c.changeId
-      ? chalk.cyan(` [${c.changeId}]`)
-      : "";
-    console.log(
-      `  ${chalk.dim(c.hash.slice(0, 8))}  ${chalk.dim(c.date)}  ${c.subject}${changeTag}`
-    );
-  }
-  if (commits.length > 20) {
-    console.log(chalk.dim(`  ... and ${commits.length - 20} more`));
-  }
-
-  // Show linked changes
-  if (changes.length > 0) {
-    console.log(chalk.bold.underline("\nLinked Changes\n"));
-    for (const ch of changes) {
-      const status = ch.archived
-        ? chalk.green("archived")
-        : chalk.yellow("active");
-      console.log(
-        `  ${chalk.cyan(ch.changeId)}  ${chalk.dim(ch.date)}  ${status}`
-      );
-      console.log(`  ${ch.summary}`);
-      if (ch.why) {
-        console.log(`  ${chalk.dim("Why:")} ${ch.why}`);
-      }
-      if (ch.features.length > 0) {
-        console.log(
-          `  ${chalk.dim("Features:")} ${ch.features.join(", ")}`
-        );
-      }
-      if (ch.decisions.length > 0) {
-        console.log(
-          `  ${chalk.dim("Decisions:")} ${ch.decisions.join(", ")}`
-        );
-      }
-      console.log();
-    }
-  } else if (changeIds.size === 0) {
-    console.log(
-      chalk.dim(
-        "\nNo grimoire change IDs found in commit trailers.\nCommits without a Change: trailer are not linked to grimoire changes.\n"
-      )
-    );
-  }
+  printTraceOutput(relFile, line, commits, changes, changeIds);
 }
 
 function parseTarget(target: string): { file: string; line?: number } {

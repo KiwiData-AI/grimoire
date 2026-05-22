@@ -60,19 +60,12 @@ export const SKILL_NAMES = [
 
 const SKILL_SHARED_DIRS = ["references"];
 
-/**
- * Build a managed block from the package AGENTS.md content.
- */
+
 function buildManagedBlock(content: string): string {
   return `${GRIMOIRE_START_MARKER}\n${content}\n${GRIMOIRE_END_MARKER}`;
 }
 
-/**
- * Upsert grimoire-managed content into a file using start/end markers.
- * If the file exists with markers, replace the managed section.
- * If the file exists without markers, append the managed section.
- * If the file doesn't exist, create it with the managed section.
- */
+
 async function upsertManagedBlock(
   filePath: string,
   managedBlock: string,
@@ -101,10 +94,7 @@ async function upsertManagedBlock(
   }
 }
 
-/**
- * Build a caveman directive block for the given intensity level.
- * Uses the upstream caveman skill format (github.com/JuliusBrussee/caveman).
- */
+
 export function buildCavemanDirective(level: CavemanLevel): string {
   if (level === "none") return "";
 
@@ -142,9 +132,7 @@ export function buildCavemanDirective(level: CavemanLevel): string {
   return lines.join("\n");
 }
 
-/**
- * Read the package AGENTS.md and upsert its content into the project's AGENTS.md.
- */
+
 export async function upsertAgentsFile(
   root: string,
   packageRoot: string,
@@ -196,9 +184,7 @@ async function upsertInPlaceAgentsFile(
   console.log(`  ${chalk.blue(verb)} AGENTS.md (in-place — stripped stale managed block)`);
 }
 
-/**
- * Ensure all grimoire directories exist (idempotent).
- */
+
 export async function ensureDirectories(
   root: string,
 ): Promise<void> {
@@ -212,10 +198,7 @@ export async function ensureDirectories(
   }
 }
 
-/**
- * Copy template files from the package into the project.
- * By default only creates missing templates. With force=true, overwrites all.
- */
+
 export async function installTemplates(
   root: string,
   packageRoot: string,
@@ -238,9 +221,7 @@ export async function installTemplates(
   }
 }
 
-/**
- * Generate agent-specific instruction files (cursor, copilot).
- */
+
 export async function generateAgentFiles(
   root: string,
   packageRoot: string,
@@ -284,10 +265,7 @@ export async function generateAgentFiles(
   }
 }
 
-/**
- * Auto-detect which agent files exist in the project.
- * Covers cursor, copilot (instruction files) and claude, opencode, codex (skill dirs).
- */
+
 export async function detectAgentFiles(root: string): Promise<string[]> {
   const agents: string[] = [];
   if (await fileExists(join(root, ".cursor", "rules", "grimoire.mdc")))
@@ -300,10 +278,7 @@ export async function detectAgentFiles(root: string): Promise<string[]> {
   return agents;
 }
 
-/**
- * Recursively copy every file under srcDir into destDir, preserving structure.
- * Returns the relative paths of files that were copied (for logging).
- */
+
 async function copyDirRecursive(srcDir: string, destDir: string): Promise<string[]> {
   const copied: string[] = [];
   const walk = async (src: string, dest: string): Promise<void> => {
@@ -324,12 +299,38 @@ async function copyDirRecursive(srcDir: string, destDir: string): Promise<string
   return copied;
 }
 
-/**
- * Copy every file in each skill directory (SKILL.md plus any sibling references)
- * into each selected agent's skill directory. Also copies shared dirs (e.g.
- * skills/references/) once per agent. Unknown agents (cursor, copilot) are
- * ignored — they use instruction files, not skills.
- */
+
+async function installSkillsForAgent(
+  skillsDir: string,
+  relDir: string,
+  skillNames: string[],
+  sourceSkillsDir: string,
+  color: (s: string) => string,
+  verb: string,
+): Promise<void> {
+  for (const skill of skillNames) {
+    let copied: string[];
+    try {
+      copied = await copyDirRecursive(join(sourceSkillsDir, skill), join(skillsDir, skill));
+    } catch {
+      console.log(`  ${chalk.yellow("missing")} skill source ${skill}`);
+      continue;
+    }
+    for (const file of copied) console.log(`  ${color(verb)} ${relDir}/${skill}/${file}`);
+  }
+  for (const shared of SKILL_SHARED_DIRS) {
+    const srcShared = join(sourceSkillsDir, shared);
+    try {
+      const s = await stat(srcShared);
+      if (!s.isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    const copied = await copyDirRecursive(srcShared, join(skillsDir, shared));
+    for (const file of copied) console.log(`  ${color(verb)} ${relDir}/${shared}/${file}`);
+  }
+}
+
 export async function installSkillFiles(
   root: string,
   packageRoot: string,
@@ -345,36 +346,6 @@ export async function installSkillFiles(
 
   for (const agent of targets) {
     const relDir = SKILL_AGENTS[agent];
-    const skillsDir = join(root, relDir);
-
-    for (const skill of skillNames) {
-      const srcSkillDir = join(sourceSkillsDir, skill);
-      const destSkillDir = join(skillsDir, skill);
-      let copied: string[];
-      try {
-        copied = await copyDirRecursive(srcSkillDir, destSkillDir);
-      } catch {
-        console.log(`  ${chalk.yellow("missing")} skill source ${skill}`);
-        continue;
-      }
-      for (const file of copied) {
-        console.log(`  ${color(verb)} ${relDir}/${skill}/${file}`);
-      }
-    }
-
-    for (const shared of SKILL_SHARED_DIRS) {
-      const srcShared = join(sourceSkillsDir, shared);
-      try {
-        const s = await stat(srcShared);
-        if (!s.isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      const destShared = join(skillsDir, shared);
-      const copied = await copyDirRecursive(srcShared, destShared);
-      for (const file of copied) {
-        console.log(`  ${color(verb)} ${relDir}/${shared}/${file}`);
-      }
-    }
+    await installSkillsForAgent(join(root, relDir), relDir, skillNames, sourceSkillsDir, color, verb);
   }
 }

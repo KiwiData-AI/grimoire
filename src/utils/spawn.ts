@@ -1,8 +1,6 @@
 import { spawn } from "node:child_process";
 
-/**
- * Spawn a command with stdin piped, avoiding sh -c shell interpretation.
- */
+
 export function spawnWithStdin(
   command: string,
   args: string[],

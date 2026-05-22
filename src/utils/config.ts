@@ -235,6 +235,20 @@ function parseLlm(raw: Record<string, unknown>): LlmConfig {
   };
 }
 
+function buildConfig(raw: Record<string, unknown>): GrimoireConfig {
+  return {
+    version: Number(raw.version ?? 1),
+    project: parseProject(raw),
+    features_dir: String(raw.features_dir ?? DEFAULT_CONFIG.features_dir),
+    decisions_dir: String(raw.decisions_dir ?? DEFAULT_CONFIG.decisions_dir),
+    tools: parseTools(raw),
+    checks: Array.isArray(raw.checks) ? (raw.checks as string[]) : DEFAULT_CHECKS,
+    llm: parseLlm(raw),
+    bug_trackers: Array.isArray(raw.bug_trackers) ? parseBugTrackers(raw.bug_trackers) : undefined,
+    testing_tools: Array.isArray(raw.testing_tools) ? parseTestingTools(raw.testing_tools) : undefined,
+  };
+}
+
 export async function loadConfig(root?: string): Promise<GrimoireConfig> {
   const projectRoot = root ?? (await findProjectRoot());
   const configPath = join(projectRoot, ".grimoire", "config.yaml");
@@ -258,17 +272,7 @@ export async function loadConfig(root?: string): Promise<GrimoireConfig> {
     return structuredClone(DEFAULT_CONFIG);
   }
 
-  return {
-    version: Number(raw.version ?? 1),
-    project: parseProject(raw),
-    features_dir: String(raw.features_dir ?? DEFAULT_CONFIG.features_dir),
-    decisions_dir: String(raw.decisions_dir ?? DEFAULT_CONFIG.decisions_dir),
-    tools: parseTools(raw),
-    checks: Array.isArray(raw.checks) ? (raw.checks as string[]) : DEFAULT_CHECKS,
-    llm: parseLlm(raw),
-    bug_trackers: Array.isArray(raw.bug_trackers) ? parseBugTrackers(raw.bug_trackers) : undefined,
-    testing_tools: Array.isArray(raw.testing_tools) ? parseTestingTools(raw.testing_tools) : undefined,
-  };
+  return buildConfig(raw);
 }
 
 function parseMcpServer(raw: Record<string, unknown>): McpServer | undefined {

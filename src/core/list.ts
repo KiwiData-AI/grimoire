@@ -17,6 +17,57 @@ interface ChangeInfo {
   featureFiles: string[];
 }
 
+async function buildChangeInfo(changePath: string, changeName: string): Promise<ChangeInfo> {
+  const hasManifest = await fileExists(join(changePath, "manifest.md"));
+  const hasTasks = await fileExists(join(changePath, "tasks.md"));
+  const glob = (await import("fast-glob")).default;
+  const featureFiles = await glob("features/**/*.feature", { cwd: changePath });
+  const hasFeatures = featureFiles.length > 0;
+  const hasDecisions = await dirHasFiles(join(changePath, "decisions"), ".md");
+
+  let status = "draft";
+  let branch: string | null = null;
+  if (hasManifest) {
+    const manifestContent = await readFile(join(changePath, "manifest.md"), "utf-8");
+    const { data: fm } = matter(manifestContent);
+    if (fm.status) status = fm.status;
+    if (fm.branch) branch = fm.branch;
+  }
+
+  return {
+    id: changeName,
+    status,
+    branch,
+    stage: hasTasks ? "planned" : "draft",
+    hasManifest,
+    hasTasks,
+    hasFeatures,
+    hasDecisions,
+    featureFiles,
+  };
+}
+
+function printChangeListOutput(results: ChangeInfo[], conflicts: Conflict[]): void {
+  console.log(chalk.bold("Active changes:\n"));
+  for (const r of results) {
+    const artifacts = [
+      r.hasManifest ? "manifest" : null,
+      r.hasFeatures ? "features" : null,
+      r.hasDecisions ? "decisions" : null,
+      r.hasTasks ? "tasks" : null,
+    ].filter(Boolean).join(", ");
+    const branchInfo = r.branch ? ` ${chalk.dim(`→ ${r.branch}`)}` : "";
+    console.log(`  ${chalk.cyan(r.id)} ${chalk.dim(`[${r.status}]`)} — ${artifacts}${branchInfo}`);
+  }
+  if (conflicts.length > 0) {
+    console.log(chalk.bold.yellow("\nConflicts detected:\n"));
+    for (const c of conflicts) {
+      console.log(`  ${chalk.yellow("!")} ${chalk.bold(c.file)} is touched by: ${c.changes.join(", ")}`);
+    }
+    console.log(chalk.dim("\n  These changes modify the same feature file. Coordinate before applying."));
+  }
+}
+
 export async function listChanges(json: boolean): Promise<void> {
   const root = await findProjectRoot();
   const changesDir = join(root, ".grimoire", "changes");
@@ -26,106 +77,26 @@ export async function listChanges(json: boolean): Promise<void> {
     const changes = entries.filter((e) => e.isDirectory());
 
     if (changes.length === 0) {
-      if (json) {
-        console.log(JSON.stringify([]));
-      } else {
-        console.log("No active changes.");
-      }
+      if (json) console.log(JSON.stringify([]));
+      else console.log("No active changes.");
       return;
     }
 
     const results: ChangeInfo[] = [];
     for (const change of changes) {
-      const changePath = join(changesDir, change.name);
-      const hasManifest = await fileExists(join(changePath, "manifest.md"));
-      const hasTasks = await fileExists(join(changePath, "tasks.md"));
-
-      const glob = (await import("fast-glob")).default;
-      const featureFiles = await glob("features/**/*.feature", {
-        cwd: changePath,
-      });
-      const hasFeatures = featureFiles.length > 0;
-      const hasDecisions = await dirHasFiles(
-        join(changePath, "decisions"),
-        ".md"
-      );
-
-      // Parse manifest frontmatter
-      let status = "draft";
-      let branch: string | null = null;
-      if (hasManifest) {
-        const manifestContent = await readFile(
-          join(changePath, "manifest.md"),
-          "utf-8"
-        );
-        const { data: fm } = matter(manifestContent);
-        if (fm.status) status = fm.status;
-        if (fm.branch) branch = fm.branch;
-      }
-
-      let stage = "draft";
-      if (hasTasks) stage = "planned";
-
-      results.push({
-        id: change.name,
-        status,
-        branch,
-        stage,
-        hasManifest,
-        hasTasks,
-        hasFeatures,
-        hasDecisions,
-        featureFiles,
-      });
+      results.push(await buildChangeInfo(join(changesDir, change.name), change.name));
     }
 
-    // Detect conflicts: multiple changes touching the same feature file
     const conflicts = detectConflicts(results);
 
     if (json) {
-      console.log(
-        JSON.stringify({ changes: results, conflicts }, null, 2)
-      );
+      console.log(JSON.stringify({ changes: results, conflicts }, null, 2));
     } else {
-      console.log(chalk.bold("Active changes:\n"));
-      for (const r of results) {
-        const artifacts = [
-          r.hasManifest ? "manifest" : null,
-          r.hasFeatures ? "features" : null,
-          r.hasDecisions ? "decisions" : null,
-          r.hasTasks ? "tasks" : null,
-        ]
-          .filter(Boolean)
-          .join(", ");
-
-        const branchInfo = r.branch
-          ? ` ${chalk.dim(`→ ${r.branch}`)}`
-          : "";
-        console.log(
-          `  ${chalk.cyan(r.id)} ${chalk.dim(`[${r.status}]`)} — ${artifacts}${branchInfo}`
-        );
-      }
-
-      if (conflicts.length > 0) {
-        console.log(chalk.bold.yellow("\nConflicts detected:\n"));
-        for (const c of conflicts) {
-          console.log(
-            `  ${chalk.yellow("!")} ${chalk.bold(c.file)} is touched by: ${c.changes.join(", ")}`
-          );
-        }
-        console.log(
-          chalk.dim(
-            "\n  These changes modify the same feature file. Coordinate before applying."
-          )
-        );
-      }
+      printChangeListOutput(results, conflicts);
     }
   } catch {
-    if (json) {
-      console.log(JSON.stringify({ changes: [], conflicts: [] }));
-    } else {
-      console.log("No .grimoire/changes/ directory. Run grimoire init first.");
-    }
+    if (json) console.log(JSON.stringify({ changes: [], conflicts: [] }));
+    else console.log("No .grimoire/changes/ directory. Run grimoire init first.");
   }
 }
 

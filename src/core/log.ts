@@ -20,6 +20,25 @@ interface ArchiveEntry {
   scenarios: string[];
 }
 
+function printLogEntry(entry: ArchiveEntry, currentMonth: string): string {
+  const month = entry.date.slice(0, 7);
+  if (month !== currentMonth) {
+    console.log(chalk.bold.underline(`\n${formatMonth(month)}\n`));
+  }
+  console.log(`  ${chalk.dim(entry.date)}  ${chalk.cyan(entry.changeId)}`);
+  console.log(`  ${entry.summary}`);
+  if (entry.features.length > 0) console.log(`  ${chalk.dim("Features:")} ${entry.features.join(", ")}`);
+  if (entry.decisions.length > 0) console.log(`  ${chalk.dim("Decisions:")} ${entry.decisions.join(", ")}`);
+  if (entry.scenarios.length > 0) {
+    const display = entry.scenarios.length <= 3
+      ? entry.scenarios.join(", ")
+      : `${entry.scenarios.slice(0, 3).join(", ")} +${entry.scenarios.length - 3} more`;
+    console.log(`  ${chalk.dim("Scenarios:")} ${display}`);
+  }
+  console.log();
+  return month;
+}
+
 export async function generateLog(options: LogOptions): Promise<void> {
   const root = await findProjectRoot();
   const archiveDir = join(root, ".grimoire", "archive");
@@ -36,21 +55,12 @@ export async function generateLog(options: LogOptions): Promise<void> {
     return;
   }
 
-  // Filter by date range if tags/dates provided
   if (options.from || options.to) {
-    const fromDate = options.from
-      ? await resolveDate(root, options.from)
-      : "";
-    const toDate = options.to
-      ? await resolveDate(root, options.to)
-      : "9999-99-99";
-
-    entries = entries.filter(
-      (e) => e.date >= fromDate && e.date <= toDate
-    );
+    const fromDate = options.from ? await resolveDate(root, options.from) : "";
+    const toDate = options.to ? await resolveDate(root, options.to) : "9999-99-99";
+    entries = entries.filter((e) => e.date >= fromDate && e.date <= toDate);
   }
 
-  // Sort newest first
   entries.sort((a, b) => b.date.localeCompare(a.date));
 
   if (options.json) {
@@ -58,42 +68,11 @@ export async function generateLog(options: LogOptions): Promise<void> {
     return;
   }
 
-  // Pretty output
   console.log(chalk.bold("Grimoire Change Log\n"));
-
   let currentMonth = "";
   for (const entry of entries) {
-    const month = entry.date.slice(0, 7); // YYYY-MM
-    if (month !== currentMonth) {
-      currentMonth = month;
-      console.log(chalk.bold.underline(`\n${formatMonth(month)}\n`));
-    }
-
-    console.log(
-      `  ${chalk.dim(entry.date)}  ${chalk.cyan(entry.changeId)}`
-    );
-    console.log(`  ${entry.summary}`);
-
-    if (entry.features.length > 0) {
-      console.log(
-        `  ${chalk.dim("Features:")} ${entry.features.join(", ")}`
-      );
-    }
-    if (entry.decisions.length > 0) {
-      console.log(
-        `  ${chalk.dim("Decisions:")} ${entry.decisions.join(", ")}`
-      );
-    }
-    if (entry.scenarios.length > 0) {
-      const display =
-        entry.scenarios.length <= 3
-          ? entry.scenarios.join(", ")
-          : `${entry.scenarios.slice(0, 3).join(", ")} +${entry.scenarios.length - 3} more`;
-      console.log(`  ${chalk.dim("Scenarios:")} ${display}`);
-    }
-    console.log();
+    currentMonth = printLogEntry(entry, currentMonth);
   }
-
   console.log(chalk.dim(`${entries.length} change(s) total`));
 }
 
@@ -179,10 +158,7 @@ function parseManifest(content: string): {
   return { summary, why, features, decisions, scenarios };
 }
 
-/**
- * Resolve a git tag or date string to an ISO date.
- * If it looks like a date already, return it. Otherwise try git tag.
- */
+
 async function resolveDate(
   root: string,
   ref: string

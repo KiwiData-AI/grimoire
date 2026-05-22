@@ -10,9 +10,7 @@ export interface Detection {
   check_command?: string;
 }
 
-/**
- * Pre-read shared files once to avoid repeated disk I/O across detectors.
- */
+
 interface ProjectFiles {
   pkg: Record<string, unknown> | null;
   pyproject: string | null;
@@ -133,8 +131,7 @@ async function detectLanguage(pf: ProjectFiles): Promise<Detection[]> {
   return results;
 }
 
-async function detectPackageManager(pf: ProjectFiles): Promise<Detection[]> {
-  // Node
+async function detectNodePkgManager(pf: ProjectFiles): Promise<Detection[] | null> {
   if (await fileExists(join(pf.root, "pnpm-lock.yaml"))) {
     return [{ category: "package_manager", name: "pnpm", confidence: "high", signal: "pnpm-lock.yaml", command: "pnpm" }];
   }
@@ -144,8 +141,10 @@ async function detectPackageManager(pf: ProjectFiles): Promise<Detection[]> {
   if (await fileExists(join(pf.root, "package-lock.json"))) {
     return [{ category: "package_manager", name: "npm", confidence: "high", signal: "package-lock.json", command: "npm" }];
   }
+  return null;
+}
 
-  // Python
+async function detectPythonPkgManager(pf: ProjectFiles): Promise<Detection[] | null> {
   if (await fileExists(join(pf.root, "uv.lock"))) {
     return [{ category: "package_manager", name: "uv", confidence: "high", signal: "uv.lock", command: "uv" }];
   }
@@ -164,15 +163,20 @@ async function detectPackageManager(pf: ProjectFiles): Promise<Detection[]> {
   if (await fileExists(join(pf.root, "requirements.txt"))) {
     return [{ category: "package_manager", name: "pip", confidence: "medium", signal: "requirements.txt", command: "pip" }];
   }
+  return null;
+}
 
-  // Go / Rust
+async function detectPackageManager(pf: ProjectFiles): Promise<Detection[]> {
+  const node = await detectNodePkgManager(pf);
+  if (node) return node;
+  const python = await detectPythonPkgManager(pf);
+  if (python) return python;
   if (await fileExists(join(pf.root, "go.mod"))) {
     return [{ category: "package_manager", name: "go", confidence: "high", signal: "go.mod", command: "go" }];
   }
   if (await fileExists(join(pf.root, "Cargo.toml"))) {
     return [{ category: "package_manager", name: "cargo", confidence: "high", signal: "Cargo.toml", command: "cargo" }];
   }
-
   return [];
 }
 
@@ -208,7 +212,7 @@ async function detectLinter(pf: ProjectFiles): Promise<Detection[]> {
   return [];
 }
 
-async function detectFormatter(pf: ProjectFiles): Promise<Detection[]> {
+async function detectPrettierFormatter(pf: ProjectFiles): Promise<Detection[] | null> {
   for (const f of [
     ".prettierrc", ".prettierrc.js", ".prettierrc.json",
     ".prettierrc.yaml", ".prettierrc.yml", "prettier.config.js", "prettier.config.cjs",
@@ -217,27 +221,29 @@ async function detectFormatter(pf: ProjectFiles): Promise<Detection[]> {
       return [{ category: "format", name: "prettier", confidence: "high", signal: f, check_command: "npx prettier --check ." }];
     }
   }
-
   if (pf.pkg?.prettier) {
     return [{ category: "format", name: "prettier", confidence: "high", signal: "prettier key in package.json", check_command: "npx prettier --check ." }];
   }
+  return null;
+}
+
+async function detectFormatter(pf: ProjectFiles): Promise<Detection[]> {
+  const prettier = await detectPrettierFormatter(pf);
+  if (prettier) return prettier;
 
   if (await fileExists(join(pf.root, "biome.json"))) {
     return [{ category: "format", name: "biome", confidence: "medium", signal: "biome.json", check_command: "npx biome format --check ." }];
   }
-
   if (pf.pyproject?.includes("[tool.black]")) {
     return [{ category: "format", name: "black", confidence: "high", signal: "[tool.black] in pyproject.toml", check_command: "black --check ." }];
   }
-
   if (pf.pyproject?.includes("[tool.ruff.format]") || pf.pyproject?.includes("[tool.ruff]")) {
     return [{ category: "format", name: "ruff", confidence: "medium", signal: "[tool.ruff] in pyproject.toml", check_command: "ruff format --check ." }];
   }
-
   return [];
 }
 
-async function detectUnitTest(pf: ProjectFiles): Promise<Detection[]> {
+async function detectVitestOrJest(pf: ProjectFiles): Promise<Detection[] | null> {
   for (const f of ["vitest.config.ts", "vitest.config.js", "vitest.config.mts"]) {
     if (await fileExists(join(pf.root, f))) {
       return [{ category: "unit_test", name: "vitest", confidence: "high", signal: f, command: "npx vitest run" }];
@@ -246,7 +252,6 @@ async function detectUnitTest(pf: ProjectFiles): Promise<Detection[]> {
   if (pf.pkg && hasDep(pf.pkg, "vitest")) {
     return [{ category: "unit_test", name: "vitest", confidence: "high", signal: "vitest in dependencies", command: "npx vitest run" }];
   }
-
   for (const f of ["jest.config.js", "jest.config.ts", "jest.config.cjs"]) {
     if (await fileExists(join(pf.root, f))) {
       return [{ category: "unit_test", name: "jest", confidence: "high", signal: f, command: "npx jest" }];
@@ -255,6 +260,12 @@ async function detectUnitTest(pf: ProjectFiles): Promise<Detection[]> {
   if (pf.pkg && hasDep(pf.pkg, "jest")) {
     return [{ category: "unit_test", name: "jest", confidence: "high", signal: "jest in dependencies", command: "npx jest" }];
   }
+  return null;
+}
+
+async function detectUnitTest(pf: ProjectFiles): Promise<Detection[]> {
+  const jsTest = await detectVitestOrJest(pf);
+  if (jsTest) return jsTest;
 
   if (await fileExists(join(pf.root, "pytest.ini"))) {
     return [{ category: "unit_test", name: "pytest", confidence: "high", signal: "pytest.ini", command: "pytest" }];
@@ -265,11 +276,9 @@ async function detectUnitTest(pf: ProjectFiles): Promise<Detection[]> {
   if (pf.pyproject?.includes("[tool.pytest")) {
     return [{ category: "unit_test", name: "pytest", confidence: "high", signal: "[tool.pytest] in pyproject.toml", command: "pytest" }];
   }
-
   if (await fileExists(join(pf.root, "go.mod"))) {
     return [{ category: "unit_test", name: "go test", confidence: "medium", signal: "go.mod", command: "go test ./..." }];
   }
-
   return [];
 }
 
@@ -369,6 +378,19 @@ async function detectSecrets(pf: ProjectFiles): Promise<Detection[]> {
   return [];
 }
 
+async function detectJsDocTool(pf: ProjectFiles): Promise<Detection[] | null> {
+  if (pf.pkg && hasDep(pf.pkg, "typedoc")) {
+    return [{ category: "doc_tool", name: "typedoc", confidence: "high", signal: "typedoc in dependencies" }];
+  }
+  if (await fileExists(join(pf.root, "jsdoc.json"))) {
+    return [{ category: "doc_tool", name: "jsdoc", confidence: "high", signal: "jsdoc.json" }];
+  }
+  if (pf.pkg && hasDep(pf.pkg, "jsdoc")) {
+    return [{ category: "doc_tool", name: "jsdoc", confidence: "medium", signal: "jsdoc in dependencies" }];
+  }
+  return null;
+}
+
 async function detectDocTool(pf: ProjectFiles): Promise<Detection[]> {
   if (
     (await fileExists(join(pf.root, "docs", "conf.py"))) ||
@@ -376,35 +398,21 @@ async function detectDocTool(pf: ProjectFiles): Promise<Detection[]> {
   ) {
     return [{ category: "doc_tool", name: "sphinx", confidence: "high", signal: "docs/conf.py" }];
   }
-
   if (await fileExists(join(pf.root, "mkdocs.yml"))) {
     return [{ category: "doc_tool", name: "mkdocs", confidence: "high", signal: "mkdocs.yml" }];
   }
-
-  if (pf.pkg && hasDep(pf.pkg, "typedoc")) {
-    return [{ category: "doc_tool", name: "typedoc", confidence: "high", signal: "typedoc in dependencies" }];
-  }
-
-  if (await fileExists(join(pf.root, "jsdoc.json"))) {
-    return [{ category: "doc_tool", name: "jsdoc", confidence: "high", signal: "jsdoc.json" }];
-  }
-  if (pf.pkg && hasDep(pf.pkg, "jsdoc")) {
-    return [{ category: "doc_tool", name: "jsdoc", confidence: "medium", signal: "jsdoc in dependencies" }];
-  }
-
+  const js = await detectJsDocTool(pf);
+  if (js) return js;
   if (await fileExists(join(pf.root, "Cargo.toml"))) {
     return [{ category: "doc_tool", name: "rustdoc", confidence: "medium", signal: "Cargo.toml (builtin)" }];
   }
-
   if (await fileExists(join(pf.root, "go.mod"))) {
     return [{ category: "doc_tool", name: "godoc", confidence: "medium", signal: "go.mod (builtin)" }];
   }
-
   return [];
 }
 
-async function detectDeadCode(pf: ProjectFiles): Promise<Detection[]> {
-  // Knip (JS/TS) — finds unused files, exports, dependencies, and types
+async function detectJsDeadCode(pf: ProjectFiles): Promise<Detection[] | null> {
   if (pf.pkg && hasDep(pf.pkg, "knip")) {
     return [{ category: "dead_code", name: "knip", confidence: "high", signal: "knip in dependencies", command: "npx knip" }];
   }
@@ -414,33 +422,27 @@ async function detectDeadCode(pf: ProjectFiles): Promise<Detection[]> {
   if (await fileExists(join(pf.root, "knip.ts"))) {
     return [{ category: "dead_code", name: "knip", confidence: "high", signal: "knip.ts", command: "npx knip" }];
   }
-
-  // ts-prune (TypeScript unused exports)
   if (pf.pkg && hasDep(pf.pkg, "ts-prune")) {
     return [{ category: "dead_code", name: "ts-prune", confidence: "high", signal: "ts-prune in dependencies", command: "npx ts-prune" }];
   }
+  return null;
+}
 
-  // Vulture (Python)
+async function detectDeadCode(pf: ProjectFiles): Promise<Detection[]> {
+  const js = await detectJsDeadCode(pf);
+  if (js) return js;
   if (pf.pythonDeps.includes("vulture")) {
     return [{ category: "dead_code", name: "vulture", confidence: "high", signal: "vulture in dependencies", command: "vulture ." }];
   }
-
-  // deadcode (Go)
   if (await fileExists(join(pf.root, "go.mod"))) {
-    // deadcode is a golang.org/x tool, check if it's likely available
     return [{ category: "dead_code", name: "deadcode", confidence: "low", signal: "go.mod (golang.org/x/tools)", command: "deadcode ./..." }];
   }
-
-  // Fallback: if JS/TS project, recommend knip
   if (pf.pkg) {
     return [{ category: "dead_code", name: "knip", confidence: "low", signal: "JS/TS project (knip recommended)", command: "npx knip" }];
   }
-
-  // Fallback: if Python project, recommend vulture
   if (pf.pyproject || pf.pythonDeps) {
     return [{ category: "dead_code", name: "vulture", confidence: "low", signal: "Python project (vulture recommended)", command: "vulture ." }];
   }
-
   return [];
 }
 
@@ -466,80 +468,103 @@ function findPattern(haystack: string, needles: string[]): string | null {
   return null;
 }
 
+async function collectMobileSignal(pf: ProjectFiles): Promise<string | null> {
+  if (pf.pkg) {
+    const dep = hasAnyDep(pf.pkg, MOBILE_DEPS);
+    if (dep) return `${dep} in package.json`;
+  }
+  if (await fileExists(join(pf.root, "pubspec.yaml"))) return "pubspec.yaml";
+  if (
+    (await fileExists(join(pf.root, "ios"))) &&
+    (await fileExists(join(pf.root, "android")))
+  ) {
+    return "ios/ and android/ directories";
+  }
+  return null;
+}
+
+async function collectTuiSignal(pf: ProjectFiles): Promise<string | null> {
+  if (pf.pkg) {
+    const dep = hasAnyDep(pf.pkg, TUI_NODE_DEPS);
+    if (dep) return `${dep} in package.json`;
+  }
+  const tuiPython = findPattern(pf.pythonDeps, TUI_PYTHON_PATTERNS);
+  if (tuiPython) return `${tuiPython} in Python dependencies`;
+  const cargo = await readFileOrNull(join(pf.root, "Cargo.toml"));
+  const tuiRust = cargo ? findPattern(cargo, TUI_RUST_PATTERNS) : null;
+  if (tuiRust) return `${tuiRust} in Cargo.toml`;
+  return null;
+}
+
+function collectWebSignal(pf: ProjectFiles, hasMobile: boolean): string | null {
+  if (!hasMobile && pf.pkg) {
+    const dep = hasAnyDep(pf.pkg, WEB_DEPS);
+    if (dep) return `${dep} in package.json`;
+  }
+  return null;
+}
+
+function collectApiSignal(pf: ProjectFiles): string | null {
+  if (pf.pkg) {
+    const dep = hasAnyDep(pf.pkg, API_NODE_DEPS);
+    if (dep) return `${dep} in package.json`;
+  }
+  const apiPython = findPattern(pf.pythonDeps, API_PYTHON_PATTERNS);
+  if (apiPython) return `${apiPython} in Python dependencies`;
+  return null;
+}
+
 async function detectSurface(pf: ProjectFiles): Promise<Detection[]> {
   const surfaces = new Map<string, string>();
 
-  if (pf.pkg) {
-    const mobileDep = hasAnyDep(pf.pkg, MOBILE_DEPS);
-    if (mobileDep) surfaces.set("mobile", `${mobileDep} in package.json`);
+  const mobileSignal = await collectMobileSignal(pf);
+  if (mobileSignal) surfaces.set("mobile", mobileSignal);
 
-    // react-native pulls in react; only count "web" deps that aren't already explained by mobile.
-    if (!mobileDep) {
-      const webDep = hasAnyDep(pf.pkg, WEB_DEPS);
-      if (webDep) surfaces.set("web", `${webDep} in package.json`);
-    }
+  const webSignal = collectWebSignal(pf, surfaces.has("mobile"));
+  if (webSignal) surfaces.set("web", webSignal);
 
-    const tuiNodeDep = hasAnyDep(pf.pkg, TUI_NODE_DEPS);
-    if (tuiNodeDep) surfaces.set("tui", `${tuiNodeDep} in package.json`);
+  const tuiSignal = await collectTuiSignal(pf);
+  if (tuiSignal) surfaces.set("tui", tuiSignal);
 
-    const apiNodeDep = hasAnyDep(pf.pkg, API_NODE_DEPS);
-    if (apiNodeDep) surfaces.set("api", `${apiNodeDep} in package.json`);
-  }
-
-  if (!surfaces.has("mobile")) {
-    if (await fileExists(join(pf.root, "pubspec.yaml"))) {
-      surfaces.set("mobile", "pubspec.yaml");
-    } else if (
-      (await fileExists(join(pf.root, "ios"))) &&
-      (await fileExists(join(pf.root, "android")))
-    ) {
-      surfaces.set("mobile", "ios/ and android/ directories");
-    }
-  }
-
-  const tuiPython = findPattern(pf.pythonDeps, TUI_PYTHON_PATTERNS);
-  if (tuiPython) surfaces.set("tui", `${tuiPython} in Python dependencies`);
-
-  const cargo = await readFileOrNull(join(pf.root, "Cargo.toml"));
-  const tuiRust = cargo ? findPattern(cargo, TUI_RUST_PATTERNS) : null;
-  if (tuiRust) surfaces.set("tui", `${tuiRust} in Cargo.toml`);
-
-  const apiPython = findPattern(pf.pythonDeps, API_PYTHON_PATTERNS);
-  if (apiPython) surfaces.set("api", `${apiPython} in Python dependencies`);
+  const apiSignal = collectApiSignal(pf);
+  if (apiSignal) surfaces.set("api", apiSignal);
 
   if (surfaces.size === 0) return [];
-
   if (surfaces.size > 1) {
     const signals = [...surfaces.entries()].map(([s, sig]) => `${s} (${sig})`).join(", ");
     return [{ category: "surface", name: "mixed", confidence: "high", signal: signals }];
   }
-
   const [name, signal] = [...surfaces.entries()][0];
   return [{ category: "surface", name, confidence: "high", signal }];
 }
 
-async function detectCommentStyle(pf: ProjectFiles): Promise<Detection[]> {
-  if (pf.pyproject?.includes('convention = "google"')) {
+function detectPyprojectConvention(pyproject: string): Detection[] | null {
+  if (pyproject.includes('convention = "google"')) {
     return [{ category: "comment_style", name: "google", confidence: "high", signal: 'convention = "google" in pyproject.toml' }];
   }
-  if (pf.pyproject?.includes('convention = "numpy"')) {
+  if (pyproject.includes('convention = "numpy"')) {
     return [{ category: "comment_style", name: "numpy", confidence: "high", signal: 'convention = "numpy" in pyproject.toml' }];
   }
-  if (pf.pyproject?.includes('convention = "pep257"')) {
+  if (pyproject.includes('convention = "pep257"')) {
     return [{ category: "comment_style", name: "pep257", confidence: "high", signal: 'convention = "pep257" in pyproject.toml' }];
   }
+  return null;
+}
 
+async function detectCommentStyle(pf: ProjectFiles): Promise<Detection[]> {
+  if (pf.pyproject) {
+    const convention = detectPyprojectConvention(pf.pyproject);
+    if (convention) return convention;
+  }
   if (
     (await fileExists(join(pf.root, "docs", "conf.py"))) ||
     (await fileExists(join(pf.root, "doc", "conf.py")))
   ) {
     return [{ category: "comment_style", name: "sphinx", confidence: "medium", signal: "sphinx docs present" }];
   }
-
   if (pf.pkg && (hasDep(pf.pkg, "typedoc") || hasDep(pf.pkg, "jsdoc"))) {
     const name = hasDep(pf.pkg, "typedoc") ? "tsdoc" : "jsdoc";
     return [{ category: "comment_style", name, confidence: "medium", signal: `${name === "tsdoc" ? "typedoc" : "jsdoc"} in dependencies` }];
   }
-
   return [];
 }

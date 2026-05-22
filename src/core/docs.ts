@@ -186,6 +186,30 @@ async function buildArchitectureSection(
 
 // --- Features ---
 
+async function renderFeatureEntry(file: string, featuresDir: string): Promise<string[]> {
+  const content = await safeRead(file);
+  if (!content) return [];
+  const rel = relative(featuresDir, file);
+  const titleMatch = content.match(/^Feature:\s*(.+)$/m);
+  const title = titleMatch ? titleMatch[1].trim() : rel;
+  const storyLines: string[] = [];
+  const storyPattern = /^\s+(As an?|I want|So that)\s+(.+)$/gm;
+  let m;
+  while ((m = storyPattern.exec(content)) !== null) {
+    storyLines.push(`${m[1]} ${m[2]}`);
+  }
+  const lines: string[] = [];
+  lines.push(`**${title}** (\`features/${rel}\`)`);
+  if (storyLines.length > 0) lines.push(`> ${storyLines.join(" · ")}`);
+  lines.push("");
+  const scenarios = content.match(/^\s*Scenario(?: Outline)?:\s*(.+)$/gm);
+  if (scenarios) {
+    for (const s of scenarios) lines.push(`- ${s.replace(/^\s*Scenario(?: Outline)?:\s*/, "")}`);
+    lines.push("");
+  }
+  return lines;
+}
+
 async function buildFeaturesSection(
   root: string
 ): Promise<string | null> {
@@ -201,11 +225,8 @@ async function buildFeaturesSection(
   if (featureFiles.length === 0) return null;
 
   const lines: string[] = ["## Features\n"];
-  lines.push(
-    "Behavioral specifications in Gherkin. Each scenario is an executable acceptance test.\n"
-  );
+  lines.push("Behavioral specifications in Gherkin. Each scenario is an executable acceptance test.\n");
 
-  // Group by capability (first directory level)
   const byCapability = new Map<string, string[]>();
   for (const file of featureFiles) {
     const rel = relative(featuresDir, file);
@@ -215,44 +236,9 @@ async function buildFeaturesSection(
   }
 
   for (const [capability, files] of byCapability) {
-    lines.push(
-      `### ${capability.charAt(0).toUpperCase() + capability.slice(1)}\n`
-    );
-
+    lines.push(`### ${capability.charAt(0).toUpperCase() + capability.slice(1)}\n`);
     for (const file of files) {
-      const content = await safeRead(file);
-      if (!content) continue;
-
-      const rel = relative(featuresDir, file);
-
-      // Extract feature title and user story
-      const titleMatch = content.match(/^Feature:\s*(.+)$/m);
-      const title = titleMatch ? titleMatch[1].trim() : rel;
-
-      const storyLines: string[] = [];
-      const storyPattern = /^\s+(As an?|I want|So that)\s+(.+)$/gm;
-      let m;
-      while ((m = storyPattern.exec(content)) !== null) {
-        storyLines.push(`${m[1]} ${m[2]}`);
-      }
-
-      lines.push(`**${title}** (\`features/${rel}\`)`);
-      if (storyLines.length > 0) {
-        lines.push(`> ${storyLines.join(" · ")}`);
-      }
-      lines.push("");
-
-      // Extract scenarios
-      const scenarios = content.match(
-        /^\s*Scenario(?: Outline)?:\s*(.+)$/gm
-      );
-      if (scenarios) {
-        for (const s of scenarios) {
-          const name = s.replace(/^\s*Scenario(?: Outline)?:\s*/, "");
-          lines.push(`- ${name}`);
-        }
-        lines.push("");
-      }
+      lines.push(...(await renderFeatureEntry(file, featuresDir)));
     }
   }
 
@@ -335,6 +321,19 @@ function renderInternalModels(
   return lines;
 }
 
+function renderEndpointsTable(
+  endpoints: Record<string, Record<string, unknown>>
+): string[] {
+  const lines: string[] = ["", "| Endpoint | Method | Path |", "|----------|--------|------|"];
+  for (const [ename, edef] of Object.entries(endpoints)) {
+    if (!edef || typeof edef !== "object") continue;
+    const method = String(edef.method ?? edef.type ?? "—");
+    const path = edef.path ? String(edef.path) : "—";
+    lines.push(`| ${ename} | ${method} | \`${path}\` |`);
+  }
+  return lines;
+}
+
 function renderExternalApis(
   apis: [string, Record<string, unknown>][]
 ): string[] {
@@ -344,32 +343,14 @@ function renderExternalApis(
     const provider = def.provider ? ` (${def.provider})` : "";
     lines.push(`#### ${name}${provider}\n`);
 
-    if (def.schema_ref) {
-      lines.push(`- **Schema**: ${def.schema_ref}`);
-    }
-    if (def.client) {
-      lines.push(`- **Client**: \`${def.client}\``);
-    }
-    if (def.auth) {
-      lines.push(`- **Auth**: ${def.auth}`);
-    }
-    if (def.note) {
-      lines.push(`- ${def.note}`);
-    }
+    if (def.schema_ref) lines.push(`- **Schema**: ${def.schema_ref}`);
+    if (def.client) lines.push(`- **Client**: \`${def.client}\``);
+    if (def.auth) lines.push(`- **Auth**: ${def.auth}`);
+    if (def.note) lines.push(`- ${def.note}`);
 
-    const endpoints = def.endpoints as
-      | Record<string, Record<string, unknown>>
-      | undefined;
+    const endpoints = def.endpoints as Record<string, Record<string, unknown>> | undefined;
     if (endpoints && typeof endpoints === "object") {
-      lines.push("");
-      lines.push("| Endpoint | Method | Path |");
-      lines.push("|----------|--------|------|");
-      for (const [ename, edef] of Object.entries(endpoints)) {
-        if (!edef || typeof edef !== "object") continue;
-        const method = String(edef.method ?? edef.type ?? "—");
-        const path = edef.path ? String(edef.path) : "—";
-        lines.push(`| ${ename} | ${method} | \`${path}\` |`);
-      }
+      lines.push(...renderEndpointsTable(endpoints));
     }
     lines.push("");
   }
@@ -377,30 +358,27 @@ function renderExternalApis(
   return lines;
 }
 
+function buildFieldConstraints(fdef: Record<string, unknown>): string {
+  const constraints: string[] = [];
+  if (fdef.pk) constraints.push("PK");
+  if (fdef.unique) constraints.push("unique");
+  if (fdef.not_null) constraints.push("not null");
+  if (fdef.default !== undefined) constraints.push(`default: ${fdef.default}`);
+  if (fdef.ref) constraints.push(`→ ${fdef.ref}`);
+  if (fdef.note) constraints.push(String(fdef.note));
+  return constraints.join(", ") || "—";
+}
+
 function renderFieldsTable(
   fields: Record<string, Record<string, unknown>>
 ): string[] {
-  const lines: string[] = [];
-
-  lines.push("| Field | Type | Constraints |");
-  lines.push("|-------|------|-------------|");
+  const lines: string[] = ["| Field | Type | Constraints |", "|-------|------|-------------|"];
   for (const [fname, fdef] of Object.entries(fields)) {
     if (!fdef || typeof fdef !== "object") continue;
     const ftype = String(fdef.type ?? "unknown");
-    const constraints: string[] = [];
-    if (fdef.pk) constraints.push("PK");
-    if (fdef.unique) constraints.push("unique");
-    if (fdef.not_null) constraints.push("not null");
-    if (fdef.default !== undefined)
-      constraints.push(`default: ${fdef.default}`);
-    if (fdef.ref) constraints.push(`→ ${fdef.ref}`);
-    if (fdef.note) constraints.push(String(fdef.note));
-    lines.push(
-      `| ${fname} | ${ftype} | ${constraints.join(", ") || "—"} |`
-    );
+    lines.push(`| ${fname} | ${ftype} | ${buildFieldConstraints(fdef)} |`);
   }
   lines.push("");
-
   return lines;
 }
 
@@ -421,6 +399,31 @@ function renderRelationships(
 
 // --- Decisions ---
 
+async function renderDecisionRow(file: string, decisionsDir: string): Promise<string | null> {
+  const content = await safeRead(join(decisionsDir, file));
+  if (!content) return null;
+  const { data: fm } = matter(content);
+  const status = fm.status ? String(fm.status).trim() : "—";
+  const date = fm.date ? String(fm.date).trim() : "—";
+  const titleMatch = content.match(/^#\s+(.+)$/m);
+  const title = titleMatch ? titleMatch[1].trim() : file;
+  const num = file.match(/^(\d+)/)?.[1] ?? "—";
+  return `| ${num} | ${title} | ${status} | ${date} |`;
+}
+
+async function renderDecisionDetail(file: string, decisionsDir: string): Promise<string[] | null> {
+  const content = await safeRead(join(decisionsDir, file));
+  if (!content) return null;
+  const titleMatch = content.match(/^#\s+(.+)$/m);
+  const title = titleMatch ? titleMatch[1].trim() : file;
+  const contextMatch = content.match(/^## Context and Problem Statement\s*\n([\s\S]*?)(?=^## )/m);
+  const outcomeMatch = content.match(/^## Decision Outcome\s*\n([\s\S]*?)(?=^## |^### Consequences)/m);
+  const lines: string[] = [`### ${title}\n`];
+  if (contextMatch) { lines.push(contextMatch[1].trim()); lines.push(""); }
+  if (outcomeMatch) { lines.push(`**Outcome:** ${outcomeMatch[1].trim()}`); lines.push(""); }
+  return lines;
+}
+
 async function buildDecisionsSection(
   root: string
 ): Promise<string | null> {
@@ -429,68 +432,29 @@ async function buildDecisionsSection(
   let files: string[];
   try {
     const entries = await readdir(decisionsDir);
-    files = entries
-      .filter((f) => f.endsWith(".md") && f !== "template.md")
-      .sort();
+    files = entries.filter((f) => f.endsWith(".md") && f !== "template.md").sort();
   } catch {
     return null;
   }
 
   if (files.length === 0) return null;
 
-  const lines: string[] = ["## Architecture Decisions\n"];
-  lines.push(
-    "Key decisions recorded as MADR (Markdown Any Decision Records).\n"
-  );
-
-  lines.push("| # | Decision | Status | Date |");
-  lines.push("|---|----------|--------|------|");
+  const lines: string[] = [
+    "## Architecture Decisions\n",
+    "Key decisions recorded as MADR (Markdown Any Decision Records).\n",
+    "| # | Decision | Status | Date |",
+    "|---|----------|--------|------|",
+  ];
 
   for (const file of files) {
-    const content = await safeRead(join(decisionsDir, file));
-    if (!content) continue;
-
-    // Extract frontmatter
-    const { data: fm } = matter(content);
-    const status = fm.status ? String(fm.status).trim() : "—";
-    const date = fm.date ? String(fm.date).trim() : "—";
-
-    // Extract title
-    const titleMatch = content.match(/^#\s+(.+)$/m);
-    const title = titleMatch ? titleMatch[1].trim() : file;
-
-    const num = file.match(/^(\d+)/)?.[1] ?? "—";
-
-    lines.push(
-      `| ${num} | ${title} | ${status} | ${date} |`
-    );
+    const row = await renderDecisionRow(file, decisionsDir);
+    if (row) lines.push(row);
   }
 
-  // Add detail sections for each decision
   lines.push("");
   for (const file of files) {
-    const content = await safeRead(join(decisionsDir, file));
-    if (!content) continue;
-
-    const titleMatch = content.match(/^#\s+(.+)$/m);
-    const title = titleMatch ? titleMatch[1].trim() : file;
-
-    const contextMatch = content.match(
-      /^## Context and Problem Statement\s*\n([\s\S]*?)(?=^## )/m
-    );
-    const outcomeMatch = content.match(
-      /^## Decision Outcome\s*\n([\s\S]*?)(?=^## |^### Consequences)/m
-    );
-
-    lines.push(`### ${title}\n`);
-    if (contextMatch) {
-      lines.push(contextMatch[1].trim());
-      lines.push("");
-    }
-    if (outcomeMatch) {
-      lines.push(`**Outcome:** ${outcomeMatch[1].trim()}`);
-      lines.push("");
-    }
+    const detail = await renderDecisionDetail(file, decisionsDir);
+    if (detail) lines.push(...detail);
   }
 
   return lines.join("\n");

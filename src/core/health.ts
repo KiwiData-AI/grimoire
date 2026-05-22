@@ -290,85 +290,69 @@ async function checkTestCoverage(root: string): Promise<Metric> {
   };
 }
 
-async function checkUnitTestCoverage(
+async function readCoverageFromFiles(
+  coveragePaths: string[],
   root: string,
-  config: Awaited<ReturnType<typeof loadConfig>>
-): Promise<Metric> {
-  // Try to get coverage from common coverage report locations
-  const coveragePaths = [
-    join(root, "coverage", "coverage-summary.json"), // jest/vitest
-    join(root, "htmlcov", "status.json"), // pytest-cov
-    join(root, ".coverage.json"), // custom
-    join(root, "coverage.json"),
-  ];
-
+): Promise<Metric | null> {
   for (const coveragePath of coveragePaths) {
     try {
-      const content = await readFile(coveragePath, "utf-8");
-      const data = JSON.parse(content);
-
-      // jest/vitest format
+      const data = JSON.parse(await readFile(coveragePath, "utf-8"));
       if (data.total?.lines?.pct !== undefined) {
         const pct = Math.round(data.total.lines.pct);
-        return {
-          name: "unit_coverage",
-          score: pct,
-          label: `${pct}% line coverage`,
-          detail: relative(root, coveragePath),
-        };
+        return { name: "unit_coverage", score: pct, label: `${pct}% line coverage`, detail: relative(root, coveragePath) };
       }
-
-      // pytest-cov JSON format
       if (data.totals?.percent_covered !== undefined) {
         const pct = Math.round(data.totals.percent_covered);
-        return {
-          name: "unit_coverage",
-          score: pct,
-          label: `${pct}% line coverage`,
-          detail: relative(root, coveragePath),
-        };
+        return { name: "unit_coverage", score: pct, label: `${pct}% line coverage`, detail: relative(root, coveragePath) };
       }
     } catch {
       continue;
     }
   }
+  return null;
+}
 
-  // Try running coverage command if configured
+async function runCoverageCommand(
+  unitTool: { name: string; command?: string },
+  config: Awaited<ReturnType<typeof loadConfig>>,
+  root: string,
+): Promise<Metric | null> {
+  const coverageCmd = detectCoverageCommand(unitTool, config);
+  if (!coverageCmd) return null;
+  try {
+    const { stdout } = await execFileAsync("sh", ["-c", coverageCmd], { cwd: root, timeout: 120_000 });
+    const pctMatch = stdout.match(/(?:total|overall|TOTAL)[^\d]*(\d+(?:\.\d+)?)\s*%/i);
+    if (pctMatch) {
+      const pct = Math.round(parseFloat(pctMatch[1]));
+      return { name: "unit_coverage", score: pct, label: `${pct}% line coverage` };
+    }
+  } catch {
+    // Coverage command failed
+  }
+  return null;
+}
+
+async function checkUnitTestCoverage(
+  root: string,
+  config: Awaited<ReturnType<typeof loadConfig>>
+): Promise<Metric> {
+  const coveragePaths = [
+    join(root, "coverage", "coverage-summary.json"),
+    join(root, "htmlcov", "status.json"),
+    join(root, ".coverage.json"),
+    join(root, "coverage.json"),
+  ];
+
+  const fromFiles = await readCoverageFromFiles(coveragePaths, root);
+  if (fromFiles) return fromFiles;
+
   const unitTool = config.tools.unit_test;
   if (unitTool?.command) {
-    // Try common coverage flags
-    const coverageCommands = detectCoverageCommand(unitTool, config);
-    if (coverageCommands) {
-      try {
-        const { stdout } = await execFileAsync(
-          "sh",
-          ["-c", coverageCommands],
-          { cwd: root, timeout: 120_000 }
-        );
-
-        // Parse percentage from output (most tools print "XX%" or "XX.X%")
-        const pctMatch = stdout.match(
-          /(?:total|overall|TOTAL)[^\d]*(\d+(?:\.\d+)?)\s*%/i
-        );
-        if (pctMatch) {
-          const pct = Math.round(parseFloat(pctMatch[1]));
-          return {
-            name: "unit_coverage",
-            score: pct,
-            label: `${pct}% line coverage`,
-          };
-        }
-      } catch {
-        // Coverage command failed
-      }
-    }
+    const fromCommand = await runCoverageCommand(unitTool, config, root);
+    if (fromCommand) return fromCommand;
   }
 
-  return {
-    name: "unit_coverage",
-    score: null,
-    label: "no coverage data (run tests with --coverage)",
-  };
+  return { name: "unit_coverage", score: null, label: "no coverage data (run tests with --coverage)" };
 }
 
 function detectCoverageCommand(
@@ -514,6 +498,24 @@ function scoreColor(score: number): typeof chalk.green {
 
 // --- Badges ---
 
+function badgeColor(score: number): string {
+  return score >= 80 ? "green" : score >= 60 ? "yellow" : "red";
+}
+
+function buildBadgeList(metrics: HealthResult["metrics"], overall: number): string[] {
+  const badges: string[] = [];
+  for (const m of metrics) {
+    if (m.score === null) continue;
+    badges.push(`![${m.name}](https://img.shields.io/badge/${m.name.replace(/_/g, "%20")}-${encodeURIComponent(`${m.score}%`)}-${badgeColor(m.score)})`);
+  }
+  for (const m of metrics) {
+    if (m.score !== null || m.label === "not configured" || m.label.includes("not available")) continue;
+    badges.push(`![${m.name}](https://img.shields.io/badge/${m.name.replace(/_/g, "%20")}-${encodeURIComponent(m.label)}-blue)`);
+  }
+  badges.push(`![health](https://img.shields.io/badge/grimoire%20health-${overall}%25-${badgeColor(overall)})`);
+  return badges;
+}
+
 async function writeBadges(
   root: string,
   filePath: string,
@@ -523,47 +525,13 @@ async function writeBadges(
   const marker = "<!-- GRIMOIRE:HEALTH:START -->";
   const endMarker = "<!-- GRIMOIRE:HEALTH:END -->";
 
-  const badges: string[] = [];
-  for (const m of result.metrics) {
-    if (m.score === null) continue;
-    const color = m.score >= 80 ? "green" : m.score >= 60 ? "yellow" : "red";
-    const label = m.name.replace(/_/g, "%20");
-    const value = encodeURIComponent(`${m.score}%`);
-    badges.push(
-      `![${m.name}](https://img.shields.io/badge/${label}-${value}-${color})`
-    );
-  }
-
-  // Add informational badges
-  for (const m of result.metrics) {
-    if (m.score !== null) continue;
-    if (m.label === "not configured" || m.label.includes("not available"))
-      continue;
-    const label = m.name.replace(/_/g, "%20");
-    const value = encodeURIComponent(m.label);
-    badges.push(
-      `![${m.name}](https://img.shields.io/badge/${label}-${value}-blue)`
-    );
-  }
-
-  // Overall
-  const overallColor =
-    result.overall >= 80
-      ? "green"
-      : result.overall >= 60
-        ? "yellow"
-        : "red";
-  badges.push(
-    `![health](https://img.shields.io/badge/grimoire%20health-${result.overall}%25-${overallColor})`
-  );
-
+  const badges = buildBadgeList(result.metrics, result.overall);
   const badgeBlock = `${marker}\n${badges.join("\n")}\n${endMarker}`;
 
   let content: string;
   try {
     content = await readFile(target, "utf-8");
   } catch {
-    // File doesn't exist, create with just badges
     await writeFile(target, badgeBlock + "\n");
     console.log(chalk.green("Created") + ` ${filePath} with health badges`);
     return;
@@ -571,15 +539,12 @@ async function writeBadges(
 
   if (content.includes(marker)) {
     const updated = content.replace(
-      new RegExp(
-        `${escapeRegex(marker)}[\\s\\S]*?${escapeRegex(endMarker)}`
-      ),
+      new RegExp(`${escapeRegex(marker)}[\\s\\S]*?${escapeRegex(endMarker)}`),
       badgeBlock
     );
     await writeFile(target, updated);
     console.log(chalk.blue("Updated") + ` ${filePath} health badges`);
   } else {
-    // Prepend badges to file
     await writeFile(target, badgeBlock + "\n\n" + content);
     console.log(chalk.blue("Added") + ` health badges to ${filePath}`);
   }

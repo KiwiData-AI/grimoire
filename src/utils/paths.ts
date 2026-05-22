@@ -1,9 +1,7 @@
 import { join, resolve } from "node:path";
 import { fileExists } from "./fs.js";
 
-/**
- * Walk up from cwd to find a directory containing .grimoire/ or features/
- */
+
 export async function findProjectRoot(): Promise<string> {
   let dir = process.cwd();
   const root = resolve("/");
@@ -29,9 +27,7 @@ export function resolveChangePath(root: string, changeId: string): string {
   return join(root, ".grimoire", "changes", changeId);
 }
 
-/**
- * Resolve a path and verify it stays within the project root.
- */
+
 export function safePath(root: string, filePath: string): string {
   const resolved = resolve(root, filePath);
   if (!resolved.startsWith(root + "/") && resolved !== root) {

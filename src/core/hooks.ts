@@ -14,20 +14,14 @@ interface HookEntry {
   command: string;
 }
 
-/**
- * Generate Claude Code hooks and git hooks for grimoire enforcement.
- */
+
 export async function setupHooks(root: string): Promise<void> {
   await setupClaudeHooks(root);
   await setupClaudeSettings(root);
   await setupGitHooks(root);
 }
 
-/**
- * Generate .claude/hooks.json for Claude Code integration.
- * Pre-commit: run grimoire check on changed files.
- * Post-commit: verify Change: trailer when active grimoire changes exist.
- */
+
 async function setupClaudeHooks(root: string): Promise<void> {
   const claudeDir = join(root, ".claude");
   const hooksPath = join(claudeDir, "hooks.json");
@@ -70,9 +64,7 @@ async function setupClaudeHooks(root: string): Promise<void> {
   }
 }
 
-/**
- * Generate a standard git pre-commit hook as fallback for non-Claude environments.
- */
+
 async function setupGitHooks(root: string): Promise<void> {
   const gitHooksDir = join(root, ".git", "hooks");
 
@@ -117,11 +109,7 @@ fi
   console.log(`  ${chalk.green("created")} .git/hooks/pre-commit`);
 }
 
-/**
- * Native Claude Code hook format lives in .claude/settings.json.
- * Wires UserPromptSubmit → grimoire branch-check so feature-intent prompts
- * get a branch-hygiene warning before Claude sees them.
- */
+
 interface ClaudeSettings {
   hooks?: Record<string, ClaudeHookEntry[]>;
   [key: string]: unknown;

@@ -63,10 +63,7 @@ export async function updateProject(
 
   // 5. Determine agents from config (fallback to auto-detect for legacy projects)
   const config = await loadConfig(root);
-  const configAgents = config.project.agents ?? [];
-  const agents = configAgents.length > 0 ? configAgents : await detectAgentFiles(root);
-  const instructionAgents = agents.filter((a) => ["cursor", "copilot"].includes(a));
-  const skillAgents = agents.filter((a) => ["claude", "opencode", "codex"].includes(a));
+  const { instructionAgents, skillAgents } = await resolveTargetAgents(config, root);
 
   // 6. Update agent-specific instruction files (cursor, copilot)
   if (!options.skipAgents && instructionAgents.length > 0) {
@@ -90,6 +87,18 @@ export async function updateProject(
   console.log(`\n${chalk.bold.green("Done!")} Grimoire updated.`);
 }
 
+async function resolveTargetAgents(
+  config: Awaited<ReturnType<typeof loadConfig>>,
+  root: string,
+): Promise<{ instructionAgents: string[]; skillAgents: string[] }> {
+  const configAgents = config.project.agents ?? [];
+  const agents = configAgents.length > 0 ? configAgents : await detectAgentFiles(root);
+  return {
+    instructionAgents: agents.filter((a) => ["cursor", "copilot"].includes(a)),
+    skillAgents: agents.filter((a) => ["claude", "opencode", "codex"].includes(a)),
+  };
+}
+
 async function updateAgentsFile(root: string): Promise<void> {
   const config = await loadConfig(root);
   const caveman = config.project.caveman ?? "none";
@@ -100,10 +109,7 @@ async function updateSkills(root: string, agents: string[]): Promise<void> {
   await installSkillFiles(root, PACKAGE_ROOT, SKILL_NAMES, "updated", agents);
 }
 
-/**
- * Migrate config.yaml to the current schema version.
- * Additive only — never removes user keys.
- */
+
 async function migrateConfig(root: string): Promise<void> {
   const configPath = join(root, ".grimoire", "config.yaml");
 
@@ -185,9 +191,7 @@ const MIGRATIONS: Migration[] = [
   },
 ];
 
-/**
- * Write a version stamp so future updates know what version was last installed.
- */
+
 async function writeVersionStamp(root: string): Promise<void> {
   try {
     const pkgJson = await readFile(join(PACKAGE_ROOT, "package.json"), "utf-8");
@@ -213,10 +217,7 @@ async function readPackageJson(): Promise<PackageJson | null> {
   }
 }
 
-/**
- * Compare two semver strings. Returns true if `a` is strictly newer than `b`.
- * Tolerant to pre-release suffixes — compares only the numeric core.
- */
+
 function isNewer(a: string, b: string): boolean {
   const parse = (v: string): number[] =>
     v.replace(/[^\d.].*$/, "").split(".").map((n) => Number(n) || 0);
@@ -246,11 +247,7 @@ async function fetchLatestVersion(name: string): Promise<string | null> {
   }
 }
 
-/**
- * Print an update-available banner when the npm registry has a newer version
- * than the one currently installed. Network failures are silent — the banner
- * is a hint, not a gate.
- */
+
 async function printUpgradeBanner(): Promise<void> {
   if (process.env.GRIMOIRE_NO_UPDATE_CHECK) return;
   const pkg = await readPackageJson();

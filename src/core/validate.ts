@@ -29,6 +29,25 @@ export interface ValidateResult {
   warnCount: number;
 }
 
+function printValidationResults(results: ValidationResult[], errorCount: number, warnCount: number): void {
+  for (const result of results) {
+    if (result.errors.length > 0) {
+      console.log(`\n${chalk.red("FAIL")} ${result.file}`);
+      for (const err of result.errors) {
+        console.log(`  ${chalk.red("error:")} ${err}`);
+      }
+    }
+    if (result.warnings.length > 0) {
+      console.log(`\n${chalk.yellow("WARN")} ${result.file}`);
+      for (const warn of result.warnings) {
+        console.log(`  ${chalk.yellow("warn:")} ${warn}`);
+      }
+    }
+  }
+  if (errorCount === 0) console.log(chalk.green("\nValidation passed."));
+  console.log(`\n${errorCount} error(s), ${warnCount} warning(s)`);
+}
+
 export async function validateChange(
   changeId: string | undefined,
   options: ValidateOptions
@@ -40,25 +59,16 @@ export async function validateChange(
     const changePath = resolveChangePath(root, changeId);
     await validateSingleChange(changePath, changeId, results, options);
   } else {
-    // Validate all active changes
     const changesDir = join(root, ".grimoire", "changes");
     try {
       const entries = await readdir(changesDir, { withFileTypes: true });
       const changes = entries.filter((e) => e.isDirectory());
-
       if (changes.length === 0) {
         console.log("No active changes to validate.");
         return { results, errorCount: 0, warnCount: 0 };
       }
-
       for (const change of changes) {
-        const changePath = join(changesDir, change.name);
-        await validateSingleChange(
-          changePath,
-          change.name,
-          results,
-          options
-        );
+        await validateSingleChange(join(changesDir, change.name), change.name, results, options);
       }
     } catch {
       console.log("No .grimoire/changes/ directory found. Run grimoire init first.");
@@ -74,31 +84,42 @@ export async function validateChange(
     return { results, errorCount, warnCount };
   }
 
-  // Print results
-  for (const result of results) {
-    if (result.errors.length > 0) {
-      console.log(`\n${chalk.red("FAIL")} ${result.file}`);
-      for (const err of result.errors) {
-        console.log(`  ${chalk.red("error:")} ${err}`);
-      }
-    }
-    if (result.warnings.length > 0) {
-      console.log(`\n${chalk.yellow("WARN")} ${result.file}`);
-      for (const warn of result.warnings) {
-        console.log(`  ${chalk.yellow("warn:")} ${warn}`);
-      }
-    }
-  }
-
-  if (errorCount === 0) {
-    console.log(chalk.green("\nValidation passed."));
-  }
-
-  console.log(
-    `\n${errorCount} error(s), ${warnCount} warning(s)`
-  );
-
+  printValidationResults(results, errorCount, warnCount);
   return { results, errorCount, warnCount };
+}
+
+async function validateFeatureFiles(
+  changePath: string,
+  options: ValidateOptions,
+): Promise<ValidationResult[]> {
+  const results: ValidationResult[] = [];
+  try {
+    const featureFiles = await findFiles(join(changePath, "features"), ".feature");
+    for (const file of featureFiles) {
+      const result = validateFeatureFile(file, await readFile(file, "utf-8"), options.strict);
+      if (result.errors.length > 0 || result.warnings.length > 0) results.push(result);
+    }
+  } catch {
+    // No features dir
+  }
+  return results;
+}
+
+async function validateDecisionFiles(
+  changePath: string,
+  options: ValidateOptions,
+): Promise<ValidationResult[]> {
+  const results: ValidationResult[] = [];
+  try {
+    const decisionFiles = await findFiles(join(changePath, "decisions"), ".md");
+    for (const file of decisionFiles) {
+      const result = validateDecisionFile(file, await readFile(file, "utf-8"), options.strict);
+      if (result.errors.length > 0 || result.warnings.length > 0) results.push(result);
+    }
+  } catch {
+    // No decisions dir
+  }
+  return results;
 }
 
 async function validateSingleChange(
@@ -107,55 +128,18 @@ async function validateSingleChange(
   results: ValidationResult[],
   options: ValidateOptions
 ): Promise<void> {
-  // Check manifest exists and has valid frontmatter
-  const manifestPath = join(changePath, "manifest.md");
   try {
-    const manifestContent = await readFile(manifestPath, "utf-8");
-    const manifestResult = validateManifest(
-      `${changeId}/manifest.md`,
-      manifestContent,
-      options.strict
-    );
+    const manifestContent = await readFile(join(changePath, "manifest.md"), "utf-8");
+    const manifestResult = validateManifest(`${changeId}/manifest.md`, manifestContent, options.strict);
     if (manifestResult.errors.length > 0 || manifestResult.warnings.length > 0) {
       results.push(manifestResult);
     }
   } catch {
-    results.push({
-      file: `${changeId}/manifest.md`,
-      errors: ["Manifest file missing"],
-      warnings: [],
-    });
+    results.push({ file: `${changeId}/manifest.md`, errors: ["Manifest file missing"], warnings: [] });
   }
 
-  // Validate feature files
-  const featuresDir = join(changePath, "features");
-  try {
-    const featureFiles = await findFiles(featuresDir, ".feature");
-    for (const file of featureFiles) {
-      const content = await readFile(file, "utf-8");
-      const result = validateFeatureFile(file, content, options.strict);
-      if (result.errors.length > 0 || result.warnings.length > 0) {
-        results.push(result);
-      }
-    }
-  } catch {
-    // No features dir is ok if there are decisions
-  }
-
-  // Validate decision files
-  const decisionsDir = join(changePath, "decisions");
-  try {
-    const decisionFiles = await findFiles(decisionsDir, ".md");
-    for (const file of decisionFiles) {
-      const content = await readFile(file, "utf-8");
-      const result = validateDecisionFile(file, content, options.strict);
-      if (result.errors.length > 0 || result.warnings.length > 0) {
-        results.push(result);
-      }
-    }
-  } catch {
-    // No decisions dir is ok if there are features
-  }
+  results.push(...(await validateFeatureFiles(changePath, options)));
+  results.push(...(await validateDecisionFiles(changePath, options)));
 }
 
 function parseGherkin(content: string): GherkinDocument | null {
@@ -241,6 +225,22 @@ function validateFeatureFile(
   return { file: filePath, errors, warnings };
 }
 
+function validateDecisionFrontmatter(content: string, fm: Record<string, unknown>, errors: string[]): void {
+  if (!content.startsWith("---")) {
+    errors.push("Missing YAML frontmatter");
+    return;
+  }
+  if (!fm.status) errors.push("Frontmatter missing 'status' field");
+  if (!fm.date) errors.push("Frontmatter missing 'date' field");
+}
+
+function validateDecisionStrictSections(content: string, warnings: string[]): void {
+  if (!content.match(/^## Decision Drivers/m)) warnings.push("Missing 'Decision Drivers' section");
+  if (!content.match(/^### Consequences/m)) warnings.push("Missing 'Consequences' section");
+  if (!content.match(/^### Cost of Ownership/m)) warnings.push("Missing 'Cost of Ownership' section");
+  if (!content.match(/^### Confirmation/m)) warnings.push("Missing 'Confirmation' section");
+}
+
 function validateDecisionFile(
   filePath: string,
   content: string,
@@ -249,44 +249,14 @@ function validateDecisionFile(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Check YAML frontmatter
   const { data: fm } = matter(content);
-  if (!content.startsWith("---")) {
-    errors.push("Missing YAML frontmatter");
-  } else {
-    if (!fm.status) {
-      errors.push("Frontmatter missing 'status' field");
-    }
-    if (!fm.date) {
-      errors.push("Frontmatter missing 'date' field");
-    }
-  }
+  validateDecisionFrontmatter(content, fm, errors);
 
-  // Check required sections
-  if (!content.match(/^## Context and Problem Statement/m)) {
-    errors.push("Missing 'Context and Problem Statement' section");
-  }
-  if (!content.match(/^## Considered Options/m)) {
-    errors.push("Missing 'Considered Options' section");
-  }
-  if (!content.match(/^## Decision Outcome/m)) {
-    errors.push("Missing 'Decision Outcome' section");
-  }
+  if (!content.match(/^## Context and Problem Statement/m)) errors.push("Missing 'Context and Problem Statement' section");
+  if (!content.match(/^## Considered Options/m)) errors.push("Missing 'Considered Options' section");
+  if (!content.match(/^## Decision Outcome/m)) errors.push("Missing 'Decision Outcome' section");
 
-  if (strict) {
-    if (!content.match(/^## Decision Drivers/m)) {
-      warnings.push("Missing 'Decision Drivers' section");
-    }
-    if (!content.match(/^### Consequences/m)) {
-      warnings.push("Missing 'Consequences' section");
-    }
-    if (!content.match(/^### Cost of Ownership/m)) {
-      warnings.push("Missing 'Cost of Ownership' section");
-    }
-    if (!content.match(/^### Confirmation/m)) {
-      warnings.push("Missing 'Confirmation' section");
-    }
-  }
+  if (strict) validateDecisionStrictSections(content, warnings);
 
   return { file: filePath, errors, warnings };
 }
@@ -298,6 +268,25 @@ const VALID_MANIFEST_STATUSES = [
   "complete",
 ];
 
+function validateManifestFrontmatter(
+  content: string,
+  mfm: Record<string, unknown>,
+  strict: boolean,
+  errors: string[],
+  warnings: string[],
+): void {
+  if (!content.startsWith("---")) {
+    if (strict) errors.push("Missing YAML frontmatter (status, branch)");
+    else warnings.push("Missing YAML frontmatter (status, branch)");
+    return;
+  }
+  if (!mfm.status) {
+    errors.push("Frontmatter missing 'status' field");
+  } else if (!VALID_MANIFEST_STATUSES.includes(mfm.status)) {
+    errors.push(`Invalid status "${mfm.status}" — must be one of: ${VALID_MANIFEST_STATUSES.join(", ")}`);
+  }
+}
+
 function validateManifest(
   filePath: string,
   content: string,
@@ -307,42 +296,16 @@ function validateManifest(
   const warnings: string[] = [];
 
   const { data: mfm } = matter(content);
-  if (!content.startsWith("---")) {
-    if (strict) {
-      errors.push("Missing YAML frontmatter (status, branch)");
-    } else {
-      warnings.push("Missing YAML frontmatter (status, branch)");
-    }
-  } else {
-    if (!mfm.status) {
-      errors.push("Frontmatter missing 'status' field");
-    } else if (!VALID_MANIFEST_STATUSES.includes(mfm.status)) {
-      errors.push(
-        `Invalid status "${mfm.status}" — must be one of: ${VALID_MANIFEST_STATUSES.join(", ")}`
-      );
-    }
-  }
+  validateManifestFrontmatter(content, mfm, strict, errors, warnings);
 
-  // Check required sections
-  if (!content.match(/^## Why/m)) {
-    errors.push("Missing 'Why' section");
-  }
-  if (
-    !content.match(/^## Feature Changes/m) &&
-    !content.match(/^## Decisions/m)
-  ) {
-    errors.push(
-      "Must have at least one of 'Feature Changes' or 'Decisions' section"
-    );
+  if (!content.match(/^## Why/m)) errors.push("Missing 'Why' section");
+  if (!content.match(/^## Feature Changes/m) && !content.match(/^## Decisions/m)) {
+    errors.push("Must have at least one of 'Feature Changes' or 'Decisions' section");
   }
 
   if (strict) {
-    if (!content.match(/^## Assumptions/m)) {
-      warnings.push("Missing 'Assumptions' section");
-    }
-    if (!content.match(/^## Pre-Mortem/m)) {
-      warnings.push("Missing 'Pre-Mortem' section");
-    }
+    if (!content.match(/^## Assumptions/m)) warnings.push("Missing 'Assumptions' section");
+    if (!content.match(/^## Pre-Mortem/m)) warnings.push("Missing 'Pre-Mortem' section");
   }
 
   return { file: filePath, errors, warnings };

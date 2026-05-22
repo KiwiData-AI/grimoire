@@ -35,52 +35,61 @@ export interface CheckResult {
   errored: number;
 }
 
-export async function runCheck(options: CheckOptions): Promise<CheckResult> {
-  const root = await findProjectRoot();
-  const config = await loadConfig(root);
-
-  // Determine which steps to run
-  let steps = options.steps?.length ? options.steps : config.checks;
-  if (options.skip?.length) {
-    const skipSet = new Set(options.skip);
-    steps = steps.filter((s) => !skipSet.has(s));
-  }
-
+async function runSteps(
+  steps: string[],
+  root: string,
+  config: GrimoireConfig,
+  options: CheckOptions,
+): Promise<StepResult[]> {
   const results: StepResult[] = [];
-
-  if (!options.json) {
-    console.log(chalk.bold("\ngrimoire check\n"));
-  }
-
   for (const step of steps) {
     const result = await runStep(step, root, config, options);
     results.push(result);
     if (!options.json) printStepResult(result);
     if (result.status === "fail" && !options.continueOnFail) break;
   }
+  return results;
+}
 
-  // Summary
+function printCheckOutput(
+  options: CheckOptions,
+  results: StepResult[],
+  passed: number,
+  failedCount: number,
+  skipped: number,
+  errored: number,
+): void {
+  if (options.json) {
+    console.log(
+      JSON.stringify({ results, summary: { passed, failed: failedCount, skipped, errored } }, null, 2)
+    );
+  } else {
+    const failStr = failedCount > 0 ? chalk.red(`${failedCount} failed`) : `${failedCount} failed`;
+    const errStr = errored > 0 ? `, ${errored} errored` : "";
+    console.log(`\n  ${chalk.green(`${passed} passed`)}, ${failStr}, ${skipped} skipped${errStr}\n`);
+  }
+}
+
+export async function runCheck(options: CheckOptions): Promise<CheckResult> {
+  const root = await findProjectRoot();
+  const config = await loadConfig(root);
+
+  let steps = options.steps?.length ? options.steps : config.checks;
+  if (options.skip?.length) {
+    const skipSet = new Set(options.skip);
+    steps = steps.filter((s) => !skipSet.has(s));
+  }
+
+  if (!options.json) console.log(chalk.bold("\ngrimoire check\n"));
+
+  const results = await runSteps(steps, root, config, options);
+
   const passed = results.filter((r) => r.status === "pass").length;
   const failedCount = results.filter((r) => r.status === "fail").length;
   const skipped = results.filter((r) => r.status === "skip").length;
   const errored = results.filter((r) => r.status === "error").length;
 
-  if (options.json) {
-    console.log(
-      JSON.stringify(
-        {
-          results,
-          summary: { passed, failed: failedCount, skipped, errored },
-        },
-        null,
-        2
-      )
-    );
-  } else {
-    console.log(
-      `\n  ${chalk.green(`${passed} passed`)}, ${failedCount > 0 ? chalk.red(`${failedCount} failed`) : `${failedCount} failed`}, ${skipped} skipped${errored > 0 ? `, ${errored} errored` : ""}\n`
-    );
-  }
+  printCheckOutput(options, results, passed, failedCount, skipped, errored);
 
   return { results, passed, failed: failedCount, skipped, errored };
 }
@@ -161,24 +170,35 @@ async function runShellStep(
   }
 }
 
-async function resolveChangedFiles(root: string): Promise<string[]> {
+async function resolveChangedFiles(root: string): Promise<{ files: string[]; diff: string }> {
   try {
     const git = simpleGit(root);
-    const diffOutput = await git.diff(["--name-only", "HEAD"]);
-    const files = diffOutput.trim().split("\n").filter(Boolean);
-    if (files.length > 0) return files;
-    const staged = await git.diff(["--name-only", "--cached"]);
-    return staged.trim().split("\n").filter(Boolean);
+    const nameOnly = await git.diff(["--name-only", "HEAD"]);
+    const files = nameOnly.trim().split("\n").filter(Boolean);
+    if (files.length > 0) {
+      const diff = await git.diff(["HEAD", "--", ...files]);
+      return { files, diff };
+    }
+    const stagedNames = await git.diff(["--name-only", "--cached"]);
+    const stagedFiles = stagedNames.trim().split("\n").filter(Boolean);
+    const diff = await git.diff(["--cached", "--", ...stagedFiles]);
+    return { files: stagedFiles, diff };
   } catch {
-    return [];
+    return { files: [], diff: "" };
   }
 }
 
-function buildLlmPrompt(prompt: string, files: string[]): string {
+const MAX_DIFF_CHARS = 40_000;
+
+function buildLlmPrompt(prompt: string, files: string[], diff: string): string {
   // Strip newlines and backticks from each filename to prevent prompt injection.
   const safeFiles = files.map((f) => `\`${f.replace(/[\n\r`]/g, "")}\``).filter((f) => f.length > 2);
-  const fileList = safeFiles.length > 0 ? `\n\nFiles to review:\n${safeFiles.join("\n")}` : "";
-  return `${prompt}${fileList}\n\nRespond with PASS or FAIL as the very first word on the very first line (no markdown, no asterisks, no extra words on that line). Then explain any issues on subsequent lines.`;
+  const fileList = safeFiles.length > 0 ? `\n\nFiles changed:\n${safeFiles.join("\n")}` : "";
+  const safeDiff = diff.replace(/`{3,}/g, "```");
+  const diffSection = safeDiff
+    ? `\n\nDiff:\n\`\`\`diff\n${safeDiff.slice(0, MAX_DIFF_CHARS)}\n\`\`\``
+    : "";
+  return `${prompt}${fileList}${diffSection}\n\nOnly flag issues directly observable in the diff above. Do not infer issues from filenames or speculate about code not shown.\n\nRespond with PASS or FAIL as the very first word on the very first line (no markdown, no asterisks, no extra words on that line). Then explain any issues on subsequent lines.`;
 }
 
 function parseLlmVerdict(output: string): boolean {
@@ -201,14 +221,14 @@ async function runLlmStep(
     return { step, status: "skip", duration: Date.now() - start, output: "", reason: `${llmCommand} not found` };
   }
 
-  const files = changedOnly ? await resolveChangedFiles(root) : [];
+  const { files, diff } = changedOnly ? await resolveChangedFiles(root) : { files: [], diff: "" };
 
   if (changedOnly && files.length === 0) {
     return { step, status: "pass", duration: Date.now() - start, output: "No changed files to review." };
   }
 
   try {
-    const output = await spawnWithStdin(llmCommand, ["--print"], buildLlmPrompt(prompt, files), root);
+    const output = await spawnWithStdin(llmCommand, ["--print"], buildLlmPrompt(prompt, files, diff), root);
     return { step, status: parseLlmVerdict(output) ? "pass" : "fail", duration: Date.now() - start, output };
   } catch (err) {
     return {
@@ -407,32 +427,40 @@ async function tryEslintComplexity(root: string): Promise<{ output: string; hasW
   }
 }
 
+async function checkPythonComplexity(root: string, start: number): Promise<StepResult | null> {
+  const radon = await tryRadon(root);
+  if (!radon) return null;
+  return {
+    step: "complexity",
+    status: radon.hasHighComplexity ? "fail" : "pass",
+    duration: Date.now() - start,
+    output: radon.output || "No high-complexity functions found.",
+  };
+}
+
+async function checkJsComplexity(root: string, start: number): Promise<StepResult | null> {
+  const eslint = await tryEslintComplexity(root);
+  if (!eslint) return null;
+  return {
+    step: "complexity",
+    status: eslint.hasWarnings ? "fail" : "pass",
+    duration: Date.now() - start,
+    output: eslint.output || "No high-complexity functions found.",
+  };
+}
+
 async function runComplexityStep(root: string, config: GrimoireConfig): Promise<StepResult> {
   const start = Date.now();
   const lang = config.project.language;
 
   if (!lang || lang === "python") {
-    const radon = await tryRadon(root);
-    if (radon) {
-      return {
-        step: "complexity",
-        status: radon.hasHighComplexity ? "fail" : "pass",
-        duration: Date.now() - start,
-        output: radon.output || "No high-complexity functions found.",
-      };
-    }
+    const result = await checkPythonComplexity(root, start);
+    if (result) return result;
   }
 
   if (!lang || ["typescript", "javascript"].includes(lang ?? "")) {
-    const eslint = await tryEslintComplexity(root);
-    if (eslint) {
-      return {
-        step: "complexity",
-        status: eslint.hasWarnings ? "fail" : "pass",
-        duration: Date.now() - start,
-        output: eslint.output || "No high-complexity functions found.",
-      };
-    }
+    const result = await checkJsComplexity(root, start);
+    if (result) return result;
   }
 
   return {

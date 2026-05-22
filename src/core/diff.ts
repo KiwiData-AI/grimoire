@@ -32,116 +32,97 @@ export interface DiffResult {
   };
 }
 
+async function diffFeatureFiles(
+  changePath: string,
+  root: string,
+): Promise<FeatureDiff[]> {
+  const features: FeatureDiff[] = [];
+  const proposedFeaturesDir = join(changePath, "features");
+  const baselineFeaturesDir = join(root, "features");
+
+  try {
+    const proposedFiles = await findFiles(proposedFeaturesDir, ".feature");
+    for (const proposedFile of proposedFiles) {
+      const relPath = relative(proposedFeaturesDir, proposedFile);
+      const baselineFile = join(baselineFeaturesDir, relPath);
+      const proposedScenarios = extractScenarios(await readFile(proposedFile, "utf-8"));
+
+      if (await fileExists(baselineFile)) {
+        const baselineScenarios = extractScenarios(await readFile(baselineFile, "utf-8"));
+        const baselineNames = new Set(baselineScenarios.map((s) => s.name));
+        const proposedNames = new Set(proposedScenarios.map((s) => s.name));
+        const added = proposedScenarios.filter((s) => !baselineNames.has(s.name)).map((s) => s.name);
+        const removed = baselineScenarios.filter((s) => !proposedNames.has(s.name)).map((s) => s.name);
+        const unchanged = proposedScenarios.filter((s) => baselineNames.has(s.name)).map((s) => s.name);
+        if (added.length > 0 || removed.length > 0) {
+          features.push({ file: relPath, status: "modified", scenariosAdded: added, scenariosRemoved: removed, scenariosUnchanged: unchanged });
+        }
+      } else {
+        features.push({ file: relPath, status: "added", scenariosAdded: proposedScenarios.map((s) => s.name), scenariosRemoved: [], scenariosUnchanged: [] });
+      }
+    }
+  } catch {
+    // No proposed features directory
+  }
+  return features;
+}
+
+async function diffRemovedFeatures(
+  changePath: string,
+  baselineFeaturesDir: string,
+): Promise<FeatureDiff[]> {
+  const features: FeatureDiff[] = [];
+  try {
+    const manifest = await readFile(join(changePath, "manifest.md"), "utf-8");
+    const removedMatches = manifest.matchAll(/\*\*REMOVED\*\*\s+`([^`]+\.feature)`/g);
+    for (const match of removedMatches) {
+      const relPath = match[1];
+      const baselineFile = join(baselineFeaturesDir, relPath);
+      if (await fileExists(baselineFile)) {
+        const baselineScenarios = extractScenarios(await readFile(baselineFile, "utf-8"));
+        features.push({ file: relPath, status: "removed", scenariosAdded: [], scenariosRemoved: baselineScenarios.map((s) => s.name), scenariosUnchanged: [] });
+      }
+    }
+  } catch {
+    // No manifest or parse error
+  }
+  return features;
+}
+
+async function diffDecisionFiles(
+  changePath: string,
+  root: string,
+): Promise<DiffResult["decisions"]> {
+  const decisions: DiffResult["decisions"] = [];
+  const proposedDecisionsDir = join(changePath, "decisions");
+  const baselineDecisionsDir = join(root, ".grimoire", "decisions");
+
+  try {
+    const proposedDecisionFiles = await findFiles(proposedDecisionsDir, ".md");
+    for (const file of proposedDecisionFiles) {
+      const relPath = relative(proposedDecisionsDir, file);
+      const baselineFile = join(baselineDecisionsDir, relPath);
+      decisions.push({ file: relPath, status: (await fileExists(baselineFile)) ? "modified" : "added" });
+    }
+  } catch {
+    // No proposed decisions directory
+  }
+  return decisions;
+}
+
 export async function diffChange(
   changeId: string,
   options: { json: boolean }
 ): Promise<DiffResult> {
   const root = await findProjectRoot();
   const changePath = resolveChangePath(root, changeId);
-
-  const features: FeatureDiff[] = [];
-  const decisions: DiffResult["decisions"] = [];
-
-  // Diff feature files
-  const proposedFeaturesDir = join(changePath, "features");
   const baselineFeaturesDir = join(root, "features");
 
-  try {
-    const proposedFiles = await findFiles(proposedFeaturesDir, ".feature");
-
-    for (const proposedFile of proposedFiles) {
-      const relPath = relative(proposedFeaturesDir, proposedFile);
-      const baselineFile = join(baselineFeaturesDir, relPath);
-
-      const proposedContent = await readFile(proposedFile, "utf-8");
-      const proposedScenarios = extractScenarios(proposedContent);
-
-      if (await fileExists(baselineFile)) {
-        const baselineContent = await readFile(baselineFile, "utf-8");
-        const baselineScenarios = extractScenarios(baselineContent);
-
-        const baselineNames = new Set(baselineScenarios.map((s) => s.name));
-        const proposedNames = new Set(proposedScenarios.map((s) => s.name));
-
-        const added = proposedScenarios
-          .filter((s) => !baselineNames.has(s.name))
-          .map((s) => s.name);
-        const removed = baselineScenarios
-          .filter((s) => !proposedNames.has(s.name))
-          .map((s) => s.name);
-        const unchanged = proposedScenarios
-          .filter((s) => baselineNames.has(s.name))
-          .map((s) => s.name);
-
-        if (added.length > 0 || removed.length > 0) {
-          features.push({
-            file: relPath,
-            status: "modified",
-            scenariosAdded: added,
-            scenariosRemoved: removed,
-            scenariosUnchanged: unchanged,
-          });
-        }
-      } else {
-        features.push({
-          file: relPath,
-          status: "added",
-          scenariosAdded: proposedScenarios.map((s) => s.name),
-          scenariosRemoved: [],
-          scenariosUnchanged: [],
-        });
-      }
-    }
-  } catch {
-    // No proposed features directory
-  }
-
-  // Check for removed features referenced in manifest
-  try {
-    const manifestPath = join(changePath, "manifest.md");
-    const manifest = await readFile(manifestPath, "utf-8");
-    const removedMatches = manifest.matchAll(
-      /\*\*REMOVED\*\*\s+`([^`]+\.feature)`/g
-    );
-    for (const match of removedMatches) {
-      const relPath = match[1];
-      const baselineFile = join(baselineFeaturesDir, relPath);
-      if (await fileExists(baselineFile)) {
-        const baselineContent = await readFile(baselineFile, "utf-8");
-        const baselineScenarios = extractScenarios(baselineContent);
-        features.push({
-          file: relPath,
-          status: "removed",
-          scenariosAdded: [],
-          scenariosRemoved: baselineScenarios.map((s) => s.name),
-          scenariosUnchanged: [],
-        });
-      }
-    }
-  } catch {
-    // No manifest or parse error
-  }
-
-  // Diff decision records
-  const proposedDecisionsDir = join(changePath, "decisions");
-  const baselineDecisionsDir = join(root, ".grimoire", "decisions");
-
-  try {
-    const proposedDecisionFiles = await findFiles(proposedDecisionsDir, ".md");
-
-    for (const file of proposedDecisionFiles) {
-      const relPath = relative(proposedDecisionsDir, file);
-      const baselineFile = join(baselineDecisionsDir, relPath);
-
-      if (await fileExists(baselineFile)) {
-        decisions.push({ file: relPath, status: "modified" });
-      } else {
-        decisions.push({ file: relPath, status: "added" });
-      }
-    }
-  } catch {
-    // No proposed decisions directory
-  }
+  const features = [
+    ...(await diffFeatureFiles(changePath, root)),
+    ...(await diffRemovedFeatures(changePath, baselineFeaturesDir)),
+  ];
+  const decisions = await diffDecisionFiles(changePath, root);
 
   const result: DiffResult = {
     changeId,
@@ -151,17 +132,10 @@ export async function diffChange(
       featuresAdded: features.filter((f) => f.status === "added").length,
       featuresModified: features.filter((f) => f.status === "modified").length,
       featuresRemoved: features.filter((f) => f.status === "removed").length,
-      scenariosAdded: features.reduce(
-        (sum, f) => sum + f.scenariosAdded.length,
-        0
-      ),
-      scenariosRemoved: features.reduce(
-        (sum, f) => sum + f.scenariosRemoved.length,
-        0
-      ),
+      scenariosAdded: features.reduce((sum, f) => sum + f.scenariosAdded.length, 0),
+      scenariosRemoved: features.reduce((sum, f) => sum + f.scenariosRemoved.length, 0),
       decisionsAdded: decisions.filter((d) => d.status === "added").length,
-      decisionsModified: decisions.filter((d) => d.status === "modified")
-        .length,
+      decisionsModified: decisions.filter((d) => d.status === "modified").length,
     },
   };
 

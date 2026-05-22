@@ -88,6 +88,16 @@ async function runFullConfigSections(root: string, config: GrimoireConfig): Prom
   await writeFile(join(root, ".grimoire", "config.yaml"), fullSerialized);
 }
 
+function buildIntegrationFlags(
+  initialFlags: { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined },
+  config: GrimoireConfig,
+): { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined } {
+  return {
+    codebaseMemoryMcp: initialFlags.codebaseMemoryMcp ?? config.project.integrations?.codebase_memory_mcp,
+    cavemanPlugin: initialFlags.cavemanPlugin ?? config.project.integrations?.caveman_plugin,
+  };
+}
+
 async function createGrimoireConfig(
   root: string,
   options: InitOptions,
@@ -104,10 +114,7 @@ async function createGrimoireConfig(
     projectDetection = result.detection;
   }
 
-  const integrationFlags = {
-    codebaseMemoryMcp: initialFlags.codebaseMemoryMcp ?? config.project.integrations?.codebase_memory_mcp,
-    cavemanPlugin: initialFlags.cavemanPlugin ?? config.project.integrations?.caveman_plugin,
-  };
+  const integrationFlags = buildIntegrationFlags(initialFlags, config);
 
   const serialized = yamlStringify(config);
   scanForSecrets(serialized);

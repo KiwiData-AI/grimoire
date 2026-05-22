@@ -205,52 +205,62 @@ function stripNone(answer: string): string | undefined {
 // Section functions (exported so init --full can call them directly)
 // ---------------------------------------------------------------------------
 
+
+function applyDeadCodeAnswer(config: GrimoireConfig, answer: string): void {
+  const t = answer.trim();
+  if (!t || t === "auto") return;
+  if (t === "none") {
+    delete config.tools.dead_code;
+    config.checks = config.checks.filter((c) => c !== "dead_code");
+    return;
+  }
+  const deadCodeCommands: Record<string, string> = {
+    knip: "npx knip",
+    "ts-prune": "npx ts-prune",
+    vulture: "vulture .",
+    deadcode: "deadcode ./...",
+  };
+  config.tools.dead_code = { name: t, command: deadCodeCommands[t] ?? t };
+}
+
 export async function configureToolsSection(
   rl: Rl,
   config: GrimoireConfig
 ): Promise<void> {
   console.log(chalk.bold("\n  Code style & quality tools:\n"));
 
-  const currentDocTool = config.project.doc_tool ?? "none";
   const docToolAnswer = await rl.question(
-    `    Doc generator? (sphinx/mkdocs/typedoc/jsdoc/none) [${currentDocTool}]: `
+    `    Doc generator? (sphinx/mkdocs/typedoc/jsdoc/none) [${config.project.doc_tool ?? "none"}]: `
   );
-  if (docToolAnswer.trim()) {
-    config.project.doc_tool =
-      docToolAnswer.trim() === "none" ? undefined : docToolAnswer.trim();
-  }
+  if (docToolAnswer.trim()) config.project.doc_tool = stripNone(docToolAnswer);
 
-  const currentCommentStyle = config.project.comment_style ?? "none";
   const commentAnswer = await rl.question(
-    `    Comment/docstring style? (google/numpy/sphinx/jsdoc/tsdoc/none) [${currentCommentStyle}]: `
+    `    Comment/docstring style? (google/numpy/sphinx/jsdoc/tsdoc/none) [${config.project.comment_style ?? "none"}]: `
   );
-  if (commentAnswer.trim()) {
-    config.project.comment_style =
-      commentAnswer.trim() === "none" ? undefined : commentAnswer.trim();
-  }
+  if (commentAnswer.trim()) config.project.comment_style = stripNone(commentAnswer);
 
   const currentDeadCode = config.tools.dead_code?.name ?? "auto";
   const deadCodeAnswer = await rl.question(
     `    Dead code finder? (knip/ts-prune/vulture/deadcode/none/auto) [${currentDeadCode}]: `
   );
-  if (deadCodeAnswer.trim() && deadCodeAnswer.trim() !== "auto") {
-    if (deadCodeAnswer.trim() === "none") {
-      delete config.tools.dead_code;
-      config.checks = config.checks.filter((c) => c !== "dead_code");
-    } else {
-      const deadCodeCommands: Record<string, string> = {
-        knip: "npx knip",
-        "ts-prune": "npx ts-prune",
-        vulture: "vulture .",
-        deadcode: "deadcode ./...",
-      };
-      config.tools.dead_code = {
-        name: deadCodeAnswer.trim(),
-        command:
-          deadCodeCommands[deadCodeAnswer.trim()] ?? deadCodeAnswer.trim(),
-      };
-    }
+  applyDeadCodeAnswer(config, deadCodeAnswer);
+}
+
+function applyToolAnswer(
+  config: GrimoireConfig,
+  toolKey: string,
+  answer: string,
+  commands: Record<string, string>,
+  field: "command" | "check_command",
+): void {
+  const t = answer.trim();
+  if (!t || t === "auto") return;
+  if (t === "none") {
+    delete config.tools[toolKey];
+    config.checks = config.checks.filter((c) => c !== toolKey);
+    return;
   }
+  config.tools[toolKey] = { name: t, [field]: commands[t] ?? t };
 }
 
 export async function configureComplianceSection(
@@ -258,74 +268,35 @@ export async function configureComplianceSection(
   config: GrimoireConfig
 ): Promise<void> {
   console.log(chalk.bold("\n  Security & compliance:\n"));
+  console.log(chalk.dim("    Which compliance frameworks apply to this project?"));
+  console.log(chalk.dim("    Options: owasp, pci-dss, hipaa, soc2, gdpr, iso27001, or Enter to skip.\n"));
 
-  console.log(
-    chalk.dim("    Which compliance frameworks apply to this project?")
-  );
-  console.log(
-    chalk.dim(
-      "    Options: owasp, pci-dss, hipaa, soc2, gdpr, iso27001, or Enter to skip.\n"
-    )
-  );
   const complianceAnswer = await rl.question(
     `    Compliance frameworks (comma-separated) [${(config.project.compliance ?? []).join(",") || "none"}]: `
   );
-  if (
-    complianceAnswer.trim() &&
-    complianceAnswer.trim().toLowerCase() !== "none"
-  ) {
-    config.project.compliance = complianceAnswer
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
+  if (complianceAnswer.trim() && complianceAnswer.trim().toLowerCase() !== "none") {
+    config.project.compliance = complianceAnswer.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   }
 
-  const currentDepAudit = config.tools.dep_audit?.name ?? "auto";
   const depAuditAnswer = await rl.question(
-    `    Dep audit tool? (npm-audit/pip-audit/safety/yarn-audit/pnpm-audit/none/auto) [${currentDepAudit}]: `
+    `    Dep audit tool? (npm-audit/pip-audit/safety/yarn-audit/pnpm-audit/none/auto) [${config.tools.dep_audit?.name ?? "auto"}]: `
   );
-  if (depAuditAnswer.trim() && depAuditAnswer.trim() !== "auto") {
-    if (depAuditAnswer.trim() === "none") {
-      delete config.tools.dep_audit;
-      config.checks = config.checks.filter((c) => c !== "dep_audit");
-    } else {
-      const depAuditCommands: Record<string, string> = {
-        "npm-audit": "npm audit --audit-level=high",
-        "pip-audit": "pip-audit",
-        safety: "safety check",
-        "yarn-audit": "yarn audit --level high",
-        "pnpm-audit": "pnpm audit --audit-level=high",
-      };
-      config.tools.dep_audit = {
-        name: depAuditAnswer.trim(),
-        check_command:
-          depAuditCommands[depAuditAnswer.trim()] ?? depAuditAnswer.trim(),
-      };
-    }
-  }
+  applyToolAnswer(config, "dep_audit", depAuditAnswer, {
+    "npm-audit": "npm audit --audit-level=high",
+    "pip-audit": "pip-audit",
+    safety: "safety check",
+    "yarn-audit": "yarn audit --level high",
+    "pnpm-audit": "pnpm audit --audit-level=high",
+  }, "check_command");
 
-  const currentSecrets = config.tools.secrets?.name ?? "auto";
   const secretsAnswer = await rl.question(
-    `    Secret scanner? (detect-secrets/gitleaks/trufflehog/none/auto) [${currentSecrets}]: `
+    `    Secret scanner? (detect-secrets/gitleaks/trufflehog/none/auto) [${config.tools.secrets?.name ?? "auto"}]: `
   );
-  if (secretsAnswer.trim() && secretsAnswer.trim() !== "auto") {
-    if (secretsAnswer.trim() === "none") {
-      delete config.tools.secrets;
-      config.checks = config.checks.filter((c) => c !== "secrets");
-    } else {
-      const secretCommands: Record<string, string> = {
-        "detect-secrets":
-          "detect-secrets scan --baseline .secrets.baseline",
-        gitleaks: "gitleaks detect --no-git",
-        trufflehog: "trufflehog filesystem . --no-update",
-      };
-      config.tools.secrets = {
-        name: secretsAnswer.trim(),
-        check_command:
-          secretCommands[secretsAnswer.trim()] ?? secretsAnswer.trim(),
-      };
-    }
-  }
+  applyToolAnswer(config, "secrets", secretsAnswer, {
+    "detect-secrets": "detect-secrets scan --baseline .secrets.baseline",
+    gitleaks: "gitleaks detect --no-git",
+    trufflehog: "trufflehog filesystem . --no-update",
+  }, "check_command");
 }
 
 export async function configureDesignSection(
@@ -468,49 +439,33 @@ export async function configureDesignSection(
   console.log(`  ${chalk.green("created")} .grimoire/brand/voice.md`);
 }
 
+function applyAgentAnswer(agent: { command: string; model?: string }, cmdAnswer: string, modelAnswer: string): void {
+  if (cmdAnswer.trim()) agent.command = cmdAnswer.trim();
+  const m = modelAnswer.trim();
+  if (m && m !== "default") agent.model = m === "auto" ? undefined : m;
+}
+
 export async function configureLlmSection(
   rl: Rl,
   config: GrimoireConfig
 ): Promise<void> {
   console.log(chalk.bold("\n  AI agent preferences:\n"));
 
-  const currentThinkCmd = config.llm.thinking.command;
   const thinkAnswer = await rl.question(
-    `    Thinking agent (planning, review)? (claude/codex/cursor/custom) [${currentThinkCmd}]: `
+    `    Thinking agent (planning, review)? (claude/codex/cursor/custom) [${config.llm.thinking.command}]: `
   );
-  if (thinkAnswer.trim()) {
-    config.llm.thinking.command = thinkAnswer.trim();
-  }
-
-  const currentThinkModel = config.llm.thinking.model ?? "default";
   const thinkModelAnswer = await rl.question(
-    `    Thinking model? (opus/sonnet/o3/auto) [${currentThinkModel}]: `
+    `    Thinking model? (opus/sonnet/o3/auto) [${config.llm.thinking.model ?? "default"}]: `
   );
-  if (thinkModelAnswer.trim() && thinkModelAnswer.trim() !== "default") {
-    config.llm.thinking.model =
-      thinkModelAnswer.trim() === "auto"
-        ? undefined
-        : thinkModelAnswer.trim();
-  }
+  applyAgentAnswer(config.llm.thinking, thinkAnswer, thinkModelAnswer);
 
-  const currentCodeCmd = config.llm.coding.command;
   const codeAnswer = await rl.question(
-    `    Coding agent (apply, implement)? (claude/codex/cursor/custom) [${currentCodeCmd}]: `
+    `    Coding agent (apply, implement)? (claude/codex/cursor/custom) [${config.llm.coding.command}]: `
   );
-  if (codeAnswer.trim()) {
-    config.llm.coding.command = codeAnswer.trim();
-  }
-
-  const currentCodeModel = config.llm.coding.model ?? "default";
   const codeModelAnswer = await rl.question(
-    `    Coding model? (sonnet/opus/gpt-4.1/auto) [${currentCodeModel}]: `
+    `    Coding model? (sonnet/opus/gpt-4.1/auto) [${config.llm.coding.model ?? "default"}]: `
   );
-  if (codeModelAnswer.trim() && codeModelAnswer.trim() !== "default") {
-    config.llm.coding.model =
-      codeModelAnswer.trim() === "auto"
-        ? undefined
-        : codeModelAnswer.trim();
-  }
+  applyAgentAnswer(config.llm.coding, codeAnswer, codeModelAnswer);
 }
 
 export async function configureTrackersSection(

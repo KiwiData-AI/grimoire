@@ -47,11 +47,7 @@ export const TEST_FILE_IGNORE = [
   "**/dist/**",
 ];
 
-/**
- * Analyze test files for quality issues.
- * Language-aware via file extension. Detects weak/missing assertions,
- * empty test bodies, tautological tests, and swallowed errors.
- */
+
 export async function analyzeTestQuality(
   filePaths: string[]
 ): Promise<TestQualityReport> {
@@ -273,13 +269,8 @@ function checkPythonEmptyBody(
   return null;
 }
 
-function checkPythonMissingAssertions(
-  body: string,
-  fnName: string,
-  file: string,
-  line: number
-): TestIssue | null {
-  const hasAssert =
+function hasPythonAssertions(body: string): boolean {
+  return (
     body.includes("assert ") ||
     body.includes("assert(") ||
     body.includes("assertEqual") ||
@@ -287,26 +278,34 @@ function checkPythonMissingAssertions(
     body.includes("assertRaises") ||
     body.includes("pytest.raises") ||
     body.includes(".should") ||
-    body.includes("expect(");
+    body.includes("expect(")
+  );
+}
 
-  if (!hasAssert && fnName !== "given" && fnName !== "when") {
-    if (fnName === "then" || fnName.startsWith("test_")) {
-      return {
-        file,
-        line,
-        severity: "critical",
-        rule: "no-assertion",
-        message: `Test function \`${fnName}\` has no assertions — it will pass regardless of behavior.`,
-      };
-    } else if (fnName === "step_impl") {
-      return {
-        file,
-        line,
-        severity: "warning",
-        rule: "no-assertion",
-        message: `Step \`${fnName}\` has no assertions — verify it sets up state that a later Then step asserts.`,
-      };
-    }
+function checkPythonMissingAssertions(
+  body: string,
+  fnName: string,
+  file: string,
+  line: number
+): TestIssue | null {
+  if (hasPythonAssertions(body) || fnName === "given" || fnName === "when") return null;
+  if (fnName === "then" || fnName.startsWith("test_")) {
+    return {
+      file,
+      line,
+      severity: "critical",
+      rule: "no-assertion",
+      message: `Test function \`${fnName}\` has no assertions — it will pass regardless of behavior.`,
+    };
+  }
+  if (fnName === "step_impl") {
+    return {
+      file,
+      line,
+      severity: "warning",
+      rule: "no-assertion",
+      message: `Step \`${fnName}\` has no assertions — verify it sets up state that a later Then step asserts.`,
+    };
   }
   return null;
 }
@@ -481,9 +480,7 @@ function analyzeJsFunction(
   return issues;
 }
 
-/**
- * Print a test quality report to the console.
- */
+
 export function printReport(report: TestQualityReport): void {
   if (report.issues.length === 0) {
     console.log(

@@ -27,6 +27,56 @@ interface TaskStatus {
   pending: string[];
 }
 
+async function readManifestStatus(changePath: string, status: ChangeStatus): Promise<void> {
+  try {
+    const manifestContent = await readFile(join(changePath, "manifest.md"), "utf-8");
+    status.artifacts.manifest = true;
+    const { data: fm } = matter(manifestContent);
+    if (fm.status) status.status = fm.status;
+    if (fm.branch) status.branch = fm.branch;
+  } catch {
+    // no manifest
+  }
+}
+
+async function parseTasksStatus(changePath: string, status: ChangeStatus): Promise<void> {
+  try {
+    const tasksContent = await readFile(join(changePath, "tasks.md"), "utf-8");
+    const taskLines = tasksContent.match(/^- \[[ x]\] .+$/gm) || [];
+    const completed = taskLines.filter((l) => l.startsWith("- [x]")).length;
+    const pending = taskLines.filter((l) => l.startsWith("- [ ]")).map((l) => l.replace("- [ ] ", "").trim());
+    status.artifacts.tasks = { total: taskLines.length, completed, pending };
+    status.stage = "planned";
+    if (completed > 0 && completed < taskLines.length) status.stage = "applying";
+    if (completed === taskLines.length && taskLines.length > 0) status.stage = "complete";
+  } catch {
+    // no tasks
+  }
+}
+
+function printChangeStatus(status: ChangeStatus): void {
+  console.log(chalk.bold(`\nChange: ${status.id}`));
+  console.log(`Status: ${stageLabel(status.status)}`);
+  if (status.branch) console.log(`Branch: ${chalk.cyan(status.branch)}`);
+  console.log(`Stage:  ${stageLabel(status.stage)}\n`);
+
+  console.log("Artifacts:");
+  console.log(`  Manifest:  ${status.artifacts.manifest ? chalk.green("yes") : chalk.red("missing")}`);
+  console.log(`  Features:  ${status.artifacts.features.length > 0 ? status.artifacts.features.join(", ") : chalk.dim("none")}`);
+  console.log(`  Decisions: ${status.artifacts.decisions.length > 0 ? status.artifacts.decisions.join(", ") : chalk.dim("none")}`);
+
+  if (status.artifacts.tasks) {
+    const t = status.artifacts.tasks;
+    console.log(`  Tasks:     ${t.completed}/${t.total} complete`);
+    if (t.pending.length > 0) {
+      console.log("\nPending tasks:");
+      for (const task of t.pending) console.log(`  ${chalk.dim("[ ]")} ${task}`);
+    }
+  } else {
+    console.log(`  Tasks:     ${chalk.dim("not yet planned")}`);
+  }
+}
+
 export async function getChangeStatus(
   changeId: string,
   options: StatusOptions
@@ -39,30 +89,11 @@ export async function getChangeStatus(
     status: "draft",
     branch: null,
     stage: "draft",
-    artifacts: {
-      manifest: false,
-      features: [],
-      decisions: [],
-      tasks: null,
-    },
+    artifacts: { manifest: false, features: [], decisions: [], tasks: null },
   };
 
-  // Check manifest and parse frontmatter
-  try {
-    const manifestContent = await readFile(
-      join(changePath, "manifest.md"),
-      "utf-8"
-    );
-    status.artifacts.manifest = true;
+  await readManifestStatus(changePath, status);
 
-    const { data: fm } = matter(manifestContent);
-    if (fm.status) status.status = fm.status;
-    if (fm.branch) status.branch = fm.branch;
-  } catch {
-    // no manifest
-  }
-
-  // Find feature and decision files
   try {
     const glob = (await import("fast-glob")).default;
     const [features, decisions] = await Promise.all([
@@ -75,73 +106,14 @@ export async function getChangeStatus(
     // no features/decisions
   }
 
-  // Parse tasks
-  try {
-    const tasksContent = await readFile(
-      join(changePath, "tasks.md"),
-      "utf-8"
-    );
-    const taskLines = tasksContent.match(/^- \[[ x]\] .+$/gm) || [];
-    const completed = taskLines.filter((l) => l.startsWith("- [x]")).length;
-    const pending = taskLines
-      .filter((l) => l.startsWith("- [ ]"))
-      .map((l) => l.replace("- [ ] ", "").trim());
-
-    status.artifacts.tasks = {
-      total: taskLines.length,
-      completed,
-      pending,
-    };
-
-    status.stage = "planned";
-    if (completed > 0 && completed < taskLines.length) {
-      status.stage = "applying";
-    }
-    if (completed === taskLines.length && taskLines.length > 0) {
-      status.stage = "complete";
-    }
-  } catch {
-    // no tasks
-  }
+  await parseTasksStatus(changePath, status);
 
   if (options.json) {
     console.log(JSON.stringify(status, null, 2));
     return;
   }
 
-  // Pretty print
-  console.log(chalk.bold(`\nChange: ${changeId}`));
-  console.log(`Status: ${stageLabel(status.status)}`);
-  if (status.branch) {
-    console.log(`Branch: ${chalk.cyan(status.branch)}`);
-  }
-  console.log(`Stage:  ${stageLabel(status.stage)}\n`);
-
-  console.log("Artifacts:");
-  console.log(
-    `  Manifest:  ${status.artifacts.manifest ? chalk.green("yes") : chalk.red("missing")}`
-  );
-  console.log(
-    `  Features:  ${status.artifacts.features.length > 0 ? status.artifacts.features.join(", ") : chalk.dim("none")}`
-  );
-  console.log(
-    `  Decisions: ${status.artifacts.decisions.length > 0 ? status.artifacts.decisions.join(", ") : chalk.dim("none")}`
-  );
-
-  if (status.artifacts.tasks) {
-    const t = status.artifacts.tasks;
-    console.log(
-      `  Tasks:     ${t.completed}/${t.total} complete`
-    );
-    if (t.pending.length > 0) {
-      console.log("\nPending tasks:");
-      for (const task of t.pending) {
-        console.log(`  ${chalk.dim("[ ]")} ${task}`);
-      }
-    }
-  } else {
-    console.log(`  Tasks:     ${chalk.dim("not yet planned")}`);
-  }
+  printChangeStatus(status);
 }
 
 function stageLabel(stage: string): string {

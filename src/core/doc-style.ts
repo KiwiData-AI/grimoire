@@ -35,10 +35,7 @@ const SOURCE_IGNORE = [
   "**/*_test.*",
 ];
 
-/**
- * Check that docstrings/comments in source files follow the configured style.
- * Supports: google, numpy, sphinx, pep257 (Python); jsdoc, tsdoc (JS/TS).
- */
+
 export async function checkDocStyle(
   root: string,
   style: string,
@@ -189,6 +186,39 @@ function findJsDoc(
   return { line: commentEnd, content: extractJsDoc(lines, commentEnd) };
 }
 
+function isTestFunctionName(name: string): boolean {
+  return name.startsWith("test") || name.startsWith("it") || name.startsWith("describe");
+}
+
+function getDocStyleIssue(
+  file: string,
+  name: string,
+  lineNum: number,
+  style: string,
+  doc: ReturnType<typeof findJsDoc>
+): DocStyleIssue | null {
+  if (!doc) {
+    if (!isTestFunctionName(name)) {
+      return {
+        file,
+        line: lineNum,
+        severity: "warning",
+        message: `Function \`${name}\` is missing a ${style.toUpperCase()} comment.`,
+      };
+    }
+    return null;
+  }
+  if (style === "tsdoc" && doc.content.includes("@param {")) {
+    return {
+      file,
+      line: doc.line + 1,
+      severity: "warning",
+      message: `\`${name}\` uses JSDoc \`@param {type}\` syntax instead of TSDoc (types belong in TypeScript signatures, not comments).`,
+    };
+  }
+  return null;
+}
+
 function checkJsDocStyle(
   file: string,
   lines: string[],
@@ -201,32 +231,11 @@ function checkJsDocStyle(
   for (let i = 0; i < lines.length; i++) {
     const fnMatch = lines[i].match(fnPattern) ?? lines[i].match(methodPattern);
     if (!fnMatch) continue;
-
     const name = fnMatch[1];
     if (name.startsWith("_")) continue;
-
     const doc = findJsDoc(lines, i);
-
-    if (!doc) {
-      if (!name.startsWith("test") && !name.startsWith("it") && !name.startsWith("describe")) {
-        issues.push({
-          file,
-          line: i + 1,
-          severity: "warning",
-          message: `Function \`${name}\` is missing a ${style.toUpperCase()} comment.`,
-        });
-      }
-      continue;
-    }
-
-    if (style === "tsdoc" && doc.content.includes("@param {")) {
-      issues.push({
-        file,
-        line: doc.line + 1,
-        severity: "warning",
-        message: `\`${name}\` uses JSDoc \`@param {type}\` syntax instead of TSDoc (types belong in TypeScript signatures, not comments).`,
-      });
-    }
+    const issue = getDocStyleIssue(file, name, i + 1, style, doc);
+    if (issue) issues.push(issue);
   }
 
   return issues;

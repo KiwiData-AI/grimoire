@@ -194,6 +194,42 @@ interface DuplicateReport {
   percentDuplicated: number;
 }
 
+function cloneLoc(loc: unknown): number {
+  return (loc as Record<string, number> | undefined)?.line ?? 0;
+}
+
+function buildCloneInfo(d: Record<string, unknown>, root: string): CloneInfo {
+  const first = d.firstFile as Record<string, unknown>;
+  const second = d.secondFile as Record<string, unknown>;
+  return {
+    firstFile: relative(root, first.name as string),
+    firstStartLine: cloneLoc(first.startLoc),
+    firstEndLine: cloneLoc(first.endLoc),
+    secondFile: relative(root, second.name as string),
+    secondStartLine: cloneLoc(second.startLoc),
+    secondEndLine: cloneLoc(second.endLoc),
+    lines: (d.lines as number) || 0,
+    tokens: (d.tokens as number) || 0,
+    fragment: ((d.fragment as string) || "").slice(0, 200),
+  };
+}
+
+function parseJscpdReport(root: string, reportContent: string): DuplicateReport {
+  const report = JSON.parse(reportContent) as Record<string, unknown>;
+  const clones: CloneInfo[] = ((report.duplicates as unknown[]) || []).map(
+    (d) => buildCloneInfo(d as Record<string, unknown>, root)
+  );
+  const stats = report.statistics as Record<string, unknown> | undefined;
+  const totals = (stats?.total as Record<string, number> | undefined);
+  const totalLines = totals?.lines || 1;
+  const dupLines = totals?.duplicatedLines || 0;
+  return {
+    clones,
+    totalDuplicatedLines: dupLines,
+    percentDuplicated: (dupLines / totalLines) * 100,
+  };
+}
+
 async function runJscpd(
   root: string,
   dupIgnoreGlobs: Set<string>
@@ -210,7 +246,6 @@ async function runJscpd(
 
   try {
     const ignoreArg = [...dupIgnoreGlobs].join(",");
-
     const args = [
       "jscpd",
       root,
@@ -218,44 +253,11 @@ async function runJscpd(
       "--output", join(root, ".grimoire", "docs"),
       "--silent",
     ];
-
-    if (ignoreArg) {
-      args.push("--ignore", ignoreArg);
-    }
-
+    if (ignoreArg) args.push("--ignore", ignoreArg);
     await execFileAsync("npx", args, { cwd: root, timeout: 60_000 });
-
     const reportPath = join(root, ".grimoire", "docs", "jscpd-report.json");
     const reportContent = await readFile(reportPath, "utf-8");
-    const report = JSON.parse(reportContent);
-
-    const clones: CloneInfo[] = (report.duplicates || []).map(
-      (d: Record<string, unknown>) => {
-        const first = d.firstFile as Record<string, unknown>;
-        const second = d.secondFile as Record<string, unknown>;
-        return {
-          firstFile: relative(root, first.name as string),
-          firstStartLine: (first.startLoc as Record<string, number>)?.line ?? 0,
-          firstEndLine: (first.endLoc as Record<string, number>)?.line ?? 0,
-          secondFile: relative(root, second.name as string),
-          secondStartLine: (second.startLoc as Record<string, number>)?.line ?? 0,
-          secondEndLine: (second.endLoc as Record<string, number>)?.line ?? 0,
-          lines: (d.lines as number) || 0,
-          tokens: (d.tokens as number) || 0,
-          fragment: ((d.fragment as string) || "").slice(0, 200),
-        };
-      }
-    );
-
-    const stats = report.statistics as Record<string, unknown> | undefined;
-    const totalLines = (stats?.total as Record<string, number>)?.lines || 1;
-    const dupLines = (stats?.total as Record<string, number>)?.duplicatedLines || 0;
-
-    return {
-      clones,
-      totalDuplicatedLines: dupLines,
-      percentDuplicated: (dupLines / totalLines) * 100,
-    };
+    return parseJscpdReport(root, reportContent);
   } catch (err) {
     console.log(
       chalk.yellow(`\njscpd failed: ${err instanceof Error ? err.message : "unknown error"}`)
