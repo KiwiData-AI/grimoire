@@ -188,6 +188,33 @@ function getScenarios(doc: GherkinDocument): GherkinScenario[] {
   return scenarios;
 }
 
+function validateScenarios(scenarios: GherkinScenario[], errors: string[]): void {
+  for (const scenario of scenarios) {
+    const name = scenario.name || "unnamed";
+    const keywords = scenario.steps.map((s) => s.keyword.trim());
+    if (!keywords.includes("When")) errors.push(`Scenario "${name}" missing When step`);
+    if (!keywords.includes("Then")) errors.push(`Scenario "${name}" missing Then step`);
+    if (scenario.keyword === "Scenario Outline" && scenario.examples.length === 0) {
+      errors.push(`Scenario Outline "${name}" missing Examples table`);
+    }
+  }
+}
+
+function validateStrictRules(feature: { description?: string }, scenarios: GherkinScenario[], warnings: string[]): void {
+  const description = feature.description || "";
+  if (!description.match(/As an?\s/i) || !description.match(/I want\s/i) || !description.match(/So that\s/i)) {
+    warnings.push("Missing user story (As a / I want / So that)");
+  }
+  const implKeywords = /\b(database|SQL|API|endpoint|HTTP|POST|GET|class|function|method|import|module)\b/i;
+  for (const scenario of scenarios) {
+    for (const step of scenario.steps) {
+      if (implKeywords.test(step.text)) {
+        warnings.push(`Possible implementation details in step: "${step.keyword.trim()} ${step.text}" (should describe WHAT not HOW)`);
+      }
+    }
+  }
+}
+
 function validateFeatureFile(
   filePath: string,
   content: string,
@@ -197,70 +224,19 @@ function validateFeatureFile(
   const warnings: string[] = [];
 
   const doc = parseGherkin(content);
-
   if (!doc || !doc.feature) {
     errors.push("Invalid Gherkin syntax — could not parse feature file");
     return { file: filePath, errors, warnings };
   }
 
   const feature = doc.feature;
-
-  if (!feature.name || feature.name.trim() === "") {
-    errors.push("Missing Feature name");
-  }
+  if (!feature.name || feature.name.trim() === "") errors.push("Missing Feature name");
 
   const scenarios = getScenarios(doc);
+  if (scenarios.length === 0) errors.push("No scenarios found");
 
-  if (scenarios.length === 0) {
-    errors.push("No scenarios found");
-  }
-
-  for (const scenario of scenarios) {
-    const name = scenario.name || "unnamed";
-    const keywords = scenario.steps.map((s) => s.keyword.trim());
-
-    if (!keywords.includes("When")) {
-      errors.push(`Scenario "${name}" missing When step`);
-    }
-    if (!keywords.includes("Then")) {
-      errors.push(`Scenario "${name}" missing Then step`);
-    }
-
-    // Scenario Outline must have Examples
-    if (
-      scenario.keyword === "Scenario Outline" &&
-      scenario.examples.length === 0
-    ) {
-      errors.push(`Scenario Outline "${name}" missing Examples table`);
-    }
-  }
-
-  if (strict) {
-    // Check for user story in feature description
-    const description = feature.description || "";
-    if (
-      !description.match(/As an?\s/i) ||
-      !description.match(/I want\s/i) ||
-      !description.match(/So that\s/i)
-    ) {
-      warnings.push(
-        "Missing user story (As a / I want / So that)"
-      );
-    }
-
-    // Warn about implementation details in step text
-    const implKeywords =
-      /\b(database|SQL|API|endpoint|HTTP|POST|GET|class|function|method|import|module)\b/i;
-    for (const scenario of scenarios) {
-      for (const step of scenario.steps) {
-        if (implKeywords.test(step.text)) {
-          warnings.push(
-            `Possible implementation details in step: "${step.keyword.trim()} ${step.text}" (should describe WHAT not HOW)`
-          );
-        }
-      }
-    }
-  }
+  validateScenarios(scenarios, errors);
+  if (strict) validateStrictRules(feature, scenarios, warnings);
 
   return { file: filePath, errors, warnings };
 }

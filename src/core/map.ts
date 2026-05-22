@@ -5,6 +5,7 @@ import {
   mkdir,
   access,
 } from "node:fs/promises";
+import type { Dirent } from "node:fs";
 import {
   join,
   relative,
@@ -334,63 +335,7 @@ async function loadConfigFile(root: string, filename: string): Promise<string> {
   }
 }
 
-export async function generateMap(options: LegacyMapOptions): Promise<void> {
-  const root = await findProjectRoot();
-  const docsDir = join(root, ".grimoire", "docs");
-
-  const ignoreContent = await loadConfigFile(root, "mapignore");
-  const keysContent = await loadConfigFile(root, "mapkeys");
-  const dupIgnoreContent = await loadConfigFile(root, "dupignore");
-  const ignorePatterns = parseIgnoreFile(ignoreContent);
-  const keyFilePatterns = parseKeyFilesConfig(keysContent);
-  const dupIgnoreGlobs = parseIgnoreFile(dupIgnoreContent);
-
-  const directories: DirectoryInfo[] = [];
-  const keyFiles: KeyFileInfo[] = [];
-
-  await scanDirectory(
-    root,
-    root,
-    0,
-    options.maxDepth,
-    directories,
-    keyFiles,
-    ignorePatterns,
-    keyFilePatterns
-  );
-
-  let existingAreas: string[] = [];
-  if (options.refresh) {
-    existingAreas = await loadExistingAreas(docsDir);
-  }
-
-  const scannedDirs = new Set(directories.map((d) => d.path));
-  const undocumented = directories
-    .filter((d) => !existingAreas.includes(d.path))
-    .filter((d) => d.fileCount > 0)
-    .map((d) => d.path);
-  const removed = existingAreas.filter((a) => !scannedDirs.has(a));
-
-  let duplicates: DuplicateReport | null = null;
-  if (options.duplicates) {
-    duplicates = await runJscpd(root, dupIgnoreGlobs);
-  }
-
-  const snapshot: MapSnapshot = {
-    generatedAt: new Date().toISOString(),
-    projectRoot: ".",
-    directories,
-    keyFiles,
-    undocumented,
-    removed,
-    duplicates,
-  };
-
-  if (options.json) {
-    console.log(JSON.stringify(snapshot, null, 2));
-    return;
-  }
-
+function printMapStructure(directories: DirectoryInfo[], keyFiles: KeyFileInfo[]): void {
   console.log(chalk.bold("\nProject Map\n"));
   console.log(chalk.bold("Structure:"));
   for (const dir of directories) {
@@ -401,83 +346,106 @@ export async function generateMap(options: LegacyMapOptions): Promise<void> {
       .slice(0, 3)
       .map(([ext, count]) => `${count} ${ext}`)
       .join(", ");
-    const keyFileNote =
-      dir.keyFiles.length > 0 ? chalk.dim(` [${dir.keyFiles.join(", ")}]`) : "";
-    console.log(
-      `${padding}${chalk.cyan(dir.path + "/")} ${chalk.dim(extSummary)}${keyFileNote}`
-    );
+    const keyFileNote = dir.keyFiles.length > 0 ? chalk.dim(` [${dir.keyFiles.join(", ")}]`) : "";
+    console.log(`${padding}${chalk.cyan(dir.path + "/")} ${chalk.dim(extSummary)}${keyFileNote}`);
   }
-
   if (keyFiles.length > 0) {
     console.log(chalk.bold("\nKey Files:"));
-    for (const kf of keyFiles) {
-      console.log(`  ${kf.path} ${chalk.dim(`(${kf.type})`)}`);
-    }
+    for (const kf of keyFiles) console.log(`  ${kf.path} ${chalk.dim(`(${kf.type})`)}`);
+  }
+}
+
+function printDuplicateReport(duplicates: DuplicateReport): void {
+  if (duplicates.clones.length === 0) {
+    console.log(chalk.green("\nNo duplicates detected."));
+    return;
+  }
+  console.log(chalk.bold.yellow(`\nDuplicates: ${duplicates.clones.length} clone(s), ${duplicates.totalDuplicatedLines} duplicated lines (${duplicates.percentDuplicated.toFixed(1)}%)\n`));
+  for (const clone of duplicates.clones.slice(0, 10)) {
+    console.log(`  ${chalk.dim(clone.firstFile)}:${clone.firstStartLine}-${clone.firstEndLine}`);
+    console.log(`  ${chalk.dim(clone.secondFile)}:${clone.secondStartLine}-${clone.secondEndLine}`);
+    console.log(`  ${chalk.dim(`${clone.lines} lines, ${clone.tokens} tokens`)}\n`);
+  }
+  if (duplicates.clones.length > 10) {
+    console.log(chalk.dim(`  ... and ${duplicates.clones.length - 10} more (see .snapshot.json for full list)`));
+  }
+}
+
+function printRefreshReport(undocumented: string[], removed: string[]): void {
+  if (undocumented.length > 0) {
+    console.log(chalk.bold.yellow("\nUndocumented areas:"));
+    for (const u of undocumented) console.log(`  ${chalk.yellow("+")} ${u}/`);
+  }
+  if (removed.length > 0) {
+    console.log(chalk.bold.red("\nRemoved (docs may be stale):"));
+    for (const r of removed) console.log(`  ${chalk.red("-")} ${r}/`);
+  }
+  if (undocumented.length === 0 && removed.length === 0) {
+    console.log(chalk.green("\nAll areas are documented. No changes detected."));
+  }
+}
+
+export async function generateMap(options: LegacyMapOptions): Promise<void> {
+  const root = await findProjectRoot();
+  const docsDir = join(root, ".grimoire", "docs");
+
+  const ignorePatterns = parseIgnoreFile(await loadConfigFile(root, "mapignore"));
+  const keyFilePatterns = parseKeyFilesConfig(await loadConfigFile(root, "mapkeys"));
+  const dupIgnoreGlobs = parseIgnoreFile(await loadConfigFile(root, "dupignore"));
+
+  const directories: DirectoryInfo[] = [];
+  const keyFiles: KeyFileInfo[] = [];
+  await scanDirectory(root, root, 0, options.maxDepth, directories, keyFiles, ignorePatterns, keyFilePatterns);
+
+  const existingAreas = options.refresh ? await loadExistingAreas(docsDir) : [];
+  const scannedDirs = new Set(directories.map((d) => d.path));
+  const undocumented = directories.filter((d) => !existingAreas.includes(d.path) && d.fileCount > 0).map((d) => d.path);
+  const removed = existingAreas.filter((a) => !scannedDirs.has(a));
+  const duplicates = options.duplicates ? await runJscpd(root, dupIgnoreGlobs) : null;
+
+  const snapshot: MapSnapshot = { generatedAt: new Date().toISOString(), projectRoot: ".", directories, keyFiles, undocumented, removed, duplicates };
+
+  if (options.json) {
+    console.log(JSON.stringify(snapshot, null, 2));
+    return;
   }
 
-  if (duplicates) {
-    if (duplicates.clones.length > 0) {
-      console.log(
-        chalk.bold.yellow(
-          `\nDuplicates: ${duplicates.clones.length} clone(s), ${duplicates.totalDuplicatedLines} duplicated lines (${duplicates.percentDuplicated.toFixed(1)}%)\n`
-        )
-      );
-      for (const clone of duplicates.clones.slice(0, 10)) {
-        console.log(
-          `  ${chalk.dim(clone.firstFile)}:${clone.firstStartLine}-${clone.firstEndLine}`
-        );
-        console.log(
-          `  ${chalk.dim(clone.secondFile)}:${clone.secondStartLine}-${clone.secondEndLine}`
-        );
-        console.log(
-          `  ${chalk.dim(`${clone.lines} lines, ${clone.tokens} tokens`)}\n`
-        );
-      }
-      if (duplicates.clones.length > 10) {
-        console.log(
-          chalk.dim(
-            `  ... and ${duplicates.clones.length - 10} more (see .snapshot.json for full list)`
-          )
-        );
-      }
-    } else {
-      console.log(chalk.green("\nNo duplicates detected."));
-    }
-  }
-
+  printMapStructure(directories, keyFiles);
+  if (duplicates) printDuplicateReport(duplicates);
   if (options.refresh) {
-    if (undocumented.length > 0) {
-      console.log(chalk.bold.yellow("\nUndocumented areas:"));
-      for (const u of undocumented) {
-        console.log(`  ${chalk.yellow("+")} ${u}/`);
-      }
-    }
-    if (removed.length > 0) {
-      console.log(chalk.bold.red("\nRemoved (docs may be stale):"));
-      for (const r of removed) {
-        console.log(`  ${chalk.red("-")} ${r}/`);
-      }
-    }
-    if (undocumented.length === 0 && removed.length === 0) {
-      console.log(chalk.green("\nAll areas are documented. No changes detected."));
-    }
+    printRefreshReport(undocumented, removed);
   } else {
-    console.log(
-      chalk.dim(
-        `\n${directories.length} directories, ${keyFiles.length} key files found.`
-      )
-    );
-    console.log(
-      chalk.dim("Run /grimoire:discover to generate area docs from this snapshot.")
-    );
+    console.log(chalk.dim(`\n${directories.length} directories, ${keyFiles.length} key files found.`));
+    console.log(chalk.dim("Run /grimoire:discover to generate area docs from this snapshot."));
   }
 
   await mkdir(docsDir, { recursive: true });
-  await writeFile(
-    join(docsDir, ".snapshot.json"),
-    JSON.stringify(snapshot, null, 2)
-  );
+  await writeFile(join(docsDir, ".snapshot.json"), JSON.stringify(snapshot, null, 2));
   console.log(chalk.dim(`\nSnapshot saved to .grimoire/docs/.snapshot.json`));
+}
+
+function shouldSkipDir(depth: number, dirName: string, ignorePatterns: Set<string>): boolean {
+  if (depth === 0) return false;
+  return ignorePatterns.has(dirName) || (dirName.startsWith(".") && dirName !== ".grimoire");
+}
+
+function processFiles(
+  files: Dirent<string>[],
+  relPath: string,
+  keyFilePatterns: Record<string, string>,
+  keyFiles: KeyFileInfo[]
+): { extensions: Record<string, number>; dirKeyFiles: string[] } {
+  const extensions: Record<string, number> = {};
+  const dirKeyFiles: string[] = [];
+  for (const file of files) {
+    const ext = extname(file.name) || file.name;
+    extensions[ext] = (extensions[ext] || 0) + 1;
+    if (keyFilePatterns[file.name]) {
+      keyFiles.push({ path: relPath === "." ? file.name : `${relPath}/${file.name}`, type: keyFilePatterns[file.name] });
+      dirKeyFiles.push(file.name);
+    }
+  }
+  return { extensions, dirKeyFiles };
 }
 
 async function scanDirectory(
@@ -493,10 +461,7 @@ async function scanDirectory(
   if (depth > maxDepth) return;
 
   const relPath = relative(root, fullPath) || ".";
-  const dirName = basename(fullPath);
-
-  if (depth > 0 && ignorePatterns.has(dirName)) return;
-  if (depth > 0 && dirName.startsWith(".") && dirName !== ".grimoire") return;
+  if (shouldSkipDir(depth, basename(fullPath), ignorePatterns)) return;
 
   let entries;
   try {
@@ -505,50 +470,19 @@ async function scanDirectory(
     return;
   }
 
-  const files = entries.filter((e) => e.isFile());
+  const files = entries.filter((e) => e.isFile()) as Dirent<string>[];
   const subdirs = entries
     .filter((e) => e.isDirectory())
-    .filter((e) => !ignorePatterns.has(e.name))
-    .filter((e) => !e.name.startsWith(".") || e.name === ".grimoire");
+    .filter((e) => !ignorePatterns.has(e.name as string) && (!(e.name as string).startsWith(".") || e.name === ".grimoire")) as Dirent<string>[];
 
-  const extensions: Record<string, number> = {};
-  const dirKeyFiles: string[] = [];
-
-  for (const file of files) {
-    const ext = extname(file.name) || file.name;
-    extensions[ext] = (extensions[ext] || 0) + 1;
-
-    if (keyFilePatterns[file.name]) {
-      const kfPath = relPath === "." ? file.name : `${relPath}/${file.name}`;
-      keyFiles.push({
-        path: kfPath,
-        type: keyFilePatterns[file.name],
-      });
-      dirKeyFiles.push(file.name);
-    }
-  }
+  const { extensions, dirKeyFiles } = processFiles(files, relPath, keyFilePatterns, keyFiles);
 
   if (files.length > 0 || depth <= 1) {
-    directories.push({
-      path: relPath === "." ? "." : relPath,
-      fileCount: files.length,
-      extensions,
-      keyFiles: dirKeyFiles,
-      subdirs: subdirs.map((s) => s.name),
-    });
+    directories.push({ path: relPath, fileCount: files.length, extensions, keyFiles: dirKeyFiles, subdirs: subdirs.map((s) => s.name) });
   }
 
   for (const subdir of subdirs) {
-    await scanDirectory(
-      join(fullPath, subdir.name),
-      root,
-      depth + 1,
-      maxDepth,
-      directories,
-      keyFiles,
-      ignorePatterns,
-      keyFilePatterns
-    );
+    await scanDirectory(join(fullPath, subdir.name), root, depth + 1, maxDepth, directories, keyFiles, ignorePatterns, keyFilePatterns);
   }
 }
 

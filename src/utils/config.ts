@@ -118,7 +118,7 @@ const DEFAULT_LLM: LlmConfig = {
 };
 
 const DEFAULT_CONFIG: GrimoireConfig = {
-  version: 1,
+  version: CURRENT_CONFIG_VERSION,
   project: {
     commit_style: "conventional",
   },
@@ -149,75 +149,56 @@ function parseTools(raw: Record<string, unknown>): Record<string, ToolConfig> {
   return tools;
 }
 
-function parseProject(raw: Record<string, unknown>): ProjectConfig {
-  const projectRaw =
-    raw.project && typeof raw.project === "object"
-      ? (raw.project as Record<string, unknown>)
-      : {};
+function parseDesignTool(projectRaw: Record<string, unknown>): DesignToolConfig | undefined {
+  if (!projectRaw.design_tool || typeof projectRaw.design_tool !== "object") return undefined;
+  const dt = projectRaw.design_tool as Record<string, unknown>;
+  return { name: String(dt.name ?? ""), path: str(dt.path), url: str(dt.url), mcp: parseMcpServer(dt) };
+}
 
-  let design_tool: DesignToolConfig | undefined;
-  if (projectRaw.design_tool && typeof projectRaw.design_tool === "object") {
-    const dt = projectRaw.design_tool as Record<string, unknown>;
-    design_tool = {
-      name: String(dt.name ?? ""),
-      path: str(dt.path),
-      url: str(dt.url),
-      mcp: parseMcpServer(dt),
-    };
-  }
+function parseIntegrations(projectRaw: Record<string, unknown>): IntegrationsConfig | undefined {
+  if (!projectRaw.integrations || typeof projectRaw.integrations !== "object") return undefined;
+  const it = projectRaw.integrations as Record<string, unknown>;
+  return {
+    codebase_memory_mcp: typeof it.codebase_memory_mcp === "boolean" ? it.codebase_memory_mcp : undefined,
+    caveman_plugin: typeof it.caveman_plugin === "boolean" ? it.caveman_plugin : undefined,
+  };
+}
 
-  let integrations: IntegrationsConfig | undefined;
-  if (projectRaw.integrations && typeof projectRaw.integrations === "object") {
-    const it = projectRaw.integrations as Record<string, unknown>;
-    integrations = {
-      codebase_memory_mcp:
-        typeof it.codebase_memory_mcp === "boolean"
-          ? it.codebase_memory_mcp
-          : undefined,
-      caveman_plugin:
-        typeof it.caveman_plugin === "boolean" ? it.caveman_plugin : undefined,
-    };
-  }
+function parsePrecommitReview(projectRaw: Record<string, unknown>): PrecommitReviewConfig | undefined {
+  if (!projectRaw.precommit_review || typeof projectRaw.precommit_review !== "object") return undefined;
+  const pr = projectRaw.precommit_review as Record<string, unknown>;
+  const depth = str(pr.depth);
+  const blockOn = str(pr.block_on);
+  return {
+    depth: depth === "quick" || depth === "full" ? depth : undefined,
+    block_on: blockOn === "blocker" || blockOn === "none" ? blockOn : undefined,
+  };
+}
 
-  let precommit_review: PrecommitReviewConfig | undefined;
-  if (
-    projectRaw.precommit_review &&
-    typeof projectRaw.precommit_review === "object"
-  ) {
-    const pr = projectRaw.precommit_review as Record<string, unknown>;
-    const depth = str(pr.depth);
-    const blockOn = str(pr.block_on);
-    precommit_review = {
-      depth: depth === "quick" || depth === "full" ? depth : undefined,
-      block_on:
-        blockOn === "blocker" || blockOn === "none" ? blockOn : undefined,
-    };
-  }
-
+function parseSurface(projectRaw: Record<string, unknown>): ProjectSurface | undefined {
   const surfaceRaw = str(projectRaw.surface);
-  const surface = PROJECT_SURFACES.includes(surfaceRaw as ProjectSurface)
-    ? (surfaceRaw as ProjectSurface)
-    : undefined;
+  return PROJECT_SURFACES.includes(surfaceRaw as ProjectSurface) ? (surfaceRaw as ProjectSurface) : undefined;
+}
 
+function parseStringArray(val: unknown): string[] | undefined {
+  return Array.isArray(val) ? (val as string[]).map(String) : undefined;
+}
+
+function parseProject(raw: Record<string, unknown>): ProjectConfig {
+  const projectRaw = raw.project && typeof raw.project === "object" ? (raw.project as Record<string, unknown>) : {};
   return {
     language: str(projectRaw.language ?? raw.language),
     package_manager: str(projectRaw.package_manager),
-    commit_style: String(
-      projectRaw.commit_style ?? raw.commit_style ?? DEFAULT_CONFIG.project.commit_style
-    ),
+    commit_style: String(projectRaw.commit_style ?? raw.commit_style ?? DEFAULT_CONFIG.project.commit_style),
     doc_tool: str(projectRaw.doc_tool ?? raw.doc_tool),
     comment_style: str(projectRaw.comment_style ?? raw.comment_style),
     caveman: str(projectRaw.caveman) as ProjectConfig["caveman"],
-    compliance: Array.isArray(projectRaw.compliance)
-      ? (projectRaw.compliance as string[]).map(String)
-      : undefined,
-    design_tool,
-    agents: Array.isArray(projectRaw.agents)
-      ? (projectRaw.agents as string[]).map(String)
-      : undefined,
-    integrations,
-    precommit_review,
-    surface,
+    compliance: parseStringArray(projectRaw.compliance),
+    design_tool: parseDesignTool(projectRaw),
+    agents: parseStringArray(projectRaw.agents),
+    integrations: parseIntegrations(projectRaw),
+    precommit_review: parsePrecommitReview(projectRaw),
+    surface: parseSurface(projectRaw),
     brand_dir: str(projectRaw.brand_dir),
   };
 }

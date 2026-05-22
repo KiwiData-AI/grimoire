@@ -27,7 +27,7 @@ describe("loadConfig", () => {
 
     const config = await loadConfig("/fake/root");
 
-    expect(config.version).toBe(1);
+    expect(config.version).toBe(2);
     expect(config.project.commit_style).toBe("conventional");
     expect(config.features_dir).toBe("features");
     expect(config.checks).toContain("lint");
@@ -108,7 +108,7 @@ doc_tool: typedoc
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0][0]).toContain("Warning: failed to parse");
-    expect(config.version).toBe(1);
+    expect(config.version).toBe(2);
     expect(config.project.commit_style).toBe("conventional");
 
     warnSpy.mockRestore();

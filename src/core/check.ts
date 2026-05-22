@@ -85,6 +85,26 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
   return { results, passed, failed: failedCount, skipped, errored };
 }
 
+function isBuiltinComplexity(tool: ToolConfig | undefined): boolean {
+  return !tool?.command && !tool?.check_command && tool?.name !== "llm";
+}
+
+async function runToolStep(
+  step: string,
+  root: string,
+  config: GrimoireConfig,
+  options: CheckOptions,
+): Promise<StepResult> {
+  const tool = config.tools[step] ?? getBuiltinLlmFallback(step);
+  if (!tool || (!tool.command && !tool.check_command && tool.name !== "llm")) {
+    return { step, status: "skip", duration: 0, output: "", reason: "not configured" };
+  }
+  if (tool.name === "llm") {
+    return runLlmStep(step, tool.prompt ?? "", config.llm.coding.command, root, options.changed);
+  }
+  return runShellStep(step, tool.check_command ?? tool.command!, root);
+}
+
 async function runStep(
   step: string,
   root: string,
@@ -93,25 +113,10 @@ async function runStep(
 ): Promise<StepResult> {
   if (step === "test_quality") return runTestQualityStep(root);
   if (step === "doc_style") return runDocStyleStep(root, config);
-
-  // Complexity: use built-in auto-detect unless an explicit tool is configured
-  const complexityTool = step === "complexity" ? config.tools[step] : undefined;
-  if (step === "complexity" && !complexityTool?.command && !complexityTool?.check_command && complexityTool?.name !== "llm") {
+  if (step === "complexity" && isBuiltinComplexity(config.tools[step])) {
     return runComplexityStep(root, config);
   }
-
-  const tool = config.tools[step] ?? getBuiltinLlmFallback(step);
-
-  if (!tool || (!tool.command && !tool.check_command && tool.name !== "llm")) {
-    return { step, status: "skip", duration: 0, output: "", reason: "not configured" };
-  }
-
-  if (tool.name === "llm") {
-    return runLlmStep(step, tool.prompt ?? "", config.llm.coding.command, root, options.changed);
-  }
-
-  const command = tool.check_command ?? tool.command!;
-  return runShellStep(step, command, root);
+  return runToolStep(step, root, config, options);
 }
 
 async function runShellStep(
@@ -156,6 +161,31 @@ async function runShellStep(
   }
 }
 
+async function resolveChangedFiles(root: string): Promise<string[]> {
+  try {
+    const git = simpleGit(root);
+    const diffOutput = await git.diff(["--name-only", "HEAD"]);
+    const files = diffOutput.trim().split("\n").filter(Boolean);
+    if (files.length > 0) return files;
+    const staged = await git.diff(["--name-only", "--cached"]);
+    return staged.trim().split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function buildLlmPrompt(prompt: string, files: string[]): string {
+  // Strip newlines and backticks from each filename to prevent prompt injection.
+  const safeFiles = files.map((f) => `\`${f.replace(/[\n\r`]/g, "")}\``).filter((f) => f.length > 2);
+  const fileList = safeFiles.length > 0 ? `\n\nFiles to review:\n${safeFiles.join("\n")}` : "";
+  return `${prompt}${fileList}\n\nRespond with PASS or FAIL as the very first word on the very first line (no markdown, no asterisks, no extra words on that line). Then explain any issues on subsequent lines.`;
+}
+
+function parseLlmVerdict(output: string): boolean {
+  const firstLine = output.trim().split("\n").map((l) => l.trim()).find(Boolean)?.toUpperCase() ?? "";
+  return /\bPASS\b/.test(firstLine) && !/\bFAIL\b/.test(firstLine);
+}
+
 async function runLlmStep(
   step: string,
   prompt: string,
@@ -165,65 +195,21 @@ async function runLlmStep(
 ): Promise<StepResult> {
   const start = Date.now();
 
-  // Check if LLM command is available
   try {
     await execFileAsync("which", [llmCommand]);
   } catch {
-    return {
-      step,
-      status: "skip",
-      duration: Date.now() - start,
-      output: "",
-      reason: `${llmCommand} not found`,
-    };
+    return { step, status: "skip", duration: Date.now() - start, output: "", reason: `${llmCommand} not found` };
   }
 
-  // Get changed files
-  let files: string[] = [];
-  if (changedOnly) {
-    try {
-      const git = simpleGit(root);
-      const diffOutput = await git.diff(["--name-only", "HEAD"]);
-      files = diffOutput.trim().split("\n").filter(Boolean);
-      if (files.length === 0) {
-        // Try staged files
-        const staged = await git.diff(["--name-only", "--cached"]);
-        files = staged.trim().split("\n").filter(Boolean);
-      }
-    } catch {
-      // Not a git repo or no changes
-    }
-  }
+  const files = changedOnly ? await resolveChangedFiles(root) : [];
 
   if (changedOnly && files.length === 0) {
-    return {
-      step,
-      status: "pass",
-      duration: Date.now() - start,
-      output: "No changed files to review.",
-    };
+    return { step, status: "pass", duration: Date.now() - start, output: "No changed files to review." };
   }
 
-  // Strip newlines and backticks from each filename before embedding in the prompt
-  // to prevent a maliciously named file from injecting instructions.
-  const safeFiles = files.map((f) => `\`${f.replace(/[\n\r`]/g, "")}\``).filter((f) => f.length > 2);
-  const fileList = safeFiles.length > 0 ? `\n\nFiles to review:\n${safeFiles.join("\n")}` : "";
-  const fullPrompt = `${prompt}${fileList}\n\nRespond with PASS or FAIL as the very first word on the very first line (no markdown, no asterisks, no extra words on that line). Then explain any issues on subsequent lines.`;
-
   try {
-    const output = await spawnWithStdin(llmCommand, ["--print"], fullPrompt, root);
-
-    const firstLine = output.trim().split("\n").map((l) => l.trim()).find(Boolean)?.toUpperCase() ?? "";
-    const hasFail = /\bFAIL\b/.test(firstLine);
-    const hasPass = /\bPASS\b/.test(firstLine);
-    const passed = hasPass && !hasFail;
-
-    return {
-      step,
-      status: passed ? "pass" : "fail",
-      duration: Date.now() - start,
-      output,
-    };
+    const output = await spawnWithStdin(llmCommand, ["--print"], buildLlmPrompt(prompt, files), root);
+    return { step, status: parseLlmVerdict(output) ? "pass" : "fail", duration: Date.now() - start, output };
   } catch (err) {
     return {
       step,

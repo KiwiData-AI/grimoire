@@ -68,190 +68,158 @@ const CATEGORY_ORDER = [
   "comment_style",
 ];
 
-export async function initProject(
-  projectPath: string,
-  options: InitOptions
-): Promise<void> {
-  const root = join(process.cwd(), projectPath);
+interface ConfigSetupResult {
+  cavemanLevel: CavemanLevel;
+  configAgents: string[];
+  integrationFlags: { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined };
+  figmaMcpConfigured: boolean;
+  projectDetection: Detection | null;
+}
 
-  console.log(chalk.bold("Initializing grimoire...\n"));
+async function runFullConfigSections(root: string, config: GrimoireConfig): Promise<void> {
+  const ALL_SECTIONS: SectionName[] = ["tools", "compliance", "llm", "trackers", "testing"];
+  const readline = await import("node:readline/promises");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  console.log(chalk.bold("\n  Advanced configuration (--full):\n"));
+  await runSections(rl, config, root, ALL_SECTIONS);
+  rl.close();
+  const fullSerialized = yamlStringify(config);
+  scanForSecrets(fullSerialized);
+  await writeFile(join(root, ".grimoire", "config.yaml"), fullSerialized);
+}
 
-  // Create directory structure
-  for (const dir of GRIMOIRE_DIRS) {
-    const fullPath = join(root, dir);
-    await mkdir(fullPath, { recursive: true });
-    console.log(`  ${chalk.green("created")} ${dir}/`);
+async function createGrimoireConfig(
+  root: string,
+  options: InitOptions,
+  initialFlags: { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined }
+): Promise<ConfigSetupResult> {
+  let projectDetection: Detection | null = null;
+  let config: GrimoireConfig;
+
+  if (options.noDetect) {
+    config = buildMinimalConfig();
+  } else {
+    const result = await buildDetectedConfig(root, initialFlags);
+    config = result.config;
+    projectDetection = result.detection;
   }
 
-  // Copy template files
+  const integrationFlags = {
+    codebaseMemoryMcp: initialFlags.codebaseMemoryMcp ?? config.project.integrations?.codebase_memory_mcp,
+    cavemanPlugin: initialFlags.cavemanPlugin ?? config.project.integrations?.caveman_plugin,
+  };
+
+  const serialized = yamlStringify(config);
+  scanForSecrets(serialized);
+  await writeFile(join(root, ".grimoire", "config.yaml"), serialized);
+  console.log(`  ${chalk.green("created")} .grimoire/config.yaml`);
+
+  if (options.full) await runFullConfigSections(root, config);
+
+  return {
+    cavemanLevel: config.project.caveman ?? "lite",
+    configAgents: config.project.agents ?? [],
+    integrationFlags,
+    figmaMcpConfigured: config.project.design_tool?.mcp?.name === "figma-dev-mode",
+    projectDetection,
+  };
+}
+
+async function loadExistingConfig(
+  root: string,
+  initialFlags: { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined }
+): Promise<Omit<ConfigSetupResult, "projectDetection">> {
+  console.log(`  ${chalk.yellow("exists")}  .grimoire/config.yaml`);
+  const { loadConfig } = await import("../utils/config.js");
+  const existing = await loadConfig(root);
+  return {
+    cavemanLevel: existing.project.caveman ?? "none",
+    configAgents: existing.project.agents ?? [],
+    integrationFlags: {
+      codebaseMemoryMcp: initialFlags.codebaseMemoryMcp ?? existing.project.integrations?.codebase_memory_mcp,
+      cavemanPlugin: initialFlags.cavemanPlugin ?? existing.project.integrations?.caveman_plugin,
+    },
+    figmaMcpConfigured: existing.project.design_tool?.mcp?.name === "figma-dev-mode",
+  };
+}
+
+function printNextSteps(isExistingProject: boolean, full: boolean): void {
+  console.log(`\n${chalk.bold.green("Done!")} Grimoire initialized.\n`);
+  console.log("Directory structure:");
+  console.log("  features/              Gherkin feature files (behavioral specs)");
+  console.log("  .grimoire/decisions/   MADR decision records (architectural specs)");
+  console.log("  .grimoire/docs/        Project docs, data schema, and context");
+  console.log("  .grimoire/changes/     Changes in progress");
+  console.log("  .grimoire/archive/     Completed changes\n");
+  console.log("Next steps:");
+  if (isExistingProject) {
+    console.log("  1. Install codebase-memory-mcp (required for code discovery):");
+    console.log("     macOS / Linux: curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash");
+    console.log("  2. Run /grimoire:discover in your agent to generate conventions files and data schema");
+    console.log("  3. Run /grimoire:audit in your agent to document existing features and decisions\n");
+  } else {
+    console.log("  Run /grimoire:draft in your agent to write your first feature spec\n");
+  }
+  if (!full) {
+    console.log(chalk.dim("  Run `grimoire configure` to set compliance, design tool, LLM models, bug trackers, and testing tools.\n"));
+  }
+}
+
+const SKILL_SUPPORTED = ["claude", "opencode", "codex"];
+const INSTRUCTION_SUPPORTED = ["cursor", "copilot"];
+
+async function scaffoldProject(root: string): Promise<void> {
+  for (const dir of GRIMOIRE_DIRS) {
+    await mkdir(join(root, dir), { recursive: true });
+    console.log(`  ${chalk.green("created")} ${dir}/`);
+  }
   for (const [src, dest] of TEMPLATE_FILES) {
-    const srcPath = join(PACKAGE_ROOT, "templates", src);
     const destPath = join(root, dest);
     if (!(await fileExists(destPath))) {
-      await copyFile(srcPath, destPath);
+      await copyFile(join(PACKAGE_ROOT, "templates", src), destPath);
       console.log(`  ${chalk.green("created")} ${dest}`);
     } else {
       console.log(`  ${chalk.yellow("exists")}  ${dest}`);
     }
   }
+}
 
-  // Generate config.yaml
-  const configPath = join(root, ".grimoire", "config.yaml");
-  let cavemanLevel: CavemanLevel = "lite";
-  let configAgents: string[] = [];
-  let integrationFlags = {
-    codebaseMemoryMcp: options.installCodebaseMemoryMcp,
-    cavemanPlugin: options.installCavemanPlugin,
-  };
-  let figmaMcpConfigured = false;
-  let projectDetection: Detection | null = null;
-
-  if (!(await fileExists(configPath))) {
-    let config: GrimoireConfig;
-    if (options.noDetect) {
-      config = buildMinimalConfig();
-    } else {
-      const result = await buildDetectedConfig(root, integrationFlags);
-      config = result.config;
-      projectDetection = result.detection;
-    }
-    cavemanLevel = config.project.caveman ?? "lite";
-    configAgents = config.project.agents ?? [];
-    integrationFlags = {
-      codebaseMemoryMcp:
-        integrationFlags.codebaseMemoryMcp ??
-        config.project.integrations?.codebase_memory_mcp,
-      cavemanPlugin:
-        integrationFlags.cavemanPlugin ??
-        config.project.integrations?.caveman_plugin,
-    };
-    figmaMcpConfigured =
-      config.project.design_tool?.mcp?.name === "figma-dev-mode";
-    const serialized = yamlStringify(config);
-    scanForSecrets(serialized);
-    await writeFile(configPath, serialized);
-    console.log(`  ${chalk.green("created")} .grimoire/config.yaml`);
-
-    // Full mode: run deferred configure sections immediately after writing base config
-    if (options.full) {
-      const ALL_SECTIONS: SectionName[] = [
-        "tools",
-        "compliance",
-        "llm",
-        "trackers",
-        "testing",
-      ];
-      const readline = await import("node:readline/promises");
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-      });
-      console.log(
-        chalk.bold("\n  Advanced configuration (--full):\n")
-      );
-      await runSections(rl, config, root, ALL_SECTIONS);
-      rl.close();
-      // Re-serialize with the updated config
-      const fullSerialized = yamlStringify(config);
-      scanForSecrets(fullSerialized);
-      await writeFile(configPath, fullSerialized);
-      figmaMcpConfigured =
-        config.project.design_tool?.mcp?.name === "figma-dev-mode";
-    }
-  } else {
-    console.log(`  ${chalk.yellow("exists")}  .grimoire/config.yaml`);
-    const { loadConfig } = await import("../utils/config.js");
-    const existing = await loadConfig(root);
-    cavemanLevel = existing.project.caveman ?? "none";
-    configAgents = existing.project.agents ?? [];
-    integrationFlags = {
-      codebaseMemoryMcp:
-        integrationFlags.codebaseMemoryMcp ??
-        existing.project.integrations?.codebase_memory_mcp,
-      cavemanPlugin:
-        integrationFlags.cavemanPlugin ??
-        existing.project.integrations?.caveman_plugin,
-    };
-  }
-
-  // Merge agents
-  const allAgents = Array.from(new Set([...configAgents, ...options.agents]));
-  const SKILL_SUPPORTED = ["claude", "opencode", "codex"];
-  const INSTRUCTION_SUPPORTED = ["cursor", "copilot"];
+async function setupAgents(root: string, options: InitOptions, setup: ConfigSetupResult): Promise<void> {
+  const allAgents = Array.from(new Set([...setup.configAgents, ...options.agents]));
   const skillAgents = allAgents.filter((a) => SKILL_SUPPORTED.includes(a));
-  const instructionAgents = allAgents.filter((a) =>
-    INSTRUCTION_SUPPORTED.includes(a)
-  );
+  const instructionAgents = allAgents.filter((a) => INSTRUCTION_SUPPORTED.includes(a));
+
   for (const a of allAgents) {
     if (!SKILL_SUPPORTED.includes(a) && !INSTRUCTION_SUPPORTED.includes(a)) {
-      console.log(
-        `  ${chalk.yellow("unknown")} agent type: ${a} (supported: ${[...SKILL_SUPPORTED, ...INSTRUCTION_SUPPORTED].join(", ")})`
-      );
+      console.log(`  ${chalk.yellow("unknown")} agent type: ${a} (supported: ${[...SKILL_SUPPORTED, ...INSTRUCTION_SUPPORTED].join(", ")})`);
     }
   }
 
-  if (!options.skipAgents) {
-    await setupAgentsFile(root, cavemanLevel);
-  }
+  if (!options.skipAgents) await setupAgentsFile(root, setup.cavemanLevel);
+  if (!options.skipSkills) await installSkills(root, skillAgents.length > 0 ? skillAgents : ["claude"]);
+  if (instructionAgents.length > 0) await generateAgentFiles(root, PACKAGE_ROOT, instructionAgents, "created");
+  if (!options.skipAgents) await setupHooks(root);
+}
 
-  if (!options.skipSkills) {
-    const targets = skillAgents.length > 0 ? skillAgents : ["claude"];
-    await installSkills(root, targets);
-  }
+export async function initProject(
+  projectPath: string,
+  options: InitOptions
+): Promise<void> {
+  const root = join(process.cwd(), projectPath);
+  console.log(chalk.bold("Initializing grimoire...\n"));
 
-  if (instructionAgents.length > 0) {
-    await generateAgentFiles(root, PACKAGE_ROOT, instructionAgents, "created");
-  }
+  await scaffoldProject(root);
 
-  if (!options.skipAgents) {
-    await setupHooks(root);
-  }
+  const configPath = join(root, ".grimoire", "config.yaml");
+  const initialFlags = { codebaseMemoryMcp: options.installCodebaseMemoryMcp, cavemanPlugin: options.installCavemanPlugin };
+  const setup = await fileExists(configPath)
+    ? { ...(await loadExistingConfig(root, initialFlags)), projectDetection: null as Detection | null }
+    : await createGrimoireConfig(root, options, initialFlags);
 
-  console.log(`\n${chalk.bold.green("Done!")} Grimoire initialized.\n`);
-  console.log("Directory structure:");
-  console.log(
-    "  features/              Gherkin feature files (behavioral specs)"
-  );
-  console.log(
-    "  .grimoire/decisions/   MADR decision records (architectural specs)"
-  );
-  console.log(
-    "  .grimoire/docs/        Project docs, data schema, and context"
-  );
-  console.log("  .grimoire/changes/     Changes in progress");
-  console.log("  .grimoire/archive/     Completed changes\n");
-  const isExistingProject = !!projectDetection?.name;
-  console.log("Next steps:");
-  if (isExistingProject) {
-    console.log(
-      "  1. Install codebase-memory-mcp (required for code discovery):"
-    );
-    console.log(
-      "     macOS / Linux: curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash"
-    );
-    console.log(
-      "  2. Run /grimoire:discover in your agent to generate conventions files and data schema"
-    );
-    console.log(
-      "  3. Run /grimoire:audit in your agent to document existing features and decisions\n"
-    );
-  } else {
-    console.log(
-      "  Run /grimoire:draft in your agent to write your first feature spec\n"
-    );
-  }
-  if (!options.full) {
-    console.log(
-      chalk.dim(
-        "  Run `grimoire configure` to set compliance, design tool, LLM models, bug trackers, and testing tools.\n"
-      )
-    );
-  }
+  await setupAgents(root, options, setup);
 
-  printIntegrationInstructions({
-    ...integrationFlags,
-    figmaMcp: figmaMcpConfigured,
-  });
+  printNextSteps(!!setup.projectDetection?.name, options.full);
+  printIntegrationInstructions({ ...setup.integrationFlags, figmaMcp: setup.figmaMcpConfigured });
 }
 
 function printIntegrationInstructions(flags: {
@@ -358,6 +326,57 @@ interface EssentialPrefill {
   detectedSurface?: ProjectSurface;
 }
 
+function bestByCategory(detections: Detection[]): Map<string, Detection> {
+  const byCategory = new Map<string, Detection>();
+  for (const d of detections) {
+    const existing = byCategory.get(d.category);
+    if (!existing || confidenceRank(d.confidence) > confidenceRank(existing.confidence)) {
+      byCategory.set(d.category, d);
+    }
+  }
+  return byCategory;
+}
+
+function applyProjectDetections(config: GrimoireConfig, byCategory: Map<string, Detection>): void {
+  const projectFields: Array<[string, keyof typeof config.project]> = [
+    ["language", "language"],
+    ["package_manager", "package_manager"],
+    ["doc_tool", "doc_tool"],
+    ["comment_style", "comment_style"],
+  ];
+  for (const [cat, field] of projectFields) {
+    const d = byCategory.get(cat);
+    if (d) (config.project as unknown as Record<string, unknown>)[field] = d.name;
+  }
+  const projectCategories = new Set(["language", "package_manager", "doc_tool", "comment_style"]);
+  for (const [category, detection] of byCategory) {
+    if (projectCategories.has(category)) continue;
+    const tool: ToolConfig = { name: detection.name };
+    if (detection.command) tool.command = detection.command;
+    if (detection.check_command) tool.check_command = detection.check_command;
+    config.tools[category] = tool;
+  }
+}
+
+function applyLlmFallbacks(config: GrimoireConfig, byCategory: Map<string, Detection>): void {
+  if (!byCategory.has("security")) {
+    config.tools.security = { name: "llm", prompt: "Review these changed files for security vulnerabilities. Tag each finding with OWASP Top 10 category and CWE ID. Check for: SQL injection (CWE-89), XSS (CWE-79), broken auth (CWE-287), insecure crypto (CWE-327), SSRF (CWE-918), path traversal (CWE-22), insecure deserialization (CWE-502), missing access control (CWE-862), CSRF (CWE-352), hardcoded secrets (CWE-798)." };
+  }
+  if (!byCategory.has("dep_audit")) {
+    config.tools.dep_audit = { name: "llm", prompt: "Review these changed files for newly added dependencies or imports. Flag potential typosquatting (CWE-1357), packages you cannot verify as real, and packages with known security advisories. Check for misspellings (e.g., 'reqeusts' instead of 'requests')." };
+  }
+  if (!byCategory.has("secrets")) {
+    config.tools.secrets = { name: "llm", prompt: "Review these changed files for hardcoded secrets (CWE-798), API keys, passwords, tokens, private keys, or credentials (CWE-312). Flag any string that looks like a secret value rather than a placeholder or environment variable reference." };
+  }
+  if (!byCategory.has("dead_code")) {
+    config.tools.dead_code = { name: "llm", prompt: "Review these changed files for dead code: unused functions, unreachable branches, unused imports, unused variables, and exports that are never imported elsewhere. Only flag code that is clearly dead, not code that might be used dynamically." };
+  }
+  config.tools.best_practices = { name: "llm", prompt: "Review these changed files for best practices violations" };
+  if (!config.tools.duplicates) {
+    config.tools.duplicates = { name: "jscpd", command: "npx jscpd --reporters console" };
+  }
+}
+
 async function buildDetectedConfig(
   root: string,
   prefill: EssentialPrefill = {}
@@ -369,131 +388,39 @@ async function buildDetectedConfig(
 
   if (detections.length === 0) {
     console.log(chalk.dim("  No tools detected. Using minimal config.\n"));
-    const finalConfig = await askEssentialPreferences(config, root, prefill);
-    return { config: finalConfig, detection: null };
+    return { config: await askEssentialPreferences(config, root, prefill), detection: null };
   }
 
-  // Pick highest-confidence detection per category
-  const byCategory = new Map<string, Detection>();
-  for (const d of detections) {
-    const existing = byCategory.get(d.category);
-    if (
-      !existing ||
-      confidenceRank(d.confidence) > confidenceRank(existing.confidence)
-    ) {
-      byCategory.set(d.category, d);
-    }
-  }
+  const byCategory = bestByCategory(detections);
 
   console.log(chalk.bold("  Detected tools:\n"));
   for (const cat of CATEGORY_ORDER) {
     const label = (CATEGORY_LABELS[cat] ?? cat).padEnd(14);
     const d = byCategory.get(cat);
-    if (d) {
-      console.log(
-        `    ${label} ${chalk.cyan(d.name.padEnd(16))} ${chalk.dim(`(${d.signal})`)}`
-      );
-    } else {
-      console.log(`    ${label} ${chalk.dim("(none detected)")}`);
-    }
+    if (d) console.log(`    ${label} ${chalk.cyan(d.name.padEnd(16))} ${chalk.dim(`(${d.signal})`)}`);
+    else console.log(`    ${label} ${chalk.dim("(none detected)")}`);
   }
 
   const readline = await import("node:readline/promises");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   console.log();
   const answer = await rl.question("  Accept detected tools? (Y/n/edit) ");
 
-  const detectedSurface = surfaceFromDetection(byCategory.get("surface"));
-  const prefillWithSurface: EssentialPrefill = {
-    ...prefill,
-    detectedSurface,
-  };
+  const prefillWithSurface: EssentialPrefill = { ...prefill, detectedSurface: surfaceFromDetection(byCategory.get("surface")) };
 
   if (answer.toLowerCase() === "n") {
     rl.close();
     console.log(chalk.dim("  Skipping tool detection.\n"));
-    const finalConfig = await askEssentialPreferences(config, root, prefillWithSurface);
-    return { config: finalConfig, detection: null };
+    return { config: await askEssentialPreferences(config, root, prefillWithSurface), detection: null };
   }
 
-  if (answer.toLowerCase() === "edit") {
-    await editDetections(rl, byCategory);
-  }
-
+  if (answer.toLowerCase() === "edit") await editDetections(rl, byCategory);
   rl.close();
 
-  // Apply project-level detections
-  const langDetection = byCategory.get("language");
-  if (langDetection) config.project.language = langDetection.name;
-  const pkgMgrDetection = byCategory.get("package_manager");
-  if (pkgMgrDetection) config.project.package_manager = pkgMgrDetection.name;
-  const docToolDetection = byCategory.get("doc_tool");
-  if (docToolDetection) config.project.doc_tool = docToolDetection.name;
-  const commentStyleDetection = byCategory.get("comment_style");
-  if (commentStyleDetection)
-    config.project.comment_style = commentStyleDetection.name;
+  applyProjectDetections(config, byCategory);
+  applyLlmFallbacks(config, byCategory);
 
-  const projectCategories = new Set([
-    "language",
-    "package_manager",
-    "doc_tool",
-    "comment_style",
-  ]);
-  for (const [category, detection] of byCategory) {
-    if (projectCategories.has(category)) continue;
-    const tool: ToolConfig = { name: detection.name };
-    if (detection.command) tool.command = detection.command;
-    if (detection.check_command) tool.check_command = detection.check_command;
-    config.tools[category] = tool;
-  }
-
-  // LLM fallbacks for undetected security tools
-  if (!byCategory.has("security")) {
-    config.tools.security = {
-      name: "llm",
-      prompt:
-        "Review these changed files for security vulnerabilities. Tag each finding with OWASP Top 10 category and CWE ID. Check for: SQL injection (CWE-89), XSS (CWE-79), broken auth (CWE-287), insecure crypto (CWE-327), SSRF (CWE-918), path traversal (CWE-22), insecure deserialization (CWE-502), missing access control (CWE-862), CSRF (CWE-352), hardcoded secrets (CWE-798).",
-    };
-  }
-  if (!byCategory.has("dep_audit")) {
-    config.tools.dep_audit = {
-      name: "llm",
-      prompt:
-        "Review these changed files for newly added dependencies or imports. Flag potential typosquatting (CWE-1357), packages you cannot verify as real, and packages with known security advisories. Check for misspellings (e.g., 'reqeusts' instead of 'requests').",
-    };
-  }
-  if (!byCategory.has("secrets")) {
-    config.tools.secrets = {
-      name: "llm",
-      prompt:
-        "Review these changed files for hardcoded secrets (CWE-798), API keys, passwords, tokens, private keys, or credentials (CWE-312). Flag any string that looks like a secret value rather than a placeholder or environment variable reference.",
-    };
-  }
-  if (!byCategory.has("dead_code")) {
-    config.tools.dead_code = {
-      name: "llm",
-      prompt:
-        "Review these changed files for dead code: unused functions, unreachable branches, unused imports, unused variables, and exports that are never imported elsewhere. Only flag code that is clearly dead, not code that might be used dynamically.",
-    };
-  }
-  config.tools.best_practices = {
-    name: "llm",
-    prompt: "Review these changed files for best practices violations",
-  };
-  if (!config.tools.duplicates) {
-    config.tools.duplicates = {
-      name: "jscpd",
-      command: "npx jscpd --reporters console",
-    };
-  }
-
-  const langDetectionResult = byCategory.get("language") ?? null;
-  const finalConfig = await askEssentialPreferences(config, root, prefillWithSurface);
-  return { config: finalConfig, detection: langDetectionResult };
+  return { config: await askEssentialPreferences(config, root, prefillWithSurface), detection: byCategory.get("language") ?? null };
 }
 
 const PROMPT_SURFACES: readonly ProjectSurface[] = [

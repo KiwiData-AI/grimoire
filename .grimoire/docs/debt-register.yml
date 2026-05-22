@@ -1,0 +1,693 @@
+version: 1
+generated: 2026-05-22
+scanner: grimoire-refactor
+project: grimoire
+
+items:
+
+  # ── HIGH SEVERITY ──────────────────────────────────────────────────────────
+
+  - id: debt-001
+    category: hotspot
+    severity: high
+    location: src/core/init.ts:71
+    title: initProject complexity 34 in highest-churn file
+    detail: >
+      initProject has cyclomatic complexity 34 (threshold 10). src/core/init.ts
+      churns every 12 commits — every future change to project initialisation
+      risks introducing bugs in untested branches. Function handles detection,
+      config writing, directory setup, skill installation, git hooks, and CI
+      generation in a single pass.
+    metrics:
+      complexity: 34
+      churn: 12
+      hotspot_score: 408
+    suggestion: >
+      Extract into focused steps: detectEnvironment(), writeConfig(),
+      scaffoldDirs(), installSkills(), configureHooks(), generateCi(). Each
+      under complexity 5, independently testable.
+    effort: large
+    consequences: >
+      Every new init option adds another branch to an already-unmaintainable
+      function. Bug in one phase silently affects others. Hard to test edge
+      cases (e.g. partial init recovery).
+    causes: evolution
+    quadrant: inadvertent-prudent
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-002
+    category: hotspot
+    severity: high
+    location: src/core/init.ts:361
+    title: buildDetectedConfig complexity 25 in highest-churn file
+    detail: >
+      buildDetectedConfig has cyclomatic complexity 25. Co-located with
+      initProject in the highest-churn file. Branches cover every language,
+      tool, and integration combination — any new detect.ts additions require
+      changes here too.
+    metrics:
+      complexity: 25
+      churn: 12
+      hotspot_score: 300
+    suggestion: >
+      Replace explicit branching with a map of language → defaults. Collapse
+      tool-detection results into a config builder pattern.
+    effort: medium
+    consequences: >
+      Adding support for a new language or tool requires touching both
+      detect.ts and buildDetectedConfig. High risk of missing a case.
+    causes: evolution
+    quadrant: inadvertent-prudent
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-003
+    category: hotspot
+    severity: high
+    location: src/utils/config.ts:152
+    title: parseProject complexity 24 in highest-churn file
+    detail: >
+      parseProject has cyclomatic complexity 24. src/utils/config.ts churns
+      every 12 commits. Every new config field or migration path adds a branch.
+      Central to the entire CLI — any parse regression breaks all commands.
+    metrics:
+      complexity: 24
+      churn: 12
+      hotspot_score: 288
+    suggestion: >
+      Extract per-field parsing into typed field parsers. Use a schema
+      validation library (e.g. zod) to declaratively describe the config shape
+      instead of imperative branching.
+    effort: medium
+    consequences: >
+      Bugs in parseProject silently misconfigure every command. Hard to add
+      new config fields without risking regressions. Test coverage can't
+      realistically reach all branches.
+    causes: evolution
+    quadrant: inadvertent-prudent
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-004
+    category: hotspot
+    severity: high
+    location: src/core/check.ts:88
+    title: runStep complexity 19 in recently-touched file
+    detail: >
+      runStep has cyclomatic complexity 19. src/core/check.ts churns every 6
+      commits and was just modified. Single function dispatches all check
+      types (llm, shell, complexity, test_quality, doc_style) via if-chains.
+      Adding a new check type always touches this function.
+    metrics:
+      complexity: 19
+      churn: 6
+      hotspot_score: 114
+    suggestion: >
+      Replace if-chain dispatch with a handler map keyed by check name/type.
+      Each handler is a self-contained function. New check types register
+      themselves — runStep shrinks to a lookup.
+    effort: medium
+    consequences: >
+      Every new check type increases complexity further. Easy to accidentally
+      break an existing check type when adding a new one. Hard to unit test
+      individual check paths in isolation.
+    causes: evolution
+    quadrant: inadvertent-prudent
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-005
+    category: structural_bloat
+    severity: high
+    location: src/core/ci.ts:23
+    title: runCi complexity 30
+    detail: >
+      runCi has cyclomatic complexity 30. Handles GitHub Actions, GitLab CI,
+      CircleCI, and Bitbucket Pipelines generation plus validation in a single
+      function. Each CI provider adds a new branch cluster.
+    metrics:
+      complexity: 30
+    suggestion: >
+      One generator per CI provider (generateGithubActions, generateGitlabCi,
+      etc.), dispatched by a thin router. Each generator under complexity 8.
+    effort: medium
+    consequences: >
+      Adding a new CI provider (e.g. Azure DevOps) will push complexity to
+      40+. Bugs in one provider's generation silently affect all providers
+      sharing the same code path.
+    causes: evolution
+    quadrant: inadvertent-prudent
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-006
+    category: structural_bloat
+    severity: high
+    location: src/core/diff.ts:191
+    title: printDiff complexity 23
+    detail: >
+      printDiff has cyclomatic complexity 23. Handles rendering of multiple
+      diff types, output modes, truncation, and colour in a single function.
+    metrics:
+      complexity: 23
+    suggestion: >
+      Split into renderHunk(), renderSummary(), applyTruncation() helpers.
+      printDiff becomes a thin coordinator.
+    effort: medium
+    consequences: >
+      Hard to add new diff rendering modes without risking regressions in
+      existing modes.
+    causes: evolution
+    quadrant: inadvertent-prudent
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-007
+    category: structural_bloat
+    severity: high
+    location: src/core/map.ts:337
+    title: generateMap complexity 20 with moderate churn
+    detail: >
+      generateMap has cyclomatic complexity 20. src/core/map.ts churns every
+      4 commits. Generates multiple map sections (APIs, routes, data models,
+      area docs) in a single function.
+    metrics:
+      complexity: 20
+      churn: 4
+      hotspot_score: 80
+    suggestion: >
+      Extract one builder per map section. generateMap becomes a pipeline:
+      sections.map(s => s.build(ctx)).join().
+    effort: medium
+    consequences: >
+      Adding a new map section always increases this function's complexity.
+    causes: evolution
+    quadrant: inadvertent-prudent
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-008
+    category: structural_bloat
+    severity: high
+    location: src/core/validate.ts:191
+    title: validateFeatureFile complexity 20
+    detail: >
+      validateFeatureFile has cyclomatic complexity 20. Validates Gherkin
+      syntax, required sections, naming conventions, and scenario structure
+      in one function.
+    metrics:
+      complexity: 20
+    suggestion: >
+      Extract validateSyntax(), validateStructure(), validateNaming() — each
+      returns a list of violations, collected and returned by the coordinator.
+    effort: medium
+    consequences: >
+      Hard to add new validation rules without increasing complexity further.
+      Validation errors from different concerns are hard to distinguish.
+    causes: evolution
+    quadrant: inadvertent-prudent
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  # ── MEDIUM SEVERITY ────────────────────────────────────────────────────────
+
+  - id: debt-009
+    category: hotspot
+    severity: medium
+    location: src/core/check.ts:159
+    title: runLlmStep complexity 14 in recently-touched file
+    detail: runLlmStep complexity 14. Just modified — further changes likely.
+    metrics: { complexity: 14, churn: 6, hotspot_score: 84 }
+    suggestion: Extract buildPrompt(), resolveChangedFiles(), parseVerdict() helpers.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-010
+    category: structural_bloat
+    severity: medium
+    location: src/core/map.ts:483
+    title: scanDirectory complexity 18
+    detail: scanDirectory complexity 18. Recursive directory walker with inline filtering.
+    metrics: { complexity: 18 }
+    suggestion: Extract shouldInclude() predicate and visitEntry() handler.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-011
+    category: structural_bloat
+    severity: medium
+    location: src/core/configure.ts:256
+    title: configureComplianceSection complexity 17
+    detail: configureComplianceSection complexity 17. Per-field prompt branches.
+    metrics: { complexity: 17 }
+    suggestion: Data-driven field config array + generic promptField() loop.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-012
+    category: structural_bloat
+    severity: medium
+    location: src/core/detect.ts:469
+    title: detectSurface complexity 17
+    detail: detectSurface complexity 17. Detects CLI/TUI/API surface via file heuristics.
+    metrics: { complexity: 17 }
+    suggestion: Extract per-surface probe functions, reduce to a scored vote.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-013
+    category: structural_bloat
+    severity: medium
+    location: src/core/trace.ts:36
+    title: traceFile complexity 16
+    detail: traceFile complexity 16.
+    metrics: { complexity: 16 }
+    suggestion: Extract per-trace-type handlers.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-014
+    category: structural_bloat
+    severity: medium
+    location: src/core/health.ts:338
+    title: renderExternalApis complexity 15
+    detail: renderExternalApis complexity 15.
+    metrics: { complexity: 15 }
+    suggestion: Extract per-api-type renderers.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-015
+    category: structural_bloat
+    severity: medium
+    location: src/core/health.ts:424
+    title: buildDecisionsSection complexity 15
+    detail: buildDecisionsSection complexity 15.
+    metrics: { complexity: 15 }
+    suggestion: Extract renderDecision() and filterByStatus() helpers.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-016
+    category: structural_bloat
+    severity: medium
+    location: src/core/detect.ts:136
+    title: detectPackageManager complexity 14
+    detail: detectPackageManager complexity 14. Per-lockfile if-chain.
+    metrics: { complexity: 14 }
+    suggestion: Lookup table of lockfile → package-manager.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-017
+    category: structural_bloat
+    severity: medium
+    location: src/core/detect.ts:240
+    title: detectUnitTest complexity 14
+    detail: detectUnitTest complexity 14.
+    metrics: { complexity: 14 }
+    suggestion: Lookup table of config file pattern → test runner.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-018
+    category: structural_bloat
+    severity: medium
+    location: src/core/detect.ts:521
+    title: detectCommentStyle complexity 14
+    detail: detectCommentStyle complexity 14.
+    metrics: { complexity: 14 }
+    suggestion: Language → comment style lookup table.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-019
+    category: structural_bloat
+    severity: medium
+    location: src/core/health.ts:189
+    title: buildFeaturesSection complexity 14
+    detail: buildFeaturesSection complexity 14.
+    metrics: { complexity: 14 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-020
+    category: structural_bloat
+    severity: medium
+    location: src/core/log.ts:23
+    title: generateLog complexity 14
+    detail: generateLog complexity 14.
+    metrics: { complexity: 14 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-021
+    category: structural_bloat
+    severity: medium
+    location: src/core/test-quality.ts:276
+    title: checkPythonMissingAssertions complexity 14
+    detail: checkPythonMissingAssertions complexity 14.
+    metrics: { complexity: 14 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-022
+    category: structural_bloat
+    severity: medium
+    location: src/core/list.ts:20
+    title: listChanges complexity 19
+    detail: listChanges complexity 19.
+    metrics: { complexity: 19 }
+    suggestion: Extract change status resolver and output formatter.
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-023
+    category: structural_bloat
+    severity: medium
+    location: src/core/status.ts:30
+    title: getChangeStatus complexity 19
+    detail: getChangeStatus complexity 19.
+    metrics: { complexity: 19 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  # ── LOW SEVERITY ───────────────────────────────────────────────────────────
+
+  - id: debt-024
+    category: structural_bloat
+    severity: low
+    location: src/core/check.ts:38
+    title: runCheck complexity 13
+    metrics: { complexity: 13, churn: 6 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-025
+    category: structural_bloat
+    severity: low
+    location: src/core/check.ts:424
+    title: runComplexityStep complexity 12
+    metrics: { complexity: 12, churn: 6 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-026
+    category: structural_bloat
+    severity: low
+    location: src/core/archive.ts:17
+    title: archiveChange complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-027
+    category: structural_bloat
+    severity: low
+    location: src/core/configure.ts:208
+    title: configureToolsSection complexity 13
+    metrics: { complexity: 13 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-028
+    category: structural_bloat
+    severity: low
+    location: src/core/configure.ts:471
+    title: configureLlmSection complexity 11
+    metrics: { complexity: 11 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-029
+    category: structural_bloat
+    severity: low
+    location: src/core/detect.ts:211
+    title: detectFormatter complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-030
+    category: structural_bloat
+    severity: low
+    location: src/core/detect.ts:372
+    title: detectDocTool complexity 11
+    metrics: { complexity: 11 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-031
+    category: structural_bloat
+    severity: low
+    location: src/core/detect.ts:406
+    title: detectDeadCode complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-032
+    category: structural_bloat
+    severity: low
+    location: src/core/diff.ts:35
+    title: diffChange complexity 13
+    metrics: { complexity: 13 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-033
+    category: structural_bloat
+    severity: low
+    location: src/core/doc-style.ts:192
+    title: checkJsDocStyle complexity 11
+    metrics: { complexity: 11 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-034
+    category: structural_bloat
+    severity: low
+    location: src/core/health.ts:293
+    title: checkUnitTestCoverage complexity 13
+    metrics: { complexity: 13 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-035
+    category: structural_bloat
+    severity: low
+    location: src/core/health.ts:380
+    title: renderFieldsTable complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-036
+    category: structural_bloat
+    severity: low
+    location: src/core/health.ts:517
+    title: writeBadges complexity 13
+    metrics: { complexity: 13 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-037
+    category: structural_bloat
+    severity: low
+    location: src/core/map.ts:196
+    title: runJscpd complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-038
+    category: structural_bloat
+    severity: low
+    location: src/core/map.ts:232
+    title: Arrow function complexity 12 in generateMap
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-039
+    category: structural_bloat
+    severity: low
+    location: src/core/update.ts:31
+    title: updateProject complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-040
+    category: structural_bloat
+    severity: low
+    location: src/core/update.ts:333
+    title: installSkillFiles complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-041
+    category: structural_bloat
+    severity: low
+    location: src/core/validate.ts:32
+    title: validateChange complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-042
+    category: structural_bloat
+    severity: low
+    location: src/core/validate.ts:104
+    title: validateSingleChange complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-043
+    category: structural_bloat
+    severity: low
+    location: src/core/validate.ts:268
+    title: validateDecisionFile complexity 12
+    metrics: { complexity: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-044
+    category: structural_bloat
+    severity: low
+    location: src/core/validate.ts:325
+    title: validateManifest complexity 11
+    metrics: { complexity: 11 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22
+
+  - id: debt-045
+    category: structural_bloat
+    severity: low
+    location: src/utils/config.ts:257
+    title: loadConfig complexity 12
+    metrics: { complexity: 12, churn: 12 }
+    effort: small
+    causes: evolution
+    status: open
+    first_detected: 2026-05-22
+    last_detected: 2026-05-22

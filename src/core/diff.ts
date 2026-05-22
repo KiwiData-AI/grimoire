@@ -188,6 +188,24 @@ function extractScenarios(content: string): ScenarioInfo[] {
   return scenarios;
 }
 
+function statusStyle(status: string): { icon: string; label: string } {
+  if (status === "added") return { icon: chalk.green("+"), label: chalk.green("added") };
+  if (status === "removed") return { icon: chalk.red("-"), label: chalk.red("removed") };
+  return { icon: chalk.yellow("~"), label: chalk.yellow("modified") };
+}
+
+function printDiffSummary(s: DiffResult["summary"]): void {
+  const parts: string[] = [];
+  if (s.featuresAdded > 0) parts.push(chalk.green(`${s.featuresAdded} feature(s) added`));
+  if (s.featuresModified > 0) parts.push(chalk.yellow(`${s.featuresModified} feature(s) modified`));
+  if (s.featuresRemoved > 0) parts.push(chalk.red(`${s.featuresRemoved} feature(s) removed`));
+  if (s.scenariosAdded > 0) parts.push(chalk.green(`${s.scenariosAdded} scenario(s) added`));
+  if (s.scenariosRemoved > 0) parts.push(chalk.red(`${s.scenariosRemoved} scenario(s) removed`));
+  if (s.decisionsAdded > 0) parts.push(chalk.green(`${s.decisionsAdded} decision(s) added`));
+  if (s.decisionsModified > 0) parts.push(chalk.yellow(`${s.decisionsModified} decision(s) modified`));
+  console.log(`\n  ${parts.join(", ")}`);
+}
+
 function printDiff(result: DiffResult): void {
   console.log(chalk.bold(`\nSpec diff: ${result.changeId}\n`));
 
@@ -196,64 +214,23 @@ function printDiff(result: DiffResult): void {
     return;
   }
 
-  // Features
   for (const f of result.features) {
-    const icon =
-      f.status === "added"
-        ? chalk.green("+")
-        : f.status === "removed"
-          ? chalk.red("-")
-          : chalk.yellow("~");
-    const label =
-      f.status === "added"
-        ? chalk.green("added")
-        : f.status === "removed"
-          ? chalk.red("removed")
-          : chalk.yellow("modified");
-
+    const { icon, label } = statusStyle(f.status);
     console.log(`  ${icon} ${chalk.bold(f.file)} ${chalk.dim(`[${label}]`)}`);
-
-    for (const s of f.scenariosAdded) {
-      console.log(`    ${chalk.green("+")} ${s}`);
-    }
-    for (const s of f.scenariosRemoved) {
-      console.log(`    ${chalk.red("-")} ${s}`);
-    }
+    for (const s of f.scenariosAdded) console.log(`    ${chalk.green("+")} ${s}`);
+    for (const s of f.scenariosRemoved) console.log(`    ${chalk.red("-")} ${s}`);
     if (f.scenariosUnchanged.length > 0 && f.status === "modified") {
-      console.log(
-        chalk.dim(`    ${f.scenariosUnchanged.length} scenario(s) unchanged`)
-      );
+      console.log(chalk.dim(`    ${f.scenariosUnchanged.length} scenario(s) unchanged`));
     }
   }
 
-  // Decisions
   if (result.decisions.length > 0) {
     console.log();
     for (const d of result.decisions) {
-      const icon =
-        d.status === "added"
-          ? chalk.green("+")
-          : chalk.yellow("~");
-      const label =
-        d.status === "added"
-          ? chalk.green("added")
-          : chalk.yellow("modified");
-      console.log(
-        `  ${icon} ${chalk.bold(d.file)} ${chalk.dim(`[${label}]`)}`
-      );
+      const { icon, label } = statusStyle(d.status);
+      console.log(`  ${icon} ${chalk.bold(d.file)} ${chalk.dim(`[${label}]`)}`);
     }
   }
 
-  // Summary line
-  const parts: string[] = [];
-  const s = result.summary;
-  if (s.featuresAdded > 0) parts.push(chalk.green(`${s.featuresAdded} feature(s) added`));
-  if (s.featuresModified > 0) parts.push(chalk.yellow(`${s.featuresModified} feature(s) modified`));
-  if (s.featuresRemoved > 0) parts.push(chalk.red(`${s.featuresRemoved} feature(s) removed`));
-  if (s.scenariosAdded > 0) parts.push(chalk.green(`${s.scenariosAdded} scenario(s) added`));
-  if (s.scenariosRemoved > 0) parts.push(chalk.red(`${s.scenariosRemoved} scenario(s) removed`));
-  if (s.decisionsAdded > 0) parts.push(chalk.green(`${s.decisionsAdded} decision(s) added`));
-  if (s.decisionsModified > 0) parts.push(chalk.yellow(`${s.decisionsModified} decision(s) modified`));
-
-  console.log(`\n  ${parts.join(", ")}`);
+  printDiffSummary(result.summary);
 }

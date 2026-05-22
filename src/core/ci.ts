@@ -20,69 +20,32 @@ interface CiResult {
   exitCode: number;
 }
 
-export async function runCi(options: CiOptions): Promise<CiResult> {
-  if (options.setup) {
-    await generateWorkflow();
-    return { validate: { errors: 0, warnings: 0 }, check: { passed: 0, failed: 0, errored: 0 }, testQuality: { critical: 0, warning: 0 }, exitCode: 0 };
-  }
-
-  const isGha = options.annotations || !!process.env.GITHUB_ACTIONS;
-
-  if (!isGha) {
-    console.log(chalk.bold("\ngrimoire ci\n"));
-  }
-
-  // 1. Validate specs
-  if (!isGha) {
-    console.log(chalk.bold("── Validate specs ──\n"));
-  }
-
-  const validateResult = await validateChange(undefined, {
-    strict: false,
-    json: isGha,
-  });
-
+async function runValidatePhase(isGha: boolean): Promise<ReturnType<typeof validateChange>> {
+  if (!isGha) console.log(chalk.bold("── Validate specs ──\n"));
+  const result = await validateChange(undefined, { strict: false, json: isGha });
   if (isGha) {
-    for (const r of validateResult.results) {
-      for (const err of r.errors) {
-        console.log(`::error file=${escapeGhaProp(r.file)}::${escapeGhaMsg(err)}`);
-      }
-      for (const warn of r.warnings) {
-        console.log(`::warning file=${escapeGhaProp(r.file)}::${escapeGhaMsg(warn)}`);
-      }
+    for (const r of result.results) {
+      for (const err of r.errors) console.log(`::error file=${escapeGhaProp(r.file)}::${escapeGhaMsg(err)}`);
+      for (const warn of r.warnings) console.log(`::warning file=${escapeGhaProp(r.file)}::${escapeGhaMsg(warn)}`);
     }
   }
+  return result;
+}
 
-  // 2. Run checks (skip steps if requested)
-  if (!isGha) {
-    console.log(chalk.bold("\n── Run checks ──\n"));
-  }
-
-  const checkResult = await runCheck({
-    continueOnFail: true,
-    changed: true,
-    skip: options.skip,
-    json: isGha,
-  });
-
+async function runChecksPhase(isGha: boolean, skip: string[] | undefined): Promise<ReturnType<typeof runCheck>> {
+  if (!isGha) console.log(chalk.bold("\n── Run checks ──\n"));
+  const result = await runCheck({ continueOnFail: true, changed: true, skip, json: isGha });
   if (isGha) {
-    for (const r of checkResult.results) {
-      if (r.status === "fail") {
-        console.log(`::error title=${escapeGhaProp(r.step)}::${escapeGhaMsg(r.output.split("\n")[0])}`);
-      } else if (r.status === "error") {
-        console.log(`::error title=${escapeGhaProp(r.step)}::${escapeGhaMsg(r.reason ?? r.output)}`);
-      }
+    for (const r of result.results) {
+      if (r.status === "fail") console.log(`::error title=${escapeGhaProp(r.step)}::${escapeGhaMsg(r.output.split("\n")[0])}`);
+      else if (r.status === "error") console.log(`::error title=${escapeGhaProp(r.step)}::${escapeGhaMsg(r.reason ?? r.output)}`);
     }
   }
+  return result;
+}
 
-  // 3. Test quality analysis
-  if (!isGha) {
-    console.log(chalk.bold("\n── Test quality ──\n"));
-  }
-
-  let testQualityCritical = 0;
-  let testQualityWarning = 0;
-
+async function runTestQualityPhase(isGha: boolean): Promise<{ critical: number; warning: number }> {
+  if (!isGha) console.log(chalk.bold("\n── Test quality ──\n"));
   try {
     const root = await findProjectRoot();
     const glob = (await import("fast-glob")).default;
@@ -90,42 +53,41 @@ export async function runCi(options: CiOptions): Promise<CiResult> {
       ["**/*.test.ts", "**/*.test.js", "**/*.spec.ts", "**/*.spec.js", "**/test_*.py", "**/*_test.py"],
       { cwd: root, absolute: true, ignore: ["**/node_modules/**"] }
     );
-
-    if (testFiles.length > 0) {
-      const report = await analyzeTestQuality(testFiles);
-      testQualityCritical = report.summary.critical;
-      testQualityWarning = report.summary.warning;
-
-      if (isGha) {
-        for (const issue of report.issues) {
-          const level = issue.severity === "critical" ? "error" : "warning";
-          console.log(`::${level} file=${escapeGhaProp(issue.file)},line=${issue.line}::${escapeGhaMsg(issue.message)}`);
-        }
-      } else {
-        if (report.issues.length === 0) {
-          console.log(chalk.green("  No test quality issues found."));
-        } else {
-          console.log(`  ${report.summary.critical} critical, ${report.summary.warning} warnings`);
-        }
+    if (testFiles.length === 0) {
+      if (!isGha) console.log(chalk.dim("  No test files found."));
+      return { critical: 0, warning: 0 };
+    }
+    const report = await analyzeTestQuality(testFiles);
+    if (isGha) {
+      for (const issue of report.issues) {
+        const level = issue.severity === "critical" ? "error" : "warning";
+        console.log(`::${level} file=${escapeGhaProp(issue.file)},line=${issue.line}::${escapeGhaMsg(issue.message)}`);
       }
     } else {
-      if (!isGha) {
-        console.log(chalk.dim("  No test files found."));
-      }
+      if (report.issues.length === 0) console.log(chalk.green("  No test quality issues found."));
+      else console.log(`  ${report.summary.critical} critical, ${report.summary.warning} warnings`);
     }
+    return { critical: report.summary.critical, warning: report.summary.warning };
   } catch {
-    if (!isGha) {
-      console.log(chalk.dim("  Test quality analysis skipped."));
-    }
+    if (!isGha) console.log(chalk.dim("  Test quality analysis skipped."));
+    return { critical: 0, warning: 0 };
+  }
+}
+
+export async function runCi(options: CiOptions): Promise<CiResult> {
+  if (options.setup) {
+    await generateWorkflow();
+    return { validate: { errors: 0, warnings: 0 }, check: { passed: 0, failed: 0, errored: 0 }, testQuality: { critical: 0, warning: 0 }, exitCode: 0 };
   }
 
-  // Summary
-  const hasFailures =
-    validateResult.errorCount > 0 ||
-    checkResult.failed > 0 ||
-    checkResult.errored > 0 ||
-    testQualityCritical > 0;
+  const isGha = options.annotations || !!process.env.GITHUB_ACTIONS;
+  if (!isGha) console.log(chalk.bold("\ngrimoire ci\n"));
 
+  const validateResult = await runValidatePhase(isGha);
+  const checkResult = await runChecksPhase(isGha, options.skip);
+  const tq = await runTestQualityPhase(isGha);
+
+  const hasFailures = validateResult.errorCount > 0 || checkResult.failed > 0 || checkResult.errored > 0 || tq.critical > 0;
   const exitCode = hasFailures ? 1 : 0;
 
   if (!isGha) {
@@ -133,14 +95,14 @@ export async function runCi(options: CiOptions): Promise<CiResult> {
     const icon = hasFailures ? chalk.red("✗") : chalk.green("✓");
     console.log(`  ${icon} Validate: ${validateResult.errorCount} errors, ${validateResult.warnCount} warnings`);
     console.log(`  ${icon} Checks: ${checkResult.passed} passed, ${checkResult.failed} failed`);
-    console.log(`  ${icon} Test quality: ${testQualityCritical} critical, ${testQualityWarning} warnings`);
+    console.log(`  ${icon} Test quality: ${tq.critical} critical, ${tq.warning} warnings`);
     console.log();
   }
 
   return {
     validate: { errors: validateResult.errorCount, warnings: validateResult.warnCount },
     check: { passed: checkResult.passed, failed: checkResult.failed, errored: checkResult.errored },
-    testQuality: { critical: testQualityCritical, warning: testQualityWarning },
+    testQuality: { critical: tq.critical, warning: tq.warning },
     exitCode,
   };
 }
