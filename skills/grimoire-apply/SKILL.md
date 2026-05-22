@@ -194,7 +194,7 @@ This links the git history to the grimoire change — `grimoire trace` and `grim
 **Loading order:**
 1. `tasks.md` — your checklist (load once at start, find the current section)
 2. Read the `<!-- context: ... -->` block for the current section
-3. Load each file listed in the context block
+3. Load each file listed in the context block — this includes relevant `.grimoire/docs/conventions/<area>.md` files for directories touched by the diff (placement/naming guidance)
 4. If a listed file doesn't exist, it may need to be created as part of the task — that's fine
 
 **If the context window fills up** (degraded output quality, forgotten context, repeated mistakes):

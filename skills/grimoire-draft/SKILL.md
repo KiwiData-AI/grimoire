@@ -121,7 +121,16 @@ Present a Requirements Summary (template in the reference) and wait for user con
 
 ### 7. Draft Artifacts
 **For behavioral changes:**
-- Write proposed `.feature` files in `.grimoire/changes/<change-id>/features/<capability>/`
+
+Before writing any `.feature` file, triage: does this scenario logically belong in an existing feature file?
+
+1. Read `features/` — list every existing `.feature` file with its `Feature:` title.
+2. For each proposed scenario, ask: "Is there already a feature file whose title and user story encompasses this behavior?" If yes, that file should be extended, not bypassed with a new file.
+3. **Extend first.** Copy the matching baseline file to `.grimoire/changes/<change-id>/features/<same-relative-path>/` and add the new scenarios there. Only create a new `.feature` file if no existing file logically owns the behavior.
+4. When creating a new file (genuinely new capability), it goes in `.grimoire/changes/<change-id>/features/<capability>/` with a fresh Feature title and user story.
+
+Signals that a scenario belongs in an existing file: same actor, same domain object, same entry point, same HTTP resource or screen. Signals for a new file: new actor, new domain object, feature title would require an "and" to cover both old and new behavior.
+
 - If modifying an existing feature, copy the current baseline first, then modify
 - Follow Gherkin best practices:
   - Feature title + user story (As a / I want / So that)

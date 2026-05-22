@@ -28,7 +28,8 @@ Audit an existing codebase to discover undocumented features and architecture de
 Ask the user what to audit:
 - **Features** — find behavioral functionality that has no `.feature` file
 - **Decisions** — find implicit architecture decisions that have no ADR
-- **Both** — full audit (default)
+- **Conventions** — find conventions files in `.grimoire/docs/conventions/` whose placement/naming rules no longer match the codebase
+- **Both** / **All** — full audit (default: features + decisions + conventions)
 
 Check what's already documented:
 - Read all files in `features/` for existing behavioral specs
@@ -60,8 +61,26 @@ Scan for implicit architecture decisions:
 
 For each pattern found, check if a corresponding ADR exists. If not, note it as undocumented.
 
+### 3.5. Conventions Drift Detection
+Read each file in `.grimoire/docs/conventions/`. For each file:
+1. Use MCP `get_architecture` or `search_graph` to query the current code structure for the relevant area
+2. Compare the conventions file's placement rules, naming rules, and patterns against what MCP reports the codebase actually does
+3. Flag any conventions rule that no longer matches:
+   - "api.md says new views go in `src/api/views/` but MCP shows views now in `src/api/handlers/`"
+   - "models.md says models are prefixed with `I` but no `I`-prefixed models found in MCP graph"
+
+Present drifted conventions to the user with the same batched interview approach:
+> "api.md states that new views go in `src/api/views/`, but the codebase now places them in `src/api/handlers/`. Options:
+> - **refresh** — update the conventions file to match current code (I'll open it for editing with MCP-sourced state)
+> - **accept-as-is** — the conventions file is intentionally ahead of the code
+> - **skip** — leave for now"
+
+Skip this step when the user's scope answer was "features only" or "decisions only".
+
 ### 4. Interview the User
 Do NOT dump a massive list. Present findings in batches of 3-5, grouped by area, and ask the user about each:
+
+Clearly label each batch item as one of: "undocumented feature", "undocumented decision", or "drifted convention"
 
 For features:
 > "I found a document review workflow with routes for `/dais/review/document/<id>/`. There's tab switching, error modals, and tag editing. I don't see a feature file covering this. Should I draft one?"
@@ -114,6 +133,7 @@ After the interview, summarize:
 - How many features are dead or stale
 - How many decisions are documented vs. undocumented
 - How many decisions are stale
+- How many conventions files drifted vs. up-to-date
 - Suggest which areas to address first (highest risk / most complex / most frequently changed)
 
 ## Important

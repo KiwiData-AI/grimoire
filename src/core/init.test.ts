@@ -261,20 +261,8 @@ describe("initProject", () => {
       surface: "skip",         // omit surface from config
       caveman: "",
       commit: "",
-      docTool: "",
-      commentStyle: "",
       designTool: "none",
       captureBrand: "n",
-      thinkCmd: "",
-      thinkModel: "",
-      codeCmd: "",
-      codeModel: "",
-      compliance: "",
-      depAudit: "",
-      secrets: "",
-      deadCode: "",
-      bugTracker: "",
-      testingTool: "",
       ...overrides,
     };
     return [
@@ -284,20 +272,8 @@ describe("initProject", () => {
       slots.surface,
       slots.caveman,
       slots.commit,
-      slots.docTool,
-      slots.commentStyle,
       slots.designTool,
       slots.captureBrand,
-      slots.thinkCmd,
-      slots.thinkModel,
-      slots.codeCmd,
-      slots.codeModel,
-      slots.compliance,
-      slots.depAudit,
-      slots.secrets,
-      slots.deadCode,
-      slots.bugTracker,
-      slots.testingTool,
     ];
   }
 
@@ -614,5 +590,66 @@ describe("initProject", () => {
     expect(agentsWrite).toBeDefined();
     const content = String(agentsWrite![1]);
     expect(content).toContain("GRIMOIRE:START");
+  });
+
+  describe("next-steps output based on detection", () => {
+    function captureConsoleLogs(): string[] {
+      const logs: string[] = [];
+      vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+        logs.push(args.map(String).join(" "));
+      });
+      return logs;
+    }
+
+    it("prints discover (not map) as next step for existing projects", async () => {
+      mockDetectTools.mockResolvedValueOnce([
+        {
+          category: "language",
+          name: "typescript",
+          confidence: "high",
+          signal: "tsconfig.json",
+        },
+      ]);
+      // accept detection, then answer essential preferences
+      readlineAnswers.push("", "claude", "n", "n", "skip", "", "", "none", "n", "", "", "", "", "", "", "", "", "", "");
+      const logs = captureConsoleLogs();
+
+      await initProject(".", {
+        skipAgents: true,
+        skipSkills: true,
+        noDetect: false,
+        agents: [],
+        full: false,
+      });
+
+      const allLog = logs.join("\n");
+      expect(allLog).toMatch(/discover/i);
+      expect(allLog).not.toMatch(/grimoire map/);
+      expect(allLog).toMatch(/codebase-memory-mcp/);
+    });
+
+    it("prints draft (not discover) as next step for greenfield projects", async () => {
+      mockDetectTools.mockResolvedValueOnce([]);
+      // no detection prompt for empty results; go straight to essential preferences
+      readlineAnswers.push("claude", "n", "n", "skip", "", "", "none", "n", "", "", "", "", "", "", "", "", "", "");
+      const logs = captureConsoleLogs();
+
+      await initProject(".", {
+        skipAgents: true,
+        skipSkills: true,
+        noDetect: false,
+        agents: [],
+        full: false,
+      });
+
+      const nextStepsStart = logs.findIndex((l) => l.includes("Next steps"));
+      const nextStepsLogs = nextStepsStart >= 0 ? logs.slice(nextStepsStart) : logs;
+      const nextStepsText = nextStepsLogs.join("\n");
+
+      expect(nextStepsText).toMatch(/draft/i);
+      expect(nextStepsText).not.toMatch(/discover/i);
+      expect(nextStepsText).not.toMatch(/grimoire map/);
+      expect(nextStepsText).not.toMatch(/codebase-memory-mcp/);
+    });
   });
 });
