@@ -94,10 +94,9 @@ User has a request
 │
 ├─ "Setting up grimoire on an existing project"
 │  1. `grimoire init` → creates .grimoire/ directory and config
-│  2. `grimoire map` → scans codebase structure into .snapshot.json
-│  3. `/grimoire:discover` → generates area docs, data schema, project context
-│  4. `/grimoire:audit` → discovers undocumented features and decisions
-│  5. Start working: `/grimoire:draft` for new changes, `/grimoire:bug` for fixes
+│  2. `/grimoire:discover` → generates conventions files, data schema, project context (requires codebase-memory-mcp)
+│  3. `/grimoire:audit` → discovers undocumented features and decisions
+│  4. Start working: `/grimoire:draft` for new changes, `/grimoire:bug` for fixes
 │
 └─ "Setting up grimoire on a new/greenfield project"
    1. `grimoire init` → creates .grimoire/ directory and config

@@ -79,6 +79,20 @@ Cross-check filenames in the diff against `tasks.md` references — surface mism
 - Relevant `.grimoire/docs/<area>.md` for directories touched by the diff
 - Repo root: `AGENTS.md`, `CLAUDE.md`, `.editorconfig`, lint/format config files (for the code-style persona)
 
+**Doc freshness check:** For each area doc loaded, check its `last_updated` date against `git log -1 --format=%ci <directory>`. Collect all stale docs (doc older than the directory's most recent commit).
+
+If stale docs exist: invoke `grimoire-discover` in **targeted refresh** mode for those directories before continuing. Pass the directory list directly — discover will update only those area docs and their `last_updated` entries in `index.yml`. Do not skip this step or defer it to the user — stale docs produce wrong findings in the review (e.g., flagging a utility as missing when it was added last week).
+
+In hook mode (`GRIMOIRE_HOOK=1`): skip the refresh (too slow for a blocking hook). Log stale doc names to `.grimoire/.stale-docs` and continue with existing docs.
+
+**Coverage gap scan:** After loading area docs (and after any refresh), scan the diff for new behaviors with no Gherkin coverage:
+- New routes, URL patterns, or endpoints added (`urlpatterns`, `router.add`, `app.get`, etc.)
+- New views, controllers, or actions
+- New background tasks or job handlers
+- New permission checks or auth gates
+
+For each, check `features/**/*.feature` for a scenario that covers it. Missing coverage → record as a documentation gap (not a blocker). Include in the review report under a **Documentation Gaps** section with a suggestion to run `grimoire-audit` for the affected area.
+
 ### 4. Build Project Briefing
 Follow `../references/review-personas.md` §1 (Project Briefing). README fallback: note `Product framing: unknown` and proceed silently — pre-commit review is fast-path; don't block on prompts.
 
@@ -118,7 +132,7 @@ Follow `../references/visual-fidelity.md` for the code-phase invocation (staged 
 
 ### 7. Present Findings
 
-Compile into the standard report layout (§5 of the personas reference):
+Compile into the standard report layout (§5 of the personas reference). If documentation gaps were found in step 3, append a **Documentation Gaps** section after the persona findings — these are not blockers but should be addressed via `grimoire-audit` before the PR is merged.
 
 ```markdown
 # Pre-Commit Review
@@ -152,6 +166,10 @@ Compile into the standard report layout (§5 of the personas reference):
 - **M suggestions** — consider addressing
 
 Recommendation: <fix blockers, then proceed to grimoire-commit / approve, ready to commit>
+
+## Documentation Gaps
+<Only present if coverage gaps were found in step 3. Otherwise omit this section entirely.>
+- `<file>:<line>` — `<route/endpoint/action>` has no Gherkin scenario. Run `grimoire-audit` for `<area>`.
 ```
 
 ### 8. Decide Next Step

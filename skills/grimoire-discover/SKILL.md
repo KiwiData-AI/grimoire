@@ -66,10 +66,11 @@ If the snapshot includes a `duplicates` section (from `grimoire map --duplicates
 This replaces the need to manually read every source file to extract symbols. The graph gives you AST-accurate function signatures, call relationships, and dead code detection across 66 languages.
 
 ### 2. Determine Scope
-Ask the user what to document:
+Ask the user what to document (or accept the scope passed in by a calling skill):
 - **Full scan** — document all areas from the snapshot (default for first run)
 - **Area scan** — document specific directories (e.g., "just the API layer")
 - **Gap fill** — only document areas flagged as `undocumented` in the snapshot
+- **Targeted refresh** — a list of directories is passed in (from `grimoire-precommit-review` doc freshness check or `grimoire-plan` staleness gate). Skip the full snapshot walk. Go directly to step 3 for each named directory, regenerate only those area docs, and update their `last_updated` entries in `index.yml`. This is the fast-path mode for post-change maintenance — it does not touch areas outside the passed list.
 
 Check `.grimoire/docs/index.yml` if it exists — don't redo work unless refreshing.
 
@@ -341,7 +342,8 @@ These are read by `grimoire map` and affect the snapshot this skill consumes.
 - The **verify** skill can check new code against documented patterns
 - The **audit** skill can trigger a discover pass as part of onboarding
 - The **design** skill reads `.grimoire/docs/components.md` first to avoid generating duplicate components
-- Run `grimoire map --refresh` periodically to detect new undocumented areas, then `/grimoire:discover` to fill the gaps
+- The **precommit-review** skill checks area doc freshness on every commit and invokes discover in targeted refresh mode for stale dirs — this is the primary maintenance trigger, not a periodic manual task
+- The **plan** skill gates on staleness for level 3-4 changes and directs the user to run targeted refresh before planning
 
 ## Important
 - **Start from the snapshot.** Don't scan the filesystem yourself — `grimoire map` already did that. Read `.snapshot.json` for structure, then use `codebase-memory-mcp` graph queries for symbols and call graphs (if available), and read actual code files for meaning.

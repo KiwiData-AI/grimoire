@@ -78,6 +78,11 @@ The plan implements what's approved. It does not expand scope to hit a checklist
 **Read proposed data changes:**
 - **`data.yml`** if present — proposed schema changes need migration and model tasks
 
+**Staleness gate:** For each area doc loaded, check its `last_updated` date against `git log -1 --format=%ci <directory>`. If any doc is older than the most recent commit to its directory, it's stale — the file paths, utility names, and patterns it describes may no longer be accurate.
+
+- **Level 1-2:** Warn ("Area doc for `<area>` is behind recent commits — reusable utilities and file paths may be wrong") and proceed. Note inferred paths with `<!-- inferred: area doc may be stale -->`.
+- **Level 3-4:** Treat as a blocker. Do not generate tasks until the user refreshes stale docs via `grimoire-discover` targeted refresh. Planning with stale docs at this complexity produces wrong file paths and misses recent utilities — the cost of re-planning outweighs the cost of refreshing first.
+
 **Read specific source files only when:**
 - Area docs don't exist yet (tell the user to run `grimoire map` + `/grimoire:discover` first — planning without area docs produces worse tasks)
 - Area docs exist but you need to verify a specific implementation detail (e.g., exact function signature, exact import path)

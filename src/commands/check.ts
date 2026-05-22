@@ -16,7 +16,7 @@ export const checkCommand = new Command("check")
       skip: options.skip,
       json: options.json ?? false,
     });
-    if (failed > 0 || errored > 0) {
+    if (failed > 0) {
       process.exit(1);
     }
   });

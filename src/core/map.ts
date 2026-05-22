@@ -1,30 +1,179 @@
-import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
-import { join, relative, extname, basename, dirname } from "node:path";
+import {
+  readdir,
+  readFile,
+  writeFile,
+  mkdir,
+  access,
+} from "node:fs/promises";
+import {
+  join,
+  relative,
+  resolve,
+  extname,
+  basename,
+  dirname,
+} from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import { findProjectRoot } from "../utils/paths.js";
+import { loadConfig } from "../utils/config.js";
 
 const execFileAsync = promisify(execFile);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(__dirname, "..", "..");
 
-interface MapOptions {
-  json: boolean;
-  refresh: boolean;
-  maxDepth: number;
+// ---------------------------------------------------------------------------
+// New public API
+// ---------------------------------------------------------------------------
+
+export interface MapOptions {
   duplicates: boolean;
 }
 
-interface DirectoryInfo {
+interface DriftItem {
+  conventionsFile: string;
   path: string;
-  fileCount: number;
-  extensions: Record<string, number>;
-  keyFiles: string[];
-  subdirs: string[];
+  context: string;
 }
+
+export class McpRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "McpRequiredError";
+  }
+}
+
+async function requireMcpConfigured(root: string): Promise<void> {
+  const config = await loadConfig(root).catch(() => null);
+  if (!config?.project.integrations?.codebase_memory_mcp) {
+    console.error(chalk.red("Error: codebase-memory-mcp is required for grimoire map."));
+    console.error("Install codebase-memory-mcp and run grimoire init to register it.");
+    throw new McpRequiredError("codebase-memory-mcp not configured");
+  }
+}
+
+const SCANNED_HEADERS = new Set(["## file placement", "## patterns"]);
+const SKIP_TOKENS = ["(", ";", "node_modules", "dist", "build", ".git"];
+
+export function extractPathRules(content: string, filename: string): DriftItem[] {
+  const items: DriftItem[] = [];
+  let inScannedSection = false;
+
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("## ")) {
+      inScannedSection = SCANNED_HEADERS.has(trimmed.toLowerCase());
+      continue;
+    }
+
+    if (!inScannedSection) continue;
+
+    const matches = [...line.matchAll(/`([a-z][^`]+\/)`/g)];
+    for (const match of matches) {
+      const token = match[1];
+      if (SKIP_TOKENS.some((s) => token.includes(s))) continue;
+      items.push({ conventionsFile: filename, path: token, context: trimmed });
+    }
+  }
+
+  return items;
+}
+
+async function detectConventionsDrift(root: string): Promise<DriftItem[]> {
+  const conventionsDir = join(root, ".grimoire", "docs", "conventions");
+
+  let files: string[];
+  try {
+    const entries = await readdir(conventionsDir);
+    files = (entries as unknown as string[]).filter((f) => f.endsWith(".md"));
+  } catch {
+    files = [];
+  }
+
+  if (files.length === 0) {
+    console.log(
+      chalk.dim("No conventions files found. Run /grimoire:discover to generate them.")
+    );
+    return [];
+  }
+
+  const driftItems: DriftItem[] = [];
+
+  for (const file of files) {
+    const content = await readFile(join(conventionsDir, file), "utf-8");
+    const rules = extractPathRules(content, file);
+
+    for (const rule of rules) {
+      const resolved = resolve(join(root, rule.path));
+      if (!resolved.startsWith(root + "/")) continue;
+
+      try {
+        await access(resolved);
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+          driftItems.push(rule);
+        }
+      }
+    }
+  }
+
+  return driftItems;
+}
+
+export async function runMap(options: MapOptions): Promise<void> {
+  const root = await findProjectRoot();
+  await requireMcpConfigured(root);
+
+  const drift = await detectConventionsDrift(root);
+
+  if (drift.length > 0) {
+    console.log(chalk.yellow("Drift detected:"));
+    for (const item of drift) {
+      const relPath = relative(root, resolve(join(root, item.path)));
+      console.log(`  ${item.conventionsFile}: ${item.context} — path not found: ${relPath}`);
+    }
+  } else {
+    console.log(chalk.green("No drift detected. Conventions files match the codebase."));
+  }
+
+  console.log(
+    chalk.dim("For semantic drift (naming, patterns), run /grimoire:discover in an agent session.")
+  );
+
+  if (options.duplicates) {
+    const dupIgnoreGlobs = await loadDupIgnore(root);
+    await runJscpd(root, dupIgnoreGlobs);
+  }
+}
+
+async function loadDupIgnore(root: string): Promise<Set<string>> {
+  const projectPath = join(root, ".grimoire", "dupignore");
+  let content: string;
+  try {
+    content = await readFile(projectPath, "utf-8");
+  } catch {
+    const templatePath = join(PACKAGE_ROOT, "templates", "dupignore");
+    try {
+      content = await readFile(templatePath, "utf-8");
+    } catch {
+      return new Set();
+    }
+  }
+  const patterns = new Set<string>();
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) patterns.add(trimmed);
+  }
+  return patterns;
+}
+
+// ---------------------------------------------------------------------------
+// Shared jscpd runner (used by both runMap and generateMap)
+// ---------------------------------------------------------------------------
 
 interface CloneInfo {
   firstFile: string;
@@ -44,339 +193,15 @@ interface DuplicateReport {
   percentDuplicated: number;
 }
 
-interface MapSnapshot {
-  generatedAt: string;
-  projectRoot: string;
-  directories: DirectoryInfo[];
-  keyFiles: KeyFileInfo[];
-  undocumented: string[];
-  removed: string[];
-  duplicates: DuplicateReport | null;
-}
-
-interface KeyFileInfo {
-  path: string;
-  type: string;
-}
-
-/**
- * Parse a mapignore file into a Set of patterns.
- * Blank lines and lines starting with # are skipped.
- */
-function parseIgnoreFile(content: string): Set<string> {
-  const patterns = new Set<string>();
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith("#")) {
-      patterns.add(trimmed);
-    }
-  }
-  return patterns;
-}
-
-/**
- * Parse a mapkeys file into a Record<filename, type>.
- * Format: filename = type
- * Blank lines and lines starting with # are skipped.
- */
-function parseKeyFilesConfig(content: string): Record<string, string> {
-  const keys: Record<string, string> = {};
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIndex = trimmed.indexOf("=");
-    if (eqIndex === -1) continue;
-    const filename = trimmed.slice(0, eqIndex).trim();
-    const type = trimmed.slice(eqIndex + 1).trim();
-    if (filename && type) {
-      keys[filename] = type;
-    }
-  }
-  return keys;
-}
-
-/**
- * Load config from project-level file, falling back to bundled template.
- */
-async function loadConfigFile(
-  root: string,
-  filename: string
-): Promise<string> {
-  // Project-level override: .grimoire/<filename>
-  const projectPath = join(root, ".grimoire", filename);
-  try {
-    return await readFile(projectPath, "utf-8");
-  } catch {
-    // Fall back to bundled template
-    const templatePath = join(PACKAGE_ROOT, "templates", filename);
-    return await readFile(templatePath, "utf-8");
-  }
-}
-
-export async function generateMap(options: MapOptions): Promise<void> {
-  const root = await findProjectRoot();
-  const docsDir = join(root, ".grimoire", "docs");
-
-  // Load config files
-  // mapignore → structure scan only (dir-name match)
-  // dupignore → jscpd only (glob match)
-  const ignoreContent = await loadConfigFile(root, "mapignore");
-  const keysContent = await loadConfigFile(root, "mapkeys");
-  const dupIgnoreContent = await loadConfigFile(root, "dupignore");
-  const ignorePatterns = parseIgnoreFile(ignoreContent);
-  const keyFilePatterns = parseKeyFilesConfig(keysContent);
-  const dupIgnoreGlobs = parseIgnoreFile(dupIgnoreContent);
-
-  // Scan the directory tree
-  const directories: DirectoryInfo[] = [];
-  const keyFiles: KeyFileInfo[] = [];
-
-  await scanDirectory(
-    root,
-    root,
-    0,
-    options.maxDepth,
-    directories,
-    keyFiles,
-    ignorePatterns,
-    keyFilePatterns
-  );
-
-  // Load existing index if refreshing
-  let existingAreas: string[] = [];
-  if (options.refresh) {
-    existingAreas = await loadExistingAreas(docsDir);
-  }
-
-  // Determine what's undocumented and what's been removed
-  const scannedDirs = new Set(directories.map((d) => d.path));
-  const undocumented = directories
-    .filter((d) => !existingAreas.includes(d.path))
-    .filter((d) => d.fileCount > 0)
-    .map((d) => d.path);
-  const removed = existingAreas.filter((a) => !scannedDirs.has(a));
-
-  // Run duplicate detection if requested
-  let duplicates: DuplicateReport | null = null;
-  if (options.duplicates) {
-    duplicates = await runJscpd(root, dupIgnoreGlobs);
-  }
-
-  const snapshot: MapSnapshot = {
-    generatedAt: new Date().toISOString(),
-    projectRoot: ".",
-    directories,
-    keyFiles,
-    undocumented,
-    removed,
-    duplicates,
-  };
-
-  if (options.json) {
-    console.log(JSON.stringify(snapshot, null, 2));
-    return;
-  }
-
-  // Pretty print
-  console.log(chalk.bold("\nProject Map\n"));
-
-  // Directory tree
-  console.log(chalk.bold("Structure:"));
-  for (const dir of directories) {
-    const depth = dir.path === "." ? 0 : dir.path.split("/").length;
-    const padding = "  ".repeat(depth);
-    const extSummary = Object.entries(dir.extensions)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([ext, count]) => `${count} ${ext}`)
-      .join(", ");
-
-    const keyFileNote =
-      dir.keyFiles.length > 0
-        ? chalk.dim(` [${dir.keyFiles.join(", ")}]`)
-        : "";
-
-    console.log(
-      `${padding}${chalk.cyan(dir.path + "/")} ${chalk.dim(extSummary)}${keyFileNote}`
-    );
-  }
-
-  // Key files
-  if (keyFiles.length > 0) {
-    console.log(chalk.bold("\nKey Files:"));
-    for (const kf of keyFiles) {
-      console.log(`  ${kf.path} ${chalk.dim(`(${kf.type})`)}`);
-    }
-  }
-
-  // Duplicate report
-  if (duplicates) {
-    if (duplicates.clones.length > 0) {
-      console.log(
-        chalk.bold.yellow(
-          `\nDuplicates: ${duplicates.clones.length} clone(s), ${duplicates.totalDuplicatedLines} duplicated lines (${duplicates.percentDuplicated.toFixed(1)}%)\n`
-        )
-      );
-      for (const clone of duplicates.clones.slice(0, 10)) {
-        console.log(
-          `  ${chalk.dim(clone.firstFile)}:${clone.firstStartLine}-${clone.firstEndLine}`
-        );
-        console.log(
-          `  ${chalk.dim(clone.secondFile)}:${clone.secondStartLine}-${clone.secondEndLine}`
-        );
-        console.log(
-          `  ${chalk.dim(`${clone.lines} lines, ${clone.tokens} tokens`)}\n`
-        );
-      }
-      if (duplicates.clones.length > 10) {
-        console.log(
-          chalk.dim(
-            `  ... and ${duplicates.clones.length - 10} more (see .snapshot.json for full list)`
-          )
-        );
-      }
-    } else {
-      console.log(chalk.green("\nNo duplicates detected."));
-    }
-  }
-
-  // Diff against existing docs
-  if (options.refresh) {
-    if (undocumented.length > 0) {
-      console.log(chalk.bold.yellow("\nUndocumented areas:"));
-      for (const u of undocumented) {
-        console.log(`  ${chalk.yellow("+")} ${u}/`);
-      }
-    }
-
-    if (removed.length > 0) {
-      console.log(chalk.bold.red("\nRemoved (docs may be stale):"));
-      for (const r of removed) {
-        console.log(`  ${chalk.red("-")} ${r}/`);
-      }
-    }
-
-    if (undocumented.length === 0 && removed.length === 0) {
-      console.log(
-        chalk.green("\nAll areas are documented. No changes detected.")
-      );
-    }
-  } else {
-    console.log(
-      chalk.dim(
-        `\n${directories.length} directories, ${keyFiles.length} key files found.`
-      )
-    );
-    console.log(
-      chalk.dim(
-        "Run /grimoire:discover to generate area docs from this snapshot."
-      )
-    );
-  }
-
-  // Write snapshot for the skill to consume
-  await mkdir(docsDir, { recursive: true });
-  await writeFile(
-    join(docsDir, ".snapshot.json"),
-    JSON.stringify(snapshot, null, 2)
-  );
-  console.log(
-    chalk.dim(`\nSnapshot saved to .grimoire/docs/.snapshot.json`)
-  );
-}
-
-async function scanDirectory(
-  fullPath: string,
-  root: string,
-  depth: number,
-  maxDepth: number,
-  directories: DirectoryInfo[],
-  keyFiles: KeyFileInfo[],
-  ignorePatterns: Set<string>,
-  keyFilePatterns: Record<string, string>
-): Promise<void> {
-  if (depth > maxDepth) return;
-
-  const relPath = relative(root, fullPath) || ".";
-  const dirName = basename(fullPath);
-
-  // Skip ignored directories (by name match)
-  if (depth > 0 && ignorePatterns.has(dirName)) return;
-  // Skip hidden dirs except .grimoire
-  if (depth > 0 && dirName.startsWith(".") && dirName !== ".grimoire") return;
-
-  let entries;
-  try {
-    entries = await readdir(fullPath, { withFileTypes: true });
-  } catch {
-    return;
-  }
-
-  const files = entries.filter((e) => e.isFile());
-  const subdirs = entries
-    .filter((e) => e.isDirectory())
-    .filter((e) => !ignorePatterns.has(e.name))
-    .filter((e) => !e.name.startsWith(".") || e.name === ".grimoire");
-
-  // Count extensions and detect key files
-  const extensions: Record<string, number> = {};
-  const dirKeyFiles: string[] = [];
-
-  for (const file of files) {
-    const ext = extname(file.name) || file.name;
-    extensions[ext] = (extensions[ext] || 0) + 1;
-
-    if (keyFilePatterns[file.name]) {
-      const kfPath = relPath === "." ? file.name : `${relPath}/${file.name}`;
-      keyFiles.push({
-        path: kfPath,
-        type: keyFilePatterns[file.name],
-      });
-      dirKeyFiles.push(file.name);
-    }
-  }
-
-  // Include directories that have files or are shallow enough to show structure
-  if (files.length > 0 || depth <= 1) {
-    directories.push({
-      path: relPath === "." ? "." : relPath,
-      fileCount: files.length,
-      extensions,
-      keyFiles: dirKeyFiles,
-      subdirs: subdirs.map((s) => s.name),
-    });
-  }
-
-  for (const subdir of subdirs) {
-    await scanDirectory(
-      join(fullPath, subdir.name),
-      root,
-      depth + 1,
-      maxDepth,
-      directories,
-      keyFiles,
-      ignorePatterns,
-      keyFilePatterns
-    );
-  }
-}
-
 async function runJscpd(
   root: string,
   dupIgnoreGlobs: Set<string>
 ): Promise<DuplicateReport | null> {
-  // Check if jscpd is available
   try {
     await execFileAsync("npx", ["jscpd", "--version"], { cwd: root });
   } catch {
-    console.log(
-      chalk.yellow(
-        "\njscpd not found. Install with: npm install -g jscpd"
-      )
-    );
-    console.log(
-      chalk.yellow("Skipping duplicate detection.\n")
-    );
+    console.log(chalk.yellow("\njscpd not found. Install with: npm install -g jscpd"));
+    console.log(chalk.yellow("Skipping duplicate detection.\n"));
     return null;
   }
 
@@ -397,12 +222,8 @@ async function runJscpd(
       args.push("--ignore", ignoreArg);
     }
 
-    await execFileAsync("npx", args, {
-      cwd: root,
-      timeout: 60_000,
-    });
+    await execFileAsync("npx", args, { cwd: root, timeout: 60_000 });
 
-    // Read the jscpd JSON report
     const reportPath = join(root, ".grimoire", "docs", "jscpd-report.json");
     const reportContent = await readFile(reportPath, "utf-8");
     const report = JSON.parse(reportContent);
@@ -436,11 +257,298 @@ async function runJscpd(
     };
   } catch (err) {
     console.log(
-      chalk.yellow(
-        `\njscpd failed: ${err instanceof Error ? err.message : "unknown error"}`
-      )
+      chalk.yellow(`\njscpd failed: ${err instanceof Error ? err.message : "unknown error"}`)
     );
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Legacy generateMap — kept to avoid breaking existing tests
+// ---------------------------------------------------------------------------
+
+interface LegacyMapOptions {
+  json: boolean;
+  refresh: boolean;
+  maxDepth: number;
+  duplicates: boolean;
+}
+
+interface DirectoryInfo {
+  path: string;
+  fileCount: number;
+  extensions: Record<string, number>;
+  keyFiles: string[];
+  subdirs: string[];
+}
+
+interface KeyFileInfo {
+  path: string;
+  type: string;
+}
+
+interface MapSnapshot {
+  generatedAt: string;
+  projectRoot: string;
+  directories: DirectoryInfo[];
+  keyFiles: KeyFileInfo[];
+  undocumented: string[];
+  removed: string[];
+  duplicates: DuplicateReport | null;
+}
+
+function parseIgnoreFile(content: string): Set<string> {
+  const patterns = new Set<string>();
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      patterns.add(trimmed);
+    }
+  }
+  return patterns;
+}
+
+function parseKeyFilesConfig(content: string): Record<string, string> {
+  const keys: Record<string, string> = {};
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIndex = trimmed.indexOf("=");
+    if (eqIndex === -1) continue;
+    const filename = trimmed.slice(0, eqIndex).trim();
+    const type = trimmed.slice(eqIndex + 1).trim();
+    if (filename && type) {
+      keys[filename] = type;
+    }
+  }
+  return keys;
+}
+
+async function loadConfigFile(root: string, filename: string): Promise<string> {
+  const projectPath = join(root, ".grimoire", filename);
+  try {
+    return await readFile(projectPath, "utf-8");
+  } catch {
+    const templatePath = join(PACKAGE_ROOT, "templates", filename);
+    return await readFile(templatePath, "utf-8");
+  }
+}
+
+export async function generateMap(options: LegacyMapOptions): Promise<void> {
+  const root = await findProjectRoot();
+  const docsDir = join(root, ".grimoire", "docs");
+
+  const ignoreContent = await loadConfigFile(root, "mapignore");
+  const keysContent = await loadConfigFile(root, "mapkeys");
+  const dupIgnoreContent = await loadConfigFile(root, "dupignore");
+  const ignorePatterns = parseIgnoreFile(ignoreContent);
+  const keyFilePatterns = parseKeyFilesConfig(keysContent);
+  const dupIgnoreGlobs = parseIgnoreFile(dupIgnoreContent);
+
+  const directories: DirectoryInfo[] = [];
+  const keyFiles: KeyFileInfo[] = [];
+
+  await scanDirectory(
+    root,
+    root,
+    0,
+    options.maxDepth,
+    directories,
+    keyFiles,
+    ignorePatterns,
+    keyFilePatterns
+  );
+
+  let existingAreas: string[] = [];
+  if (options.refresh) {
+    existingAreas = await loadExistingAreas(docsDir);
+  }
+
+  const scannedDirs = new Set(directories.map((d) => d.path));
+  const undocumented = directories
+    .filter((d) => !existingAreas.includes(d.path))
+    .filter((d) => d.fileCount > 0)
+    .map((d) => d.path);
+  const removed = existingAreas.filter((a) => !scannedDirs.has(a));
+
+  let duplicates: DuplicateReport | null = null;
+  if (options.duplicates) {
+    duplicates = await runJscpd(root, dupIgnoreGlobs);
+  }
+
+  const snapshot: MapSnapshot = {
+    generatedAt: new Date().toISOString(),
+    projectRoot: ".",
+    directories,
+    keyFiles,
+    undocumented,
+    removed,
+    duplicates,
+  };
+
+  if (options.json) {
+    console.log(JSON.stringify(snapshot, null, 2));
+    return;
+  }
+
+  console.log(chalk.bold("\nProject Map\n"));
+  console.log(chalk.bold("Structure:"));
+  for (const dir of directories) {
+    const depth = dir.path === "." ? 0 : dir.path.split("/").length;
+    const padding = "  ".repeat(depth);
+    const extSummary = Object.entries(dir.extensions)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([ext, count]) => `${count} ${ext}`)
+      .join(", ");
+    const keyFileNote =
+      dir.keyFiles.length > 0 ? chalk.dim(` [${dir.keyFiles.join(", ")}]`) : "";
+    console.log(
+      `${padding}${chalk.cyan(dir.path + "/")} ${chalk.dim(extSummary)}${keyFileNote}`
+    );
+  }
+
+  if (keyFiles.length > 0) {
+    console.log(chalk.bold("\nKey Files:"));
+    for (const kf of keyFiles) {
+      console.log(`  ${kf.path} ${chalk.dim(`(${kf.type})`)}`);
+    }
+  }
+
+  if (duplicates) {
+    if (duplicates.clones.length > 0) {
+      console.log(
+        chalk.bold.yellow(
+          `\nDuplicates: ${duplicates.clones.length} clone(s), ${duplicates.totalDuplicatedLines} duplicated lines (${duplicates.percentDuplicated.toFixed(1)}%)\n`
+        )
+      );
+      for (const clone of duplicates.clones.slice(0, 10)) {
+        console.log(
+          `  ${chalk.dim(clone.firstFile)}:${clone.firstStartLine}-${clone.firstEndLine}`
+        );
+        console.log(
+          `  ${chalk.dim(clone.secondFile)}:${clone.secondStartLine}-${clone.secondEndLine}`
+        );
+        console.log(
+          `  ${chalk.dim(`${clone.lines} lines, ${clone.tokens} tokens`)}\n`
+        );
+      }
+      if (duplicates.clones.length > 10) {
+        console.log(
+          chalk.dim(
+            `  ... and ${duplicates.clones.length - 10} more (see .snapshot.json for full list)`
+          )
+        );
+      }
+    } else {
+      console.log(chalk.green("\nNo duplicates detected."));
+    }
+  }
+
+  if (options.refresh) {
+    if (undocumented.length > 0) {
+      console.log(chalk.bold.yellow("\nUndocumented areas:"));
+      for (const u of undocumented) {
+        console.log(`  ${chalk.yellow("+")} ${u}/`);
+      }
+    }
+    if (removed.length > 0) {
+      console.log(chalk.bold.red("\nRemoved (docs may be stale):"));
+      for (const r of removed) {
+        console.log(`  ${chalk.red("-")} ${r}/`);
+      }
+    }
+    if (undocumented.length === 0 && removed.length === 0) {
+      console.log(chalk.green("\nAll areas are documented. No changes detected."));
+    }
+  } else {
+    console.log(
+      chalk.dim(
+        `\n${directories.length} directories, ${keyFiles.length} key files found.`
+      )
+    );
+    console.log(
+      chalk.dim("Run /grimoire:discover to generate area docs from this snapshot.")
+    );
+  }
+
+  await mkdir(docsDir, { recursive: true });
+  await writeFile(
+    join(docsDir, ".snapshot.json"),
+    JSON.stringify(snapshot, null, 2)
+  );
+  console.log(chalk.dim(`\nSnapshot saved to .grimoire/docs/.snapshot.json`));
+}
+
+async function scanDirectory(
+  fullPath: string,
+  root: string,
+  depth: number,
+  maxDepth: number,
+  directories: DirectoryInfo[],
+  keyFiles: KeyFileInfo[],
+  ignorePatterns: Set<string>,
+  keyFilePatterns: Record<string, string>
+): Promise<void> {
+  if (depth > maxDepth) return;
+
+  const relPath = relative(root, fullPath) || ".";
+  const dirName = basename(fullPath);
+
+  if (depth > 0 && ignorePatterns.has(dirName)) return;
+  if (depth > 0 && dirName.startsWith(".") && dirName !== ".grimoire") return;
+
+  let entries;
+  try {
+    entries = await readdir(fullPath, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  const files = entries.filter((e) => e.isFile());
+  const subdirs = entries
+    .filter((e) => e.isDirectory())
+    .filter((e) => !ignorePatterns.has(e.name))
+    .filter((e) => !e.name.startsWith(".") || e.name === ".grimoire");
+
+  const extensions: Record<string, number> = {};
+  const dirKeyFiles: string[] = [];
+
+  for (const file of files) {
+    const ext = extname(file.name) || file.name;
+    extensions[ext] = (extensions[ext] || 0) + 1;
+
+    if (keyFilePatterns[file.name]) {
+      const kfPath = relPath === "." ? file.name : `${relPath}/${file.name}`;
+      keyFiles.push({
+        path: kfPath,
+        type: keyFilePatterns[file.name],
+      });
+      dirKeyFiles.push(file.name);
+    }
+  }
+
+  if (files.length > 0 || depth <= 1) {
+    directories.push({
+      path: relPath === "." ? "." : relPath,
+      fileCount: files.length,
+      extensions,
+      keyFiles: dirKeyFiles,
+      subdirs: subdirs.map((s) => s.name),
+    });
+  }
+
+  for (const subdir of subdirs) {
+    await scanDirectory(
+      join(fullPath, subdir.name),
+      root,
+      depth + 1,
+      maxDepth,
+      directories,
+      keyFiles,
+      ignorePatterns,
+      keyFilePatterns
+    );
   }
 }
 
