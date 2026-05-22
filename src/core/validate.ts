@@ -282,7 +282,7 @@ function validateManifestFrontmatter(
   }
   if (!mfm.status) {
     errors.push("Frontmatter missing 'status' field");
-  } else if (!VALID_MANIFEST_STATUSES.includes(mfm.status)) {
+  } else if (!VALID_MANIFEST_STATUSES.includes(mfm.status as string)) {
     errors.push(`Invalid status "${mfm.status}" — must be one of: ${VALID_MANIFEST_STATUSES.join(", ")}`);
   }
 }
