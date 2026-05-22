@@ -1,4 +1,4 @@
-version: 1
+version: 2
 project:
   commit_style: conventional
   language: typescript
@@ -49,8 +49,8 @@ checks:
   - bdd_test
   - security
   - dep_audit
-  # - secrets  # disabled: gitleaks not installed on this machine; re-enable when present
   - best_practices
+  - secrets
 llm:
   thinking:
     command: claude

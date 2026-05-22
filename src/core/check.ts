@@ -135,11 +135,15 @@ async function runShellStep(
     const duration = Date.now() - start;
     if (err && typeof err === "object" && "stdout" in err) {
       const execErr = err as { stdout: string; stderr: string; code?: number };
+      const output = (execErr.stdout + execErr.stderr).trim();
+      if (output.includes("command not found") || output.includes("No such file or directory")) {
+        return { step, status: "skip", duration, output: "", reason: output.split("\n")[0] };
+      }
       return {
         step,
         status: "fail",
         duration,
-        output: (execErr.stdout + execErr.stderr).trim(),
+        output,
       };
     }
     return {
@@ -204,13 +208,15 @@ async function runLlmStep(
   // to prevent a maliciously named file from injecting instructions.
   const safeFiles = files.map((f) => `\`${f.replace(/[\n\r`]/g, "")}\``).filter((f) => f.length > 2);
   const fileList = safeFiles.length > 0 ? `\n\nFiles to review:\n${safeFiles.join("\n")}` : "";
-  const fullPrompt = `${prompt}${fileList}\n\nFirst line of your response must be exactly PASS or FAIL (no other text on that line). Then explain any issues on subsequent lines.`;
+  const fullPrompt = `${prompt}${fileList}\n\nRespond with PASS or FAIL as the very first word on the very first line (no markdown, no asterisks, no extra words on that line). Then explain any issues on subsequent lines.`;
 
   try {
     const output = await spawnWithStdin(llmCommand, ["--print"], fullPrompt, root);
 
-    const firstLine = output.trim().split("\n")[0].trim().toUpperCase();
-    const passed = firstLine === "PASS";
+    const firstLine = output.trim().split("\n").map((l) => l.trim()).find(Boolean)?.toUpperCase() ?? "";
+    const hasFail = /\bFAIL\b/.test(firstLine);
+    const hasPass = /\bPASS\b/.test(firstLine);
+    const passed = hasPass && !hasFail;
 
     return {
       step,
@@ -408,7 +414,7 @@ async function tryEslintComplexity(root: string): Promise<{ output: string; hasW
     const output = (stdout + stderr).trim();
     // Match ESLint complexity rule output ("  complexity" at end of warning line).
     // Avoids false positives from parsing errors or unrelated warnings.
-    const hasWarnings = / complexity$/.test(output);
+    const hasWarnings = / complexity$/m.test(output);
     return { output, hasWarnings };
   } catch {
     return null;

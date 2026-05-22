@@ -1,3 +1,16 @@
 {
-  "hooks": {}
+  "hooks": {
+    "PreCommit": [
+      {
+        "matcher": "*",
+        "command": "grimoire check --changed --json"
+      }
+    ],
+    "PostCommit": [
+      {
+        "matcher": "*",
+        "command": "sh -c 'if [ -d .grimoire/changes ] && [ \"$(ls -A .grimoire/changes 2>/dev/null)\" ]; then TRAILER=$(git log -1 --format=\"%(trailers:key=Change)\" 2>/dev/null); if [ -z \"$TRAILER\" ]; then echo \"WARNING: Commit is missing Change: trailer. Active grimoire changes exist.\"; fi; fi'"
+      }
+    ]
+  }
 }

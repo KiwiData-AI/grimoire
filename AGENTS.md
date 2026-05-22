@@ -228,4 +228,5 @@ Auto-clarity exception: revert to normal for security warnings, irreversible act
 Boundaries: code, commits, PRs written normally. Stop with "stop caveman" or "normal mode".
 
 <!-- caveman:lite — based on github.com/JuliusBrussee/caveman -->
+
 <!-- GRIMOIRE:END -->
