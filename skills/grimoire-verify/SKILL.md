@@ -170,6 +170,36 @@ Check for features that exist in specs but may no longer be implemented:
 - Step definitions with `pass` or `NotImplementedError` bodies
 - Features tagged `@skip` or `@wip` that have been in that state for a long time
 
+### 6b. Code Quality Audit
+
+For every production file changed in this implementation, run an independent quality check — not a re-read of what the implementing agent self-reported.
+
+**A. Walk the seven-point checklist from `../references/code-quality.md` on each changed file:**
+
+1. **Reuse before write** — any new helper/function that duplicates existing code? Flag the duplicate and the existing function.
+2. **Branching budget** — any function with more than ~7 branches (`if`/`else`/`case`/ternary/`&&`/`||`)? Name it and count.
+3. **Function size** — any function body over ~30 lines? Flag it. "One job per function" — if the name needs "and", it's two functions.
+4. **Defensive code inside trust boundary** — `if x is None` guards on non-nullable types, `isinstance` checks on values the codebase just built, `try/except` with no real recovery? Flag each.
+5. **Names** — any local named `data`, `result`, `temp`, `info`, `obj`, `item`, or `value` when a specific name would fit?
+6. **Premature abstraction** — any new `BaseX`, factory, strategy, config object, or registry pattern with a single caller? Any wrapper function that only renames arguments?
+7. **Comments** — any comment that restates the code (`# loop over users`), references the current task/PR/ticket, is a multi-line docstring on a private function, or whose removal would not confuse a future reader?
+
+**B. Classify findings:**
+- **[critical]** — premature abstraction (new base class / factory / strategy for one caller), or dead code (function/class written but never called)
+- **[warning]** — function too large, too many branches, defensive guards inside trust boundary, generic names
+- **[suggestion]** — comment noise, minor naming issue
+
+**C. Report format:**
+```
+## Code Quality
+- [ ] **[critical]** `src/auth.ts:12` — `BaseTokenValidator` has one subclass; inline it
+- [ ] **[critical]** `src/auth.ts:88` — `_validate_helper` never called outside `validate()`; inline it
+- [ ] **[warning]** `src/auth.ts:45` — `process_request` is 62 lines with 9 branches; split by responsibility
+- [ ] **[suggestion]** `src/auth.ts:31` — comment "# check if token is expired" restates the code; remove
+```
+
+If no issues: `## Code Quality — clean`.
+
 ### 7. Generate Report
 Produce a structured report:
 
@@ -189,6 +219,9 @@ Produce a structured report:
 - [x] Verified: <security pattern confirmed> — `file:line`
 - [ ] **[critical]** [OWASP/CWE tag] <violation> — `file:line`
 - [ ] **[warning]** [OWASP/CWE tag] <concern> — `file:line`
+
+## Code Quality
+- [ ] **[critical/warning/suggestion]** <issue> — `file:line`
 
 ## Warnings
 - [ ] <issue description> — `file:line`

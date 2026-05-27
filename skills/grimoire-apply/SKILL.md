@@ -126,11 +126,13 @@ The parent agent is the **orchestrator only** — it does NOT implement tasks it
    trust callers (no defensive guards inside the trust boundary), specific names
    (no `data`/`result`/`temp`), branching budget ~7, function size ~30 lines,
    no premature abstraction, comments only for non-obvious WHY.
-   Before writing the test for each task, run the pattern-guard brief (Steps 1–4):
-   classify the code type, find 3–5 peers via search_graph, extract the modal
-   pattern, write a brief. Write code that matches the brief. After writing
-   production code, run the hallucination check (Step 6): verify every called
-   external function exists in the graph before running tests.
+   Before writing the test for each task, run the pattern-guard brief (Steps 1–1b–2–4):
+   classify the code type (Step 1), run reuse discovery — two search_graph calls
+   by concept and by name to find existing code to call instead of writing (Step 1b),
+   find 3–5 peers via search_graph (Step 2), extract the modal pattern, write a brief.
+   Write code that matches the brief. After writing production code, run the
+   hallucination check (Step 6): verify every called external function exists in
+   the graph before running tests.
 
    When the section is complete, write a <!-- SESSION: ... --> handoff note
    under the last task and exit.
@@ -216,13 +218,13 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
    - Step wired to wrong function or missing the actual check
    - Overly broad assertion that matches anything
 5. Once confirmed red: write the production code to make it pass. **While writing — not after — apply the rules in `../references/code-quality.md` and the pattern brief from step 1. Do not write the slop version first and clean up later.** Inline rules:
-   - **Reuse first.** Grep / check area doc / read neighbors for an existing function before writing a new one. No re-implementation, no one-line wrappers.
+   - **Reuse first — search before write.** Before writing any new function or class, run two searches: `search_graph(semantic_query=["<concept>", "<verb>", "<domain_noun>"])` to find it by concept, then `search_graph(name_pattern="<likely_prefix_or_suffix>")` to find it by name. If either returns something that does the job → call it. If something almost fits → use it directly; don't generalize for a hypothetical second caller. Write new code only when both searches return nothing usable. No one-line wrappers. No re-implementations. Full instructions: `../references/pattern-guard.md` Step 1b.
    - **Trust your callers.** No `if x is None` / `isinstance` / `try-except` guards inside the trust boundary. Validate at edges (user input, external APIs, file/network) only.
    - **Names reveal intent.** No `data` / `result` / `temp` / `info` / `obj` when a specific name fits. Booleans read as yes/no questions (`is_expired`, `has_admin_role`).
    - **Branching budget ~7.** If a function has more `if` / `else` / `case` / `&&` than that, split or drop dead guards.
    - **Function size ~30 lines.** One job per function. If the name needs "and", split.
    - **No premature abstraction.** Three near-identical copies is fine. No new `BaseX` / factory / strategy / config object for a single caller.
-   - **Comments only for *why*, never *what*.** Default: no comment. No comments referencing current task / PR / ticket — they rot.
+   - **Comments: zero by default.** Do not add a comment unless you can state the non-obvious *why* in one sentence. No function docstrings unless the project's `comment_style` requires them. No inline comments restating what the code does (`# loop over users`, `# return result`). No block comments describing a section. No comments naming the task, PR, or ticket. If removing the comment would not confuse a future reader, do not write it.
 6. Run the step definitions again — they should PASS (green)
 7. If still red, fix the production code (not the test)
 8. **Hallucination check:** Before running tests, verify every external function/method your new code calls actually exists in the graph: `search_graph(name_pattern="<name>")` for each. If not found: find the correct function or stop and flag to user. Do not run tests against calls to non-existent functions. (Full instructions in `../references/pattern-guard.md` Step 6.)
@@ -279,8 +281,8 @@ Present a brief summary:
 ## References
 
 **Before writing code**, read all three:
-- `../references/pattern-guard.md` — run before each task: classify code type, find peers via `search_graph`, extract modal pattern across four seams (error handling, dependency, abstraction depth, return shape), write a pattern brief. Apply the brief while writing. Run hallucination check after writing (verify called functions exist in graph). Skip if graph not indexed.
-- `../references/code-quality.md` — anti-slop rules to apply *while writing*: reuse before write, trust callers, names reveal intent, branching budget, function size, no premature abstraction, comments only for non-obvious why. Includes a seven-point quality gate to run before marking each task `[x]`.
+- `../references/pattern-guard.md` — run before each task: (1) classify code type, (1b) reuse discovery — two `search_graph` calls (semantic_query by concept + name_pattern by likely name) to find existing code to call instead of writing new code, (2) find 3–5 peers, extract modal pattern across four seams (error handling, dependency, abstraction depth, return shape), write a pattern brief. Apply the brief while writing. Run hallucination check after writing (verify called functions exist in graph). Skip if graph not indexed.
+- `../references/code-quality.md` — anti-slop rules to apply *while writing*: reuse before write, trust callers, names reveal intent, branching budget, function size, no premature abstraction, zero comments by default (only non-obvious *why*, never *what*). Includes a seven-point quality gate to run before marking each task `[x]`.
 - `../references/testing-contracts.md` — verify-before-using rules (imports, packages, APIs), mocking strategy (HTTP boundary not client), fixture management, contract tests, and step definition quality checks.
 
 ## Important

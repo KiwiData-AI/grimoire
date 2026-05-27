@@ -301,7 +301,7 @@ function printStepResult(result: StepResult): void {
         `  ${stepName} ${chalk.red("✗ failed")}   ${chalk.dim(duration)}`
       );
       if (result.output) {
-        const lines = result.output.split("\n").slice(0, 5);
+        const lines = result.output.split("\n").slice(0, 30);
         for (const line of lines) {
           console.log(`    ${chalk.dim("→")} ${line}`);
         }

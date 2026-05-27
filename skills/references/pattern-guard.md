@@ -27,6 +27,38 @@ From the task description and feature file, identify what category of code this 
 
 A task may touch multiple types — classify the primary one.
 
+### Step 1b — Reuse discovery
+
+Before finding peer patterns, ask: **does what I'm about to write already exist?**
+
+These are two different questions. Step 2 finds code to *pattern-match against*. This step finds code to *call instead of writing*.
+
+For each function, helper, or class the task requires, run both searches:
+
+**Semantic search** — find it by concept, not by name:
+```
+search_graph(semantic_query=["<primary_concept>", "<action_verb>", "<domain_noun>"])
+```
+Example: about to write something that formats a currency amount →
+```
+search_graph(semantic_query=["format", "currency", "amount"])
+```
+This finds `render_price`, `display_amount`, `format_currency` — whatever name the codebase already uses.
+
+**Name-pattern search** — find it by likely prefix or suffix:
+```
+search_graph(name_pattern="(format_|_format|currency|amount|price)")
+```
+
+**Decision rules:**
+- Result does the job → **call it**. Do not re-implement.
+- Result almost fits → **use it directly**. Do not generalize it for a second case that doesn't exist yet.
+- Both searches return nothing usable → write new code and proceed to Step 2.
+
+**Log the outcome in the pattern brief** (Step 4): note which searches ran and what they found. If calling an existing function instead of writing new code, note it explicitly: `Reused format_currency from billing/utils.py — no new function needed.`
+
+Do not skip this step. Writing new code without a reuse search is the primary source of duplication in LLM-generated codebases. The semantic_query mode bridges vocabulary gaps — it finds "publish" when you search "send".
+
 ### Step 2 — Find peer examples
 
 Use `search_graph` to find 3–5 existing functions/classes of the same type. Prefer the most established (oldest, least recently changed) — these are the modal pattern, not the recent drift.
