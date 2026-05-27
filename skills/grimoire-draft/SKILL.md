@@ -122,14 +122,42 @@ Present a Requirements Summary (template in the reference) and wait for user con
 ### 7. Draft Artifacts
 **For behavioral changes:**
 
-Before writing any `.feature` file, triage: does this scenario logically belong in an existing feature file?
+Before writing any `.feature` file, triage existing files. **The default is always extend. New files are the exception and require explicit justification.**
 
-1. Read `features/` — list every existing `.feature` file with its `Feature:` title.
-2. For each proposed scenario, ask: "Is there already a feature file whose title and user story encompasses this behavior?" If yes, that file should be extended, not bypassed with a new file.
-3. **Extend first.** Copy the matching baseline file to `.grimoire/changes/<change-id>/features/<same-relative-path>/` and add the new scenarios there. Only create a new `.feature` file if no existing file logically owns the behavior.
-4. When creating a new file (genuinely new capability), it goes in `.grimoire/changes/<change-id>/features/<capability>/` with a fresh Feature title and user story.
+**Step 1 — List existing feature files (required, not skippable)**
 
-Signals that a scenario belongs in an existing file: same actor, same domain object, same entry point, same HTTP resource or screen. Signals for a new file: new actor, new domain object, feature title would require an "and" to cover both old and new behavior.
+Read `features/` recursively. Print a table before doing anything else:
+
+```
+Existing feature files:
+  features/auth/login.feature         — "User Login"
+  features/auth/registration.feature  — "User Registration"
+  features/billing/invoices.feature   — "Invoice Management"
+  ...
+```
+
+If `features/` is empty or doesn't exist, skip to step 3.
+
+**Step 2 — Match each proposed scenario to an existing file**
+
+For each scenario you intend to draft, explicitly decide: extend or new? Show the decision:
+
+```
+Scenario triage:
+  "Admin resets a user's password"  → extend features/auth/login.feature  (same actor domain: auth)
+  "User exports invoices as CSV"    → extend features/billing/invoices.feature  (same resource)
+  "User configures SSO provider"    → NEW  (no existing file owns SSO configuration)
+```
+
+Do not proceed to writing until this table is complete. If unsure about a match, default to extend.
+
+**Step 3 — Execute**
+
+- **Extend:** copy the matching baseline file to `.grimoire/changes/<change-id>/features/<same-relative-path>/` and add scenarios there.
+- **New file (requires justification):** state which existing files were considered and why none fit. Then create `.grimoire/changes/<change-id>/features/<capability>/<name>.feature`.
+
+Signals a scenario belongs in an existing file: same actor, same domain object, same entry point, same HTTP resource or screen.
+Signals a genuinely new file: new actor type with no existing file, entirely new domain object, or existing file's Feature title would need "and" to cover both.
 
 - If modifying an existing feature, copy the current baseline first, then modify
 - Follow Gherkin best practices:
