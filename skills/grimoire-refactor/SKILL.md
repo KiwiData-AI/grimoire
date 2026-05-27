@@ -34,7 +34,7 @@ Each debt item in the register follows a structured format influenced by the Cod
 
 **Required fields:**
 - `id` — unique identifier (debt-NNN, monotonically increasing)
-- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `dead_code`, `test_debt`, `pattern_divergence`
+- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `dead_code`, `test_debt`, `pattern_divergence`, `comment_noise`
 - `severity` — `high`, `medium`, or `low`
 - `location` — file path (with optional `:line`), or `path ↔ path` for relationships
 - `title` — short human-readable summary
@@ -108,15 +108,16 @@ Run applicable scans from the categories in `../references/refactor-scan-categor
 
 **Key categories** (details in reference):
 - **Hotspots** (churn x complexity) — highest ROI, uses `git log` + `config.tools.complexity`
-- **Structural bloat** — oversized files/functions/classes
+- **Structural bloat** — oversized files/functions/classes; plus graph-powered checks for single-subclass bases, single-caller wrappers, zero-caller exports, single-implementation interfaces (requires `codebase-memory-mcp`)
 - **Data structure complexity** — over-engineered models, deep nesting
 - **Circular dependencies** — tight coupling between modules
 - **Dependency staleness** — uses `config.tools.dep_audit` or package manager outdated commands
 - **Broken promises** — aged TODO/FIXME/HACK comments via `grep` + `git blame`
-- **Duplication** — uses `.snapshot.json` duplicates or `config.tools.duplicates`
+- **Duplication** — textual clones via `.snapshot.json` or `config.tools.duplicates`; plus semantic duplicate detection via `search_graph(semantic_query=[...])` to find re-implementations under different names (requires `codebase-memory-mcp`)
 - **Dead code** — uses `config.tools.dead_code` or `codebase-memory-mcp` graph queries
 - **Test debt** — high complexity + low coverage
 - **Pattern divergence** — code that contradicts established codebase patterns; uses `codebase-memory-mcp` peer group analysis + hallucinated reference detection (skip if graph not indexed)
+- **Comment noise** — restatement comments, task/PR references, high comment density, multi-line docstrings on private functions; grep-based, no graph required
 
 ### 3. Load Exceptions
 

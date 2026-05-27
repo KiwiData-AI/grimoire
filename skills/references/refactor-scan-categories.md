@@ -28,6 +28,21 @@ Files that change frequently AND are hard to change. Highest-ROI refactoring tar
 
 **Severity:** high = 2x+ threshold, medium = 1-2x, low = marginally over
 
+**Graph-powered LLM bloat checks** (requires `codebase-memory-mcp`; skip if not indexed):
+
+These target patterns that static size checks miss — structurally valid code that adds indirection without value. Primary signal of LLM-generated over-engineering.
+
+| Pattern | Query | Flag when |
+|---|---|---|
+| Single-subclass base class | `query_graph("MATCH (sub)-[:INHERITS]->(base:Class) WITH base, collect(sub) AS subs WHERE size(subs) = 1 RETURN base.qualified_name, base.file, subs[0].qualified_name AS only_subclass")` | Any result — a base with one child is premature abstraction |
+| Single-caller wrapper | Step 1: `query_graph("MATCH (caller)-[:CALLS]->(fn) WITH fn, collect(caller) AS callers WHERE size(callers) = 1 RETURN fn.qualified_name, fn.file, callers[0].qualified_name AS only_caller")`. Step 2: for each result, `get_code_snippet(qualified_name)` and count body lines. | Wrapper with 1 caller and ≤7 body lines — inline candidate |
+| Zero-caller export | `query_graph("MATCH (f:Function) WHERE f.exported = true AND NOT ()-[:CALLS]->(f) RETURN f.qualified_name, f.file")` — then filter out entry points manually: skip files named `index.ts`, `__init__.py`, `main.py`, `cli.py`, `app.py`, or in a `public/` directory | Exported, unreachable within repo, not an entry point — dead export |
+| Single-implementation interface | `query_graph("MATCH (impl)-[:IMPLEMENTS]->(iface:Interface) WITH iface, collect(impl) AS impls WHERE size(impls) = 1 RETURN iface.qualified_name, iface.file, impls[0].qualified_name AS only_impl")` | Any result — interface with one implementor adds no polymorphism |
+
+Note: the exact Cypher depends on the graph schema. If a query returns an error, adjust field names using `get_graph_schema()` to inspect available properties.
+
+**Severity for graph findings:** high = single-implementation interface or zero-caller export, medium = single-subclass base or single-caller wrapper
+
 ## 2c. Data Structure Complexity
 
 | Signal | Meaning |
@@ -81,6 +96,22 @@ TODO/FIXME/HACK/XXX comments that have aged.
 - Group by area — within-area dupes are easy to consolidate
 
 **Severity:** high = >30 lines or >3 copies, medium = 10-30 lines or 2 copies, low = <10 lines
+
+**Concept-based duplicate detection** (requires `codebase-memory-mcp`; supplements jscpd which only finds textual clones):
+
+LLM-generated code frequently re-implements existing utilities under a different name. jscpd won't catch these — the code is structurally different even though it does the same thing.
+
+**How to scan:**
+1. Find utility/helper functions: `search_graph(label="Function", name_pattern="(parse_|format_|validate_|convert_|build_|get_|find_|create_|check_|is_|has_)")`
+2. For each result, extract 2–3 concept words from the function name (e.g., `format_invoice_date` → `["format", "date", "invoice"]`)
+3. Run: `search_graph(semantic_query=["<concept1>", "<concept2>", "<concept3>"])` — if `semantic_query` is unsupported, fall back to `search_graph(name_pattern="(<concept1>|<concept2>)")`
+4. Compare: if the search returns a different function, read both with `get_code_snippet` and assess whether they do the same job
+
+**Flag when:** two functions accept similar inputs, produce similar outputs, and operate on the same domain concept. Assessment is qualitative — the tool returns ranked results, not similarity scores.
+
+**Focus on:** utility directories (`utils/`, `helpers/`, `lib/`, `common/`), validators, formatters, parsers. These are where re-implementations accumulate.
+
+**Severity:** high = identical behavior under different names, medium = near-duplicate with minor variations that could be unified with a parameter, low = similar but distinct enough to keep
 
 ## 2h. Dead Code
 
@@ -172,3 +203,52 @@ Flag as `pattern_divergence` with detail: "Called `foo.bar()` — no matching no
 - Abstraction: extract domain logic to service, slim the handler
 - Dependency: adopt constructor injection or established DI pattern
 - Hallucinated ref: replace with actual existing function (use `search_graph` to find it)
+
+## 2k. Comment Noise
+
+Comments that restate the code, reference stale context, or pad function bodies without conveying non-obvious intent. A secondary LLM bloat signal — LLMs are trained to produce documentation and carry that habit into code generation.
+
+**How to scan:**
+
+**Step 1 — High comment density files**
+```bash
+grep -rcE "^\s*#|^\s*//" --include="*.py" --include="*.ts" --include="*.js" <src_dirs> | \
+  grep -v ":0$" | sort -t: -k2 -rn | head -20
+```
+Flag files with >30 comment lines. Raw count, not ratio — a 30-comment file is a candidate regardless of size.
+
+**Step 2 — Restatement pattern grep**
+```bash
+grep -rni \
+  -e "# loop over" -e "# iterate over" -e "# return the" -e "# return result" \
+  -e "# loop through" -e "# now call" -e "# call the" -e "# increment" -e "# decrement" \
+  -e "// loop over" -e "// iterate over" -e "// return the" -e "// return result" \
+  -e "// loop through" -e "// now call" -e "// call the" -e "// increment" -e "// decrement" \
+  --include="*.py" --include="*.ts" --include="*.js" <src_dirs>
+```
+Treat results as candidates — quick human scan to confirm before deleting.
+
+**Step 3 — Task/PR reference comments**
+```bash
+grep -rn \
+  -e "# added for" -e "# used by" -e "# see issue" -e "# handles the case" -e "# added in" \
+  -e "// added for" -e "// used by" -e "// see issue" -e "// handles the case" -e "// added in" \
+  --include="*.py" --include="*.ts" --include="*.js" <src_dirs>
+```
+These belong in commit messages, not source. Treat results as candidates — review before flagging, as patterns like `# see issue` can appear in legitimate context.
+
+**Step 4 — Docstrings on private/internal functions**
+```bash
+# Python: single-underscore private functions (excludes dunders)
+grep -rn "def _[^_]" --include="*.py" <src_dirs>
+# TS/JS: JSDoc blocks
+grep -rn "/\*\*" --include="*.ts" --include="*.js" <src_dirs>
+```
+Manual triage: open each hit and check whether a multi-line docstring follows. Python `def _name` functions and TS/JS non-exported functions don't need docstrings. Delete multi-line blocks; a single-line doc is acceptable if `comment_style` requires it.
+
+**Severity:**
+- high = >20 restatement comments in a single file, or task/PR references in core business logic
+- medium = 5–20 restatement comments, or any task/PR references found
+- low = multi-line docstrings on private functions
+
+**Suggested action:** Delete restatement comments. Move task/PR references to commit history. Trim private function docstrings to one line or remove entirely.
