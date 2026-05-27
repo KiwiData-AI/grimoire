@@ -289,7 +289,29 @@ When all tests are green:
 
 Feature files were already promoted to `features/` in step 3b — no copy needed here.
 
-### 8. Summary
+### 8. Commit
+
+Finalize must be complete before committing — the commit captures the finished state including archived manifest and promoted decisions, not mid-flight change artefacts.
+
+Stage everything:
+```
+git add features/ .grimoire/decisions/ .grimoire/archive/ .grimoire/docs/ src/ tests/
+git add -u  # picks up any deleted files (removed change directory)
+```
+
+Then commit using `/grimoire:commit` (reads change context for the message) or write a manual message following `AGENTS.md` commit trailer conventions:
+```
+feat(<change-id>): <short description>
+
+<body if needed>
+
+Change: <change-id>
+Scenarios: "<scenario 1>", "<scenario 2>"
+```
+
+Mid-task commits are fine — commit whenever it makes sense during implementation. **Do not open a PR before finalize is complete.** The PR should represent the finished, archived state of the change.
+
+### 9. Summary
 Present a brief summary:
 - What was implemented
 - Which features now pass (with test counts if available)

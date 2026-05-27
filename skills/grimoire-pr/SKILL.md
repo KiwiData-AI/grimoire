@@ -17,16 +17,14 @@ Generate a pull request description from grimoire change artifacts and optionall
 - Loose match: "PR", "pull request", "ready to merge", "create PR"
 
 ## Routing
-- Tasks incomplete → `grimoire-apply` first (or create a draft PR)
+- Tasks incomplete or finalize not done → `grimoire-apply` first. Do not create a PR before the change is finalized — PR must reflect the archived state (decisions promoted, manifest archived, change directory removed).
 - Haven't committed yet → `grimoire-commit` first
 - Want a pre-merge design review → this skill includes optional post-implementation review
 
 ## Prerequisites
-- A change exists in `.grimoire/changes/<change-id>/` with:
-  - `manifest.md`
-  - `tasks.md` with all (or most) tasks checked
-  - Feature files and/or decision records
-- The change should be on a feature branch (created during apply)
+- Change has been finalized: `.grimoire/changes/<change-id>/` is removed, manifest is in `.grimoire/archive/`
+- All decisions promoted to `.grimoire/decisions/`
+- The change is on a feature branch (created during apply)
 
 ## Workflow
 
