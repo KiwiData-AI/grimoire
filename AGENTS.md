@@ -24,6 +24,43 @@ These principles govern all grimoire work — drafting, planning, reviewing, and
 
 **Verify before using.** Before importing a module, calling a function, or adding a dependency — confirm it exists. Check `.grimoire/docs/<area>.md` for reusable code with exact paths. Check `.grimoire/docs/data/schema.yml` for real model fields and API endpoints. If you haven't read the file you're importing from, read it (or its area doc) first. Never guess at package names, function signatures, or API paths.
 
+## Anti-Loop Protocol
+
+Applies everywhere: writing code, running tests, fixing checks, editing files. These rules exist because loops are expensive — each iteration burns context and time, and the later iterations are usually worse than just stopping.
+
+### Attempt budget: 3
+
+Count attempts per discrete problem (one failing test, one failing check, one broken script). After 3 failed attempts:
+
+1. **Stop.** Do not attempt #4.
+2. **Diagnose.** State the pattern: what you tried each time, what failed each time, what's different and what's the same.
+3. **Escalate.** Present the diagnosis to the user and ask how to proceed. Don't silently switch to a different approach without saying so.
+
+A "different attempt" means a fundamentally different approach — not the same fix with minor tweaks. If attempt 2 makes the same type of change as attempt 1, it counts as the same attempt.
+
+### Change approach after 2 failures of the same type
+
+If the second failure looks like the first failure (same error class, same location, same check), the approach is wrong — not the implementation. Don't attempt a third narrow fix. Step back and ask: is the whole approach wrong? Is there a simpler path?
+
+Examples:
+- Two shell scripts with portability bugs → stop writing scripts, use prose or build into the tool
+- Two attempts to fix the same failing test → reread the test and the code together, don't just tweak values
+- Two check failures on the same file → run the check manually and read the full output before editing
+
+### Pre-validate before acting
+
+Don't use side-effect actions (commits, test runs, check runs) as the primary validator. Validate first, then act.
+
+- Shell scripts: run against the actual codebase before embedding in any file
+- Commits: run `grimoire check <step>` manually, fix all issues, then commit once
+- Code: read the function you're calling before calling it — don't rely on the compiler or test runner to catch typos in function names
+
+### Diagnose before fixing
+
+After any failure, state what you observe before proposing a fix. One sentence: what failed, where, and why. If you can't state the why, you're not ready to fix it.
+
+This applies especially to test failures. "The test failed" is not a diagnosis. "The test expected `302` but got `200` because the redirect middleware isn't registered in the test client" is.
+
 ## When to Use Grimoire
 
 Use grimoire when the user's request involves:
