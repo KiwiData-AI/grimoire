@@ -189,6 +189,23 @@ Where `<type>` is `feat`, `fix`, `refactor`, or `chore` based on the change. If 
 
 This links the git history to the grimoire change — `grimoire trace` and `grimoire log` depend on it.
 
+### 3b. Promote Feature Files
+
+Before writing any code, copy the proposed feature files from the change directory into the live `features/` tree:
+
+```
+cp -r .grimoire/changes/<change-id>/features/* features/
+```
+
+For extended files (scenarios added to an existing feature), overwrite — the change copy already contains the baseline scenarios plus the new ones. For new files, place them at the correct path under `features/`.
+
+**Why this comes first:** BDD test runners discover scenarios from `features/`. Scenarios that only exist in `.grimoire/changes/` are invisible to the test runner, so the red-green cycle cannot work. On a feature branch, `features/` is branch-local — promoting here has no effect on `main` until the PR merges.
+
+Commit the promoted files before writing any step definitions:
+```
+git add features/ && git commit -m "feat(<change-id>): promote feature specs to features/"
+```
+
 ### 4. Load Context
 
 **Use the context blocks in `tasks.md`.** Each task section has a `<!-- context: ... -->` comment listing the exact files to load for that section. This was computed during planning with full codebase knowledge. Load those files — they include the relevant feature files, area docs, and source files you'll need.
@@ -264,12 +281,13 @@ When all implementation tasks are complete:
 
 ### 7. Finalize
 When all tests are green:
-1. Copy proposed `.feature` files from `.grimoire/changes/<change-id>/features/` to `features/` (replacing baseline)
-2. Move new decision records to `.grimoire/decisions/` with proper sequential numbering
-3. Update MADR status from `proposed` to `accepted` and set the date
-4. If `data.yml` exists, merge the changes into `.grimoire/docs/data/schema.yml` — apply adds/modifies/removes so the baseline schema stays current
-5. Move `manifest.md` to `.grimoire/archive/YYYY-MM-DD-<change-id>/`
-6. Remove the change directory from `.grimoire/changes/`
+1. Move new decision records to `.grimoire/decisions/` with proper sequential numbering
+2. Update MADR status from `proposed` to `accepted` and set the date
+3. If `data.yml` exists, merge the changes into `.grimoire/docs/data/schema.yml` — apply adds/modifies/removes so the baseline schema stays current
+4. Move `manifest.md` to `.grimoire/archive/YYYY-MM-DD-<change-id>/`
+5. Remove the change directory from `.grimoire/changes/`
+
+Feature files were already promoted to `features/` in step 3b — no copy needed here.
 
 ### 8. Summary
 Present a brief summary:
