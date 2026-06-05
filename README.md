@@ -41,7 +41,7 @@ cd grimoire
 npm install
 npm run build
 npm link              # makes `grimoire` available globally
-grimoire --version    # should print 0.1.2
+grimoire --version    # should print the installed version
 ```
 
 To update after pulling new changes:

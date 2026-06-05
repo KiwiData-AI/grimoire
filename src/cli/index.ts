@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { Command } from "commander";
 import { initCommand } from "../commands/init.js";
 import { updateCommand } from "../commands/update.js";
@@ -15,6 +18,10 @@ import { ciCommand } from "../commands/ci.js";
 import { branchCheckCommand } from "../commands/branch-check.js";
 import { configureCommand } from "../commands/configure.js";
 
+const pkg = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json"), "utf-8")
+) as { version: string };
+
 const program = new Command();
 
 program
@@ -22,7 +29,7 @@ program
   .description(
     "Gherkin + MADR spec-driven development for AI coding assistants"
   )
-  .version("0.1.2");
+  .version(pkg.version);
 
 program.addCommand(initCommand);
 program.addCommand(updateCommand);
