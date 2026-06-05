@@ -1,14 +1,37 @@
+---
+status: implementing
+branch: refactor-complexity
+complexity: 3
+---
+
 # refactor-complexity
 
-**Type:** refactoring  
-**Status:** in-progress  
-**Debt items:** debt-001, debt-002, debt-003, debt-004, debt-005, debt-006, debt-007, debt-008, debt-009
+## Why
 
-## Goal
+Several functions exceed the ESLint cyclomatic-complexity threshold of 10, making
+them hard to test and reason about. Reduce the highest-severity violations to bring
+all functions under the threshold. No behaviour changes — existing tests must
+continue to pass. Done when every function below is under 10 and the suite is green.
 
-Reduce cyclomatic complexity across the highest-severity violations to bring all functions under the ESLint threshold of 10. No behaviour changes — existing tests must continue to pass.
+## Non-goals
+
+- No behaviour changes — this is a pure refactor.
+- No new abstractions or files unless an obvious grouping emerges.
+- Not addressing complexity below the threshold (only the listed violations).
+
+## Feature Changes
+
+None — internal refactoring only. No feature behaviour changes, so no `.feature`
+files are added, modified, or removed.
+
+## Decisions
+
+None — no architecture decision is created or superseded. The extraction strategy
+(focused, independently testable helpers) is an implementation detail, not an ADR.
 
 ## Scope
+
+Debt items: debt-001 … debt-009.
 
 | File | Function | Before | Target |
 |------|----------|--------|--------|
@@ -25,4 +48,5 @@ Reduce cyclomatic complexity across the highest-severity violations to bring all
 
 ## Approach
 
-Extract focused helper functions. No new abstractions, no new files unless a grouping is obvious. Each extracted helper must be independently testable.
+Extract focused helper functions. No new abstractions, no new files unless a
+grouping is obvious. Each extracted helper must be independently testable.

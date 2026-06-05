@@ -1,0 +1,27 @@
+# Grimoire Risk-Accepted Vulnerabilities
+# Vulnerabilities triaged as `affected`/`not_affected` but consciously accepted —
+# because no fix exists yet, the residual risk is low, or the fix isn't worth it.
+#
+# Written by: grimoire-vuln-remediate (from a grimoire-vuln-triage verdict)
+# Read by:    grimoire-vuln-triage (reconciliation) AND the dep_audit / security
+#             check steps — an UNEXPIRED entry whose advisory id appears in the
+#             scan output is suppressed so the gate doesn't block on triaged-away
+#             findings. An EXPIRED entry is re-surfaced.
+#
+# Last updated: 2026-06-04
+
+accepted:
+  - cve: GHSA-5xrq-8626-4rwp
+    aliases: []
+    component: vitest
+    component_type: library
+    vex_justification: vulnerable_code_not_in_execute_path
+    reason: "Vitest UI server arbitrary file read/exec. Vitest (and its transitive
+             @vitest/coverage-v8) is a dev/test-only dependency — never shipped in
+             the published npm package (grimoire ships dist/, skills/, templates/),
+             and the UI server is not run in CI or production. Not reachable by any
+             deployed surface. Fix is a breaking vitest v4 major bump; deferred to a
+             dedicated upgrade. EPSS ~0, not in KEV."
+    owner: fred
+    accepted: 2026-06-04
+    expires: 2026-09-04

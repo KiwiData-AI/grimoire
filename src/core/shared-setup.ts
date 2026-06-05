@@ -15,12 +15,14 @@ export const GRIMOIRE_DIRS = [
   ".grimoire/archive",
   ".grimoire/bugs",
   ".grimoire/brand",
+  ".grimoire/security/vulns",
 ];
 
 export const TEMPLATE_FILES: Array<[string, string]> = [
   ["decision.md", ".grimoire/decisions/template.md"],
   ["context.yml", ".grimoire/docs/context.yml"],
   ["debt-exceptions.yml", ".grimoire/debt-exceptions.yml"],
+  ["accepted-risks.yml", ".grimoire/security/accepted-risks.yml"],
   ["mapignore", ".grimoire/mapignore"],
   ["mapkeys", ".grimoire/mapkeys"],
   ["dupignore", ".grimoire/dupignore"],
@@ -56,6 +58,8 @@ export const SKILL_NAMES = [
   "grimoire-precommit-review",
   "grimoire-refactor",
   "grimoire-branch-guard",
+  "grimoire-vuln-triage",
+  "grimoire-vuln-remediate",
 ];
 
 const SKILL_SHARED_DIRS = ["references"];

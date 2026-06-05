@@ -441,6 +441,8 @@ Grimoire owns the **inner loop** — the Dev and Sec portions of DevSecOps. Ops 
 | Traceability | Every commit → change → feature → decision | `grimoire trace` |
 | Security review | STRIDE threat modeling, OWASP/CWE tagging at design time | Review + plan + verify skills |
 | Security tooling | SAST, SCA, secrets scanning in pre-commit pipeline | `grimoire check` |
+| Vulnerability triage | CVE noise → VEX verdict + hotfix-now/next-release, scored on KEV/EPSS/reachability vs deployment + recorded controls | Vuln-triage skill |
+| Vulnerability remediation | Triaged findings → bug-tracker tickets, risk-accept register with expiry (feeds back into triage *and* the `dep_audit`/`security` check gate), change stubs for non-trivial fixes | Vuln-remediate skill |
 | Bug discipline | Reproduce-first fixes, structured triage, confidential security handling | Bug workflow skills |
 | Exploratory testing | Gap analysis, coverage mapping, charter-based sessions | Bug-explore + bug-session skills |
 | Tech debt tracking | Structured debt register with severity and formal exceptions | Refactor skill |
@@ -464,6 +466,8 @@ Grimoire captures environment context (`.grimoire/docs/context.yml`) so the AI u
 Grimoire's security capabilities are **AI-mediated at design time**, not static analysis enforcement at build time. The review skill runs STRIDE threat modeling, the plan skill mandates proven security patterns (OAuth2, bcrypt, parameterized queries), and the verify skill checks that guidance was followed. The check pipeline runs SAST/SCA/secrets tools when configured.
 
 This means security coverage depends on: (1) configuring the right tools in your check pipeline, and (2) the AI following its own instructions. Projects that run `grimoire init` with detection get solid defaults. Projects that skip detection should configure `tools.security`, `tools.dep_audit`, and `tools.secrets` in `.grimoire/config.yaml`.
+
+**Vulnerability triage.** Scanners (`npm audit`, `pip-audit`, `osv-scanner`) rank CVEs by CVSS base score, which knows nothing about your deployment — so they over-escalate. The vuln-triage skill scores each advisory the way it actually matters here: KEV (known-exploited), EPSS (exploit probability), reachability (is the vulnerable code even on our execute path), and exposure/controls read from `context.yml` + MADR decisions — never a new config file. The output is a [VEX](https://www.cisa.gov/sites/default/files/2023-04/minimum-requirements-for-vex-508c.pdf) verdict per CVE (`not_affected` with a justification code suppresses noise auditably) and, for the survivors, the only decision that matters: **drop-everything hotfix vs next release cycle**. A Contrarian calibration pass (the same one from the review engine) steel-mans "we're not affected" against every escalation to kill manufactured emergencies. Full rubric in `skills/references/dependency-vuln-triage.md`. Accepted findings land in `.grimoire/security/accepted-risks.yml` with an expiry; the `dep_audit` and `security` check steps read that register and suppress an advisory only while its entry is unexpired — so the commit gate stops blocking on triaged-away findings (e.g. a dev-only CVE) without silently ignoring new ones.
 
 **Supply chain defense.** For apps and services, the review and verify skills treat any dependency add/upgrade without a committed lockfile (and integrity hashes, where the ecosystem supports them) as a **blocker** — motivated by recent npm / PyPI / RubyGems / Cargo maintainer-account compromises that auto-installed through floating version ranges. Per-ecosystem rules cover `package.json` + lockfile (no `^`/`~`/`*`/`latest` for apps), `uv.lock` / `poetry.lock` / `pip-compile --generate-hashes`, `Gemfile.lock` with `CHECKSUMS` (Bundler 2.5+), `Cargo.lock` for binaries, and `go.mod` + `go.sum`. CI must install from the lockfile (`npm ci`, `pnpm install --frozen-lockfile`, `yarn install --immutable`, `uv sync --frozen`, `pip install --require-hashes`, `bundle install --deployment`, `cargo build --locked`, `go build` with `-mod=readonly`). Libraries published to a registry are out of scope — keep compatible ranges in your published manifest. Full ruleset in `skills/references/security-compliance.md`.
 
@@ -650,6 +654,8 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | `/grimoire:bug` | Disciplined bug fix with reproduction test first |
 | `/grimoire:bug-report` | Structured bug reporting (accepts test tool output) |
 | `/grimoire:bug-triage` | Classify and route bug reports |
+| `/grimoire:vuln-triage` | Triage vuln scans (npm audit / pip-audit / Trivy / any tool) against deployment + controls — hotfix-now vs next release |
+| `/grimoire:vuln-remediate` | File triaged vulns — tickets in the bug tracker, risk-accept register with expiry, change stubs for big fixes |
 | `/grimoire:bug-explore` | AI-guided exploratory testing and gap analysis |
 | `/grimoire:bug-session` | Charter-based exploratory testing sessions |
 | `/grimoire:branch-guard` | Enforce branch hygiene before starting new feature work (also wired as a hook) |
@@ -853,7 +859,7 @@ grimoire/
 ### Adding a New Skill
 
 1. Create `skills/grimoire-<name>/SKILL.md` with trigger, prerequisites, workflow, and important notes
-2. Add `"grimoire-<name>"` to the `skillNames` array in both `src/core/init.ts` and `src/core/update.ts`
+2. Add `"grimoire-<name>"` to the `SKILL_NAMES` array in `src/core/shared-setup.ts` (shared by init and update)
 3. Build and test: `npm run build && node bin/grimoire.js update .`
 
 Skills are pure markdown — instructions for the AI, not executable code.

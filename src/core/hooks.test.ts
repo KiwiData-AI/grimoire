@@ -67,7 +67,9 @@ describe("setupHooks", () => {
     // Should keep existing entry and add grimoire entries
     expect(written.hooks.PreCommit).toHaveLength(2);
     expect(written.hooks.PreCommit[0].command).toBe("black --check .");
-    expect(written.hooks.PreCommit[1].command).toBe("grimoire check --changed --json");
+    expect(written.hooks.PreCommit[1].command).toBe(
+      "grimoire check --changed --json --skip best_practices",
+    );
   });
 
   it("skips git hooks when .git doesn't exist", async () => {

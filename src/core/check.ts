@@ -8,6 +8,14 @@ import { findProjectRoot } from "../utils/paths.js";
 import { spawnWithStdin } from "../utils/spawn.js";
 import { analyzeTestQuality, TEST_FILE_GLOBS, TEST_FILE_IGNORE } from "./test-quality.js";
 import { checkDocStyle } from "./doc-style.js";
+import { loadAcceptedRiskIds, partitionAdvisories } from "./risk-register.js";
+
+// Steps whose tool emits CVE/GHSA advisory ids in its output and can therefore
+// be suppressed by the risk-acceptance register (.grimoire/security/accepted-risks.yml).
+// Only meaningful for advisory-id-emitting scanners (npm audit, pip-audit, osv,
+// trivy, ...); suppression is a no-op for tools whose failures aren't keyed by a
+// CVE/GHSA id, since no ids will match the register.
+const REGISTER_AWARE_STEPS = new Set(["dep_audit", "security"]);
 
 const execFileAsync = promisify(execFile);
 
@@ -125,7 +133,41 @@ async function runStep(
   if (step === "complexity" && isBuiltinComplexity(config.tools[step])) {
     return runComplexityStep(root, config);
   }
-  return runToolStep(step, root, config, options);
+  const result = await runToolStep(step, root, config, options);
+  if (result.status === "fail" && REGISTER_AWARE_STEPS.has(step)) {
+    return applyRiskRegister(result, root);
+  }
+  return result;
+}
+
+/**
+ * For a failed vuln-scan step, suppress advisories that are risk-accepted in
+ * .grimoire/security/accepted-risks.yml. If every advisory in the output is an
+ * unexpired accepted entry, the step passes (with a note). If some remain
+ * unaccepted, it still fails — but annotates which were suppressed vs outstanding.
+ */
+async function applyRiskRegister(result: StepResult, root: string): Promise<StepResult> {
+  const acceptedIds = await loadAcceptedRiskIds(root, new Date());
+  if (acceptedIds.size === 0) return result;
+
+  const { suppressed, remaining } = partitionAdvisories(result.output, acceptedIds);
+  if (suppressed.length === 0) return result; // nothing the register covers
+
+  if (remaining.length > 0) {
+    return {
+      ...result,
+      reason: `${suppressed.length} risk-accepted, ${remaining.length} outstanding`,
+      output:
+        `${result.output}\n\n[risk-register] ${suppressed.length} suppressed via accepted-risks.yml ` +
+        `(${suppressed.join(", ")}); ${remaining.length} still outstanding (${remaining.join(", ")})`,
+    };
+  }
+
+  return {
+    ...result,
+    status: "pass",
+    reason: `${suppressed.length} advisory(ies) risk-accepted: ${suppressed.join(", ")}`,
+  };
 }
 
 async function runShellStep(
@@ -286,6 +328,19 @@ function getBuiltinLlmFallback(step: string): ToolConfig | undefined {
   return BUILTIN_LLM_FALLBACKS[step];
 }
 
+const MAX_FAIL_LINES = 30;
+
+function printFailOutput(output: string): void {
+  if (!output) return;
+  const lines = output.split("\n");
+  for (const line of lines.slice(0, MAX_FAIL_LINES)) {
+    console.log(`    ${chalk.dim("→")} ${line}`);
+  }
+  if (lines.length > MAX_FAIL_LINES) {
+    console.log(chalk.dim("    ... (truncated)"));
+  }
+}
+
 function printStepResult(result: StepResult): void {
   const duration = `(${(result.duration / 1000).toFixed(1)}s)`;
   const stepName = result.step.padEnd(16);
@@ -293,22 +348,13 @@ function printStepResult(result: StepResult): void {
   switch (result.status) {
     case "pass":
       console.log(
-        `  ${stepName} ${chalk.green("✓ passed")}   ${chalk.dim(duration)}`
+        `  ${stepName} ${chalk.green("✓ passed")}   ${chalk.dim(duration)}` +
+          (result.reason ? `  ${chalk.dim(result.reason)}` : "")
       );
       break;
     case "fail":
-      console.log(
-        `  ${stepName} ${chalk.red("✗ failed")}   ${chalk.dim(duration)}`
-      );
-      if (result.output) {
-        const lines = result.output.split("\n").slice(0, 30);
-        for (const line of lines) {
-          console.log(`    ${chalk.dim("→")} ${line}`);
-        }
-        if (result.output.split("\n").length > 5) {
-          console.log(chalk.dim("    ... (truncated)"));
-        }
-      }
+      console.log(`  ${stepName} ${chalk.red("✗ failed")}   ${chalk.dim(duration)}`);
+      printFailOutput(result.output);
       break;
     case "skip":
       console.log(

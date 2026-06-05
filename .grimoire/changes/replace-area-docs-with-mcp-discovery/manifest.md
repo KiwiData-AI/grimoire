@@ -12,18 +12,18 @@ date: 2026-05-21
 
 Skills that need code discovery currently branch on MCP availability — sometimes querying the graph, sometimes reading area docs. This inconsistency produces worse agent output than either path alone. Area docs also go stale silently. Making MCP the single source of truth eliminates the branch and the staleness problem. Conventions files replace area docs for the small set of semantic knowledge MCP cannot provide.
 
-## What changes
+## Feature Changes
 
-**Modified features:**
-- `features/onboarding/run-discover.feature` — removes area-doc and snapshot scenarios; adds conventions-file generation, MCP-required guard, and legacy doc archival
-- `features/onboarding/run-audit.feature` — adds conventions drift detection scenarios and extends scope options
-- `features/cli/map.feature` — replaces snapshot/refresh scenarios with drift detection against conventions files; keeps `--duplicates`
-- `features/cli/init.feature` — simplifies onboarding next-steps: removes `grimoire map` as prerequisite step; existing-project flow is now init → discover → audit (3 steps not 4)
+- **MODIFIED** `features/onboarding/run-discover.feature` — removes area-doc and snapshot scenarios; adds conventions-file generation, MCP-required guard, and legacy doc archival
+- **MODIFIED** `features/onboarding/run-audit.feature` — adds conventions drift detection scenarios and extends scope options
+- **MODIFIED** `features/cli/map.feature` — replaces snapshot/refresh scenarios with drift detection against conventions files; keeps `--duplicates`
+- **MODIFIED** `features/cli/init.feature` — simplifies onboarding next-steps: removes `grimoire map` as prerequisite step; existing-project flow is now init → discover → audit (3 steps not 4)
 
-**New decisions:**
+## Decisions
+
 - `decisions/0030-mcp-required-conventions-replace-area-docs.md` — supersedes ADR 0029's fallback approach
 
-**Skills to update (implementation stage):**
+## Skills to update (implementation stage)
 - `grimoire-discover` — produces `.grimoire/docs/conventions/<area>.md` instead of area docs; archives existing area docs; requires MCP; removes snapshot dependency (step 1 of current workflow eliminated)
 - `grimoire-audit` — adds conventions drift detection (via MCP comparison); new scope option "conventions"; batches drift findings alongside dead features and stale decisions
 - `grimoire-plan` — reads conventions files (not area docs) for placement/naming; queries MCP directly for symbol/utility lookup; staleness gate removed (MCP is always current)

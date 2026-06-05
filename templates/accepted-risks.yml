@@ -1,0 +1,47 @@
+# Grimoire Risk-Accepted Vulnerabilities
+# Vulnerabilities triaged as `affected` but consciously accepted — because no fix
+# exists yet, the residual risk is low, or the fix isn't worth it right now.
+#
+# Written by: grimoire-vuln-remediate (from a grimoire-vuln-triage `accept` verdict)
+# Read by:    grimoire-vuln-triage — an UNEXPIRED entry auto-suppresses that CVE as
+#             known-accepted so it doesn't re-flood the queue. An EXPIRED entry is
+#             re-surfaced for re-triage.
+#
+# Each entry requires: a CVE, the component, the VEX justification, a reason, an
+# owner, an accepted date, and an expiry (when to re-evaluate).
+#
+# An accepted risk is NOT closed — it is scheduled for review. Don't accept the same
+# CVE twice; update the existing entry.
+#
+# Created by: grimoire init
+# Last updated: YYYY-MM-DD
+
+accepted: []
+
+# --- Examples ---
+#
+# No upstream fix available — low residual risk, reachable but damped:
+#
+#   - cve: CVE-2026-44405
+#     component: paramiko
+#     component_type: library
+#     vex_justification: inline_mitigations_already_exist
+#     reason: "SHA-1 accepted in rsakey; outbound SFTP only, to tenant-configured
+#              trusted hosts. No upstream fix. EPSS ~0, not in KEV. Blast radius:
+#              low (integration, not the public API)."
+#     owner: fred
+#     accepted: 2026-06-04
+#     expires: 2026-09-04
+#
+# Base-image OS package with no patched version yet (not removable — transitive):
+#
+#   - cve: CVE-2026-40356
+#     component: krb5 (libgssapi-krb5-2, libk5crypto3, libkrb5-3, libkrb5support0)
+#     component_type: os-package
+#     vex_justification: vulnerable_code_not_in_execute_path
+#     reason: "Kerberos DoS. No gssapi/kerberos usage in app; pulled transitively
+#              via libpq5 (Postgres). Not removable without breaking libpq.
+#              status=affected, no FixedVersion. Re-check on base-image bump."
+#     owner: fred
+#     accepted: 2026-06-04
+#     expires: 2026-09-04
