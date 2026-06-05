@@ -226,7 +226,7 @@ describe("runHealth", () => {
     const result = await captureJson(() => runHealth({ json: true }));
     const areaDocs = result.metrics.find((m: any) => m.name === "area_docs");
     expect(areaDocs.score).toBe(100);
-    expect(areaDocs.label).toContain("2/2");
+    expect(areaDocs.label).toContain("2 areas");
   });
 
   it("updates badges in existing file with markers", async () => {

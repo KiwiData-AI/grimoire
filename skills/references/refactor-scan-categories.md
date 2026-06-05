@@ -91,8 +91,8 @@ TODO/FIXME/HACK/XXX comments that have aged.
 ## 2g. Duplication
 
 **How to scan:**
-- Read `.grimoire/docs/.snapshot.json` `duplicates` section if present
-- Or run `config.tools.duplicates` if configured (e.g., jscpd)
+- Run `config.tools.duplicates` if configured (e.g., jscpd), or `grimoire health` (config-driven `duplicates` metric)
+- Plus semantic clones via `search_graph(semantic_query=[...])` (requires codebase-memory-mcp) to catch re-implementations under different names
 - Group by area — within-area dupes are easy to consolidate
 
 **Severity:** high = >30 lines or >3 copies, medium = 10-30 lines or 2 copies, low = <10 lines

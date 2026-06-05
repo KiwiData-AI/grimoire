@@ -66,7 +66,7 @@ If `commit_style` in config is anything else, read it as a format hint and adapt
 - If multiple logical changes are staged, suggest splitting into separate commits
 
 ### 5. Git Trailers (mandatory for audit trail)
-When a grimoire change is active, the commit **MUST** include `Change:` as a git trailer. This is what makes `grimoire trace` and `grimoire log` work — without it, the commit is invisible to the audit trail.
+When a grimoire change is active, the commit **MUST** include `Change:` as a git trailer. This git-native anchor links the commit to its change — `grimoire trace` and `git log --grep "Change: <id>"` both rely on it. Without it, the commit is invisible to the audit trail.
 
 ```
 Change: add-2fa-login

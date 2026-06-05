@@ -26,13 +26,13 @@ Build once, inject as preface to every persona. Findings that don't threaten any
 - `.grimoire/brand/tokens.json` and `.grimoire/brand/voice.md` — brand axis (if exist; see `./brand-tokens-format.md`)
 - `.grimoire/changes/<id>/consult.md` — pre-design consult assumptions + givens (if exists)
 - `.grimoire/changes/<id>/designs/problem.md` — design problem statement (if exists)
-- Tag histogram across `.grimoire/changes/**/*.feature` + `.grimoire/archive/**/*.feature`
+- Tag histogram across `features/**/*.feature` (the live baseline; features are edited in place, so this covers both the change and prior work)
 - All `.grimoire/decisions/*.md` with `status: accepted` — extract ID, title, top Decision Driver
 - Linked manifest's `Why` and `Non-goals` (if a Change trailer / active manifest exists); else PR body or commit messages
 
 ### Feature inventory
 
-- Glob `.grimoire/changes/**/*.feature` + `.grimoire/archive/**/*.feature`
+- Glob `features/**/*.feature` (the live baseline, including this change's edits)
 - Parse: `Feature:` line, first description line, `@tags`
 - Bucket by path prefix (area)
 - If total >80, emit area-level summary only (count + capability one-liner)

@@ -64,7 +64,7 @@ git log <base>..<head> --format="%B" | grep -E "^Change:"
 
 If present:
 - Change ID = trailer value
-- Load artifacts: first check `.grimoire/changes/<change-id>/` (in-progress), then `.grimoire/archive/*<change-id>*/` (archived). Try the PR's head branch checked out locally if needed.
+- Load artifacts: check `.grimoire/changes/<change-id>/` for an active change. If the change is already finalized/merged the change folder is gone — read the artifacts from the PR's head branch (`git diff main` shows the live `features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`) and use the `Change:` trailer to correlate commits.
 - Read `manifest.md`, all `.feature` files in the change, decision records, `tasks.md`, `data.yml`
 - Also grep for `Scenarios:` and `Decisions:` trailers to scope review to the named items
 

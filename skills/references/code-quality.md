@@ -14,7 +14,7 @@ For each production file you wrote or edited, walk the seven checks below. Any f
 
 ### 1. Reuse before write
 
-Before adding a function, helper, type, or constant: grep for it. Check the area doc's reusable-code table if one exists. Check neighbors in the same directory.
+Before adding a function, helper, type, or constant: query the graph (`search_graph` by concept and by name) for an existing one. Then grep, and check neighbors in the same directory.
 
 - If a function with the same job already exists → call it. Don't re-implement.
 - If something *almost* fits → use it directly first, refactor it once a second caller actually needs the change. Don't generalize on speculation.

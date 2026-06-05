@@ -38,7 +38,7 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 - "See if there's an existing utility for Z"
 - "TODO: check if this conflicts with…"
 
-Resolve each one yourself before writing the task. Tools: codebase-memory-mcp (`search_graph`, `trace_path`, `get_code_snippet`), `.grimoire/docs/<area>.md` reusable-code tables, `Grep`, neighbor files. The task should state the *answer* ("Reuse `parse_invoice` in `src/billing/parsing.py:42`" or "No existing utility — write new"), never the *question*.
+Resolve each one yourself before writing the task. Tools: codebase-memory-mcp (`search_graph`, `trace_path`, `get_code_snippet`) for symbols and reusable code, `.grimoire/docs/<area>.md` for conventions/boundaries, `Grep`, neighbor files. The task should state the *answer* ("Reuse `parse_invoice` in `src/billing/parsing.py:42`" or "No existing utility — write new"), never the *question*.
 
 **2. Clarify or propose, never assume.** When the spec is ambiguous or silent on something you need to plan:
 
@@ -47,6 +47,14 @@ Resolve each one yourself before writing the task. Tools: codebase-memory-mcp (`
 - **Confident** (spec is clear or the unstated detail follows obviously from project conventions) → plan, but note the inference in a `<!-- inferred: ... -->` comment so the user can override.
 
 The plan implements what's approved. It does not expand scope to hit a checklist.
+
+**3. Plan to the principles.** Every task is gated by the four principles in `../references/principles.md` — **one right way, DRY, don't reinvent the wheel, keep it simple.** Concretely, before writing each task:
+- **One right way:** name the single sanctioned approach. If the spec leaves two ways open, pick one (record why in the task) — never plan both.
+- **DRY:** reuse before write (search the graph); don't plan a task that stores a fact already derivable from code/mcp or already homed elsewhere.
+- **Don't reinvent:** prefer an existing tool/library/proven pattern over a bespoke mechanism. git for change process, standard libs for crypto/auth/parsing.
+- **Keep it simple:** choose the least-code option inside the non-goals. Flag any task that adds an abstraction, a dependency, or a second mechanism — it needs an explicit reason.
+
+These are gates, not aspirations — a task that adds a duplicate home or a reinvented wheel is rejected, not refined.
 
 ### 1. Select Change
 - List active changes in `.grimoire/changes/`
@@ -59,9 +67,10 @@ The plan implements what's approved. It does not expand scope to hit a checklist
 
 **Always read:**
 - `manifest.md` for the change summary, **including complexity level, Assumptions, Pre-Mortem, and Prior Art sections**
-- All proposed `.feature` files
-- All proposed decision records, **including Cost of Ownership sections**
-- The current baseline (`features/`, `.grimoire/decisions/`) for context on what's changing
+- All `.feature` files for this change (edited live in `features/` on the branch)
+- All decision records for this change (edited live in `.grimoire/decisions/`), **including Cost of Ownership sections**
+- `.grimoire/docs/constraints.md` — any constraints (security/NFR/observability) this change adds or touches. These produce `unit-invariant` tasks, not scenarios.
+- The current baseline (`features/`, `.grimoire/decisions/`) via `git diff main` to see exactly what this change adds vs. what already existed
 
 **Validate the build-vs-buy decision:**
 - Check that `manifest.md` has a **Prior Art** section documenting what existing solutions were researched. If it's missing or empty, **stop and tell the user** — planning without a build-vs-buy analysis produces plans that ignore cheaper alternatives.
@@ -70,21 +79,21 @@ The plan implements what's approved. It does not expand scope to hit a checklist
 - If the decision was **hybrid** (adopt for part, build for part), ensure the boundary between adopted and custom code is clear in the tasks.
 
 **Read from grimoire docs (these replace codebase exploration):**
-- **`.grimoire/docs/<area>.md`** for each area the change touches — these contain: key files with responsibilities, reusable utilities (exact function names, file paths, line numbers), naming conventions, structural patterns, and "Where New Code Goes" guidance. This is the information that lets you write tasks with exact file paths without reading every source file.
+- **`.grimoire/docs/<area>.md`** for each area the change touches — these contain Purpose, Boundaries, Conventions (naming/structure), and "Where New Code Goes" guidance. For key files, exact symbols, reusable utilities (function names, file paths, line numbers), and call graphs, **query the graph** — `search_graph` / `get_code_snippet` / `get_architecture`. Area docs give you intent and placement; the graph gives you the live structure to write exact file paths and reuse existing code.
 - **`.grimoire/docs/data/schema.yml`** — the full data model: every table/collection, field types, relationships, indexes, and external API contracts with `source:` pointers to ORM code. Read this instead of reading individual model files.
 - **`.grimoire/docs/context.yml`** — the project's deployment environment, related services, infrastructure dependencies, CI/CD pipelines, and observability setup. Read this to understand deployment constraints (e.g., Lambda means no long-running processes, Kubernetes means you may need health check endpoints), cross-service boundaries (e.g., auth is handled by a sibling service, not this project), and infrastructure available at runtime (e.g., Redis is available for caching, RabbitMQ for async tasks).
-- **`.grimoire/docs/.snapshot.json`** `duplicates` section if present — existing clones in areas you're touching, so tasks consolidate rather than add more.
+- Existing duplication in areas you're touching — query codebase-memory-mcp (`search_graph` for similar functions) or run `grimoire health` (its config-driven `duplicates` metric) so tasks consolidate rather than add more clones.
 
 **Read proposed data changes:**
 - **`data.yml`** if present — proposed schema changes need migration and model tasks
 
 **Staleness gate:** For each area doc loaded, check its `last_updated` date against `git log -1 --format=%ci <directory>`. If any doc is older than the most recent commit to its directory, it's stale — the file paths, utility names, and patterns it describes may no longer be accurate.
 
-- **Level 1-2:** Warn ("Area doc for `<area>` is behind recent commits — reusable utilities and file paths may be wrong") and proceed. Note inferred paths with `<!-- inferred: area doc may be stale -->`.
+- **Level 1-2:** Warn ("Area doc for `<area>` is behind recent commits — its boundaries/conventions may be wrong; rely on the graph for structure") and proceed. Note inferred paths with `<!-- inferred: area doc may be stale -->`.
 - **Level 3-4:** Treat as a blocker. Do not generate tasks until the user refreshes stale docs via `grimoire-discover` targeted refresh. Planning with stale docs at this complexity produces wrong file paths and misses recent utilities — the cost of re-planning outweighs the cost of refreshing first.
 
 **Read specific source files only when:**
-- Area docs don't exist yet (tell the user to run `grimoire map` + `/grimoire:discover` first — planning without area docs produces worse tasks)
+- Area docs don't exist yet (tell the user to run `/grimoire:discover` first — planning without area docs produces worse tasks)
 - Area docs exist but you need to verify a specific implementation detail (e.g., exact function signature, exact import path)
 - You need to read existing step definitions to understand the test setup
 
@@ -133,11 +142,22 @@ Level 1-2 changes with minor gaps may proceed; level 3-4 with multiple gaps shou
 **If no real gaps**, proceed directly to task generation.
 
 ### 4. Generate Tasks
-Create `.grimoire/changes/<change-id>/tasks.md`. **Every scenario must produce both production code AND tests.** Tasks are structured as pairs: step definitions first, then production code.
+Create `.grimoire/changes/<change-id>/tasks.md`. **Every task produces both production code AND a test — but the test level matches the artifact the task derives from.** Tasks are structured as pairs: the failing test first, then the production code.
+
+**Tag every implementation task with a `verify:` level** — this tells `grimoire-apply` which test vehicle to use. Match the artifact:
+
+| Task derives from | `verify:` | Test vehicle |
+|-------------------|-----------|--------------|
+| a `.feature` scenario (actor-observable behavior) | `scenario` | step definitions + Gherkin |
+| a constraint in `constraints.md` (security/NFR/observability) | `unit-invariant` | unit/integration test asserting the invariant |
+| an ADR consequence, refactor, or internal change with no spec | `characterization` | unit / characterization test |
+
+**Do not plan a `.feature` scenario task for a constraint or an internal change.** Constraints get `unit-invariant` unit tests; internal changes get `characterization` tests. Forcing Gherkin onto a non-behavioral concern is the antipattern that fills feature files with slop (one right way: behavior → scenario, everything else → unit test).
 
 **THE PLAN'S SCOPE IS WHAT WAS APPROVED.** Tasks may only derive from:
-- Approved `.feature` scenarios in this change
-- Approved ADRs in this change (and their Confirmation sections)
+- `.feature` scenarios in this change → `verify: scenario`
+- Constraints added/touched in `.grimoire/docs/constraints.md` → `verify: unit-invariant`
+- ADRs in this change (and their Confirmation sections) → `verify: unit-invariant` or `characterization`
 - `data.yml` entries in this change
 - The manifest's Assumptions, Pre-Mortem mitigations, and Prior Art borrowings
 - Verification tasks (run feature suite, run project suite, validate ADR confirmation)
@@ -259,8 +279,8 @@ Follow the rules in `../references/testing-contracts.md`. Key points: mock at HT
 - If a library was rejected for a specific reason (e.g., doesn't support X), add a comment to the relevant task noting this so future developers don't re-evaluate the same option
 
 **Existing code to reuse:**
-- If `.grimoire/docs/` has area docs, check the Reusable Code tables for utilities that apply to this change
-- If the snapshot has duplicate data, check whether the area you're touching already has clones — tasks should consolidate rather than add more
+- Query the graph (`search_graph` by concept/name) for existing utilities that apply to this change; area docs give conventions, the graph gives the reusable symbols
+- If `grimoire health`/mcp shows existing clones in the area you're touching, tasks should consolidate rather than add more
 - Add a "Reuse" section at the top of tasks.md listing specific functions/classes to import instead of rewriting
 
 **Verification (always last):**
@@ -282,12 +302,12 @@ The tasks file starts with a context block so any LLM can orient without re-read
 
 ## 1. <Capability/Area>
 <!-- context:
-  - .grimoire/changes/<change-id>/features/<capability>/<name>.feature
+  - features/<name>.feature
   - .grimoire/docs/<area>.md
   - src/<area>/<file-to-edit>.ts
   - tests/<area>/<test-file>.ts
 -->
-- [ ] 1.1 Write step defs in `<exact path>` for scenario: "<scenario name>" in `<file>`
+- [ ] 1.1 (verify: scenario) Write step defs in `<exact path>` for scenario: "<scenario name>" in `features/<file>`
       - Given: <what the step does, what it calls>
       - When: <what the step does, what it calls>
       - Then: <what to assert — specific expected values/states>
@@ -295,32 +315,40 @@ The tasks file starts with a context block so any LLM can orient without re-read
       - <specific function/class/view to create or modify>
       - <specific behavior to implement>
       - <edge cases to handle>
-- [ ] 1.3 Write step defs in `<exact path>` for scenario: "<next scenario>"
-      ...
-- [ ] 1.4 Implement in `<exact path>`:
-      ...
 
-## 2. Shared Steps
+## 2. Constraints
+<!-- context:
+  - .grimoire/docs/constraints.md
+  - src/<area>/<file-to-edit>.ts
+  - tests/<area>/<unit-test-file>.ts
+-->
+- [ ] 2.1 (verify: unit-invariant) Write unit test in `<exact path>` asserting constraint: "<assertion from constraints.md>"
+      - Arrange: <setup>
+      - Assert: <the invariant — exact expected behavior, no Gherkin>
+- [ ] 2.2 Implement in `<exact path>`:
+      - <specific change that satisfies the invariant>
+
+## 3. Shared Steps
 <!-- context:
   - tests/step_defs/common.py
-  - .grimoire/changes/<change-id>/features/<all relevant .feature files>
+  - features/<all relevant .feature files>
 -->
-- [ ] 2.1 Add to `<exact path>`:
+- [ ] 3.1 Add to `<exact path>`:
       - Given "<step text>": <what it does>
       - Given "<step text>": <what it does>
 
-## 3. Architecture
+## 4. Architecture
 <!-- context:
-  - .grimoire/changes/<change-id>/decisions/<nnnn-title>.md
+  - .grimoire/decisions/<nnnn-title>.md
   - src/<files affected by decision>
 -->
-- [ ] 3.1 In `<exact path>`: <specific change from ADR>
-- [ ] 3.2 Add test in `<exact path>`: <ADR confirmation check — what to assert>
+- [ ] 4.1 (verify: characterization) In `<exact path>`: <specific change from ADR>
+- [ ] 4.2 Add test in `<exact path>`: <ADR confirmation check — what to assert>
 
-## 4. Verification
-- [ ] 4.1 Run `<exact test command>` — all new scenarios green
-- [ ] 4.2 Run `<exact test command>` — no regressions
-- [ ] 4.3 Run `<exact test command>` — full project suite
+## 5. Verification
+- [ ] 5.1 Run `<exact test command>` — all new scenarios green
+- [ ] 5.2 Run `<exact test command>` — no regressions
+- [ ] 5.3 Run `<exact test command>` — full project suite
 ```
 
 **Context blocks are mandatory.** Every task section (except Verification) must have a `<!-- context: ... -->` listing the files needed. This serves two purposes:
@@ -330,11 +358,13 @@ The tasks file starts with a context block so any LLM can orient without re-read
 ### 6. Quality Check
 Before presenting to the user, verify the plan:
 - [ ] Every task references a specific file path (no "implement the feature")
-- [ ] Every step definition task describes what to assert (no "write a test")
+- [ ] Every implementation task carries a `verify:` tag matching its source artifact — `scenario` only for `.feature` behavior; `unit-invariant` for constraints; `characterization` for internal/refactor. No `.feature` scenario task for a constraint or internal change.
+- [ ] Every test task describes what to assert (no "write a test")
 - [ ] Every implementation task describes what to create/modify (no "add the code")
 - [ ] The verification section has the exact commands to run
-- [ ] Tasks are ordered: shared steps → step defs → production code → verification
+- [ ] Tasks are ordered: shared steps → test → production code → verification
 - [ ] No task requires the LLM to make architectural decisions — those should already be in the ADR
+- [ ] **Principles gate** (`../references/principles.md`): no task introduces a duplicate home for an existing fact (DRY), a second way to do an existing thing (one right way), a reinvented wheel where a tool/library/proven pattern exists (don't reinvent), or an abstraction/dependency justified only by a hypothetical (KISS). Any that does has a stated reason.
 
 If any task is too vague, make it more specific before presenting. Read more codebase if needed.
 

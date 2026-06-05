@@ -1,6 +1,6 @@
 ---
 name: grimoire-discover
-description: Generate area docs and data schema from a codebase snapshot. Use when initializing grimoire on an existing project or when codebase structure has changed significantly.
+description: Generate intent-focused area docs and data schema by querying the codebase graph. Use when initializing grimoire on an existing project or when an area's intent/boundaries have changed.
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
@@ -9,13 +9,15 @@ metadata:
 
 # grimoire-discover
 
-Generate a structured project map in `.grimoire/docs/` from a codebase snapshot. This map helps LLMs understand the codebase layout, find reusable code, and follow existing patterns — preventing duplicate code and misplaced files.
+Generate **intent-focused** area docs and a data schema in `.grimoire/docs/`. Area docs capture what the graph can't know — an area's *purpose, boundaries, and conventions* — and point at the codebase-memory-mcp graph for everything structural (symbols, key files, call graphs, reusable code). The graph is the live source of structure; discover does not freeze it into a doc that drifts.
 
 ## Triggers
-- User wants to document or map the codebase structure
-- User asks about coding standards, patterns, or conventions
-- User wants to prevent duplicate code or find existing utilities
-- Loose match: "discover", "map", "standards", "conventions", "DRY", "utilities", "codebase layout"
+- User wants to document an area's purpose, boundaries, or conventions
+- User asks about coding standards or where new code of a type should go
+- User is onboarding an existing project to grimoire
+- Loose match: "discover", "standards", "conventions", "boundaries", "onboard codebase"
+
+Note: "find existing utilities", "what calls what", "codebase layout/structure" are **graph** queries, not discover — use codebase-memory-mcp (`search_graph`, `get_architecture`, `trace_path`) directly.
 
 ## Routing
 - Want to document existing behavior as Gherkin features → `grimoire-audit`
@@ -24,85 +26,63 @@ Generate a structured project map in `.grimoire/docs/` from a codebase snapshot.
 
 ## Prerequisites
 
-**Structural snapshot:** Run `grimoire map` first. This produces `.grimoire/docs/.snapshot.json` — a structural scan of the directory tree, key files, and file extension counts. The snapshot is the input for directory structure; this skill adds the semantic layer.
+**The codebase graph is the structure source.** `codebase-memory-mcp` should be indexed for this project — discover reads directory layout, symbols, key files, and call graphs from it (`get_architecture`, `search_graph`, `trace_path`), not from a filesystem snapshot. There is no `grimoire map` step and no `.snapshot.json` (both retired).
 
-If `.snapshot.json` doesn't exist or is stale, tell the user to run `grimoire map` (or `grimoire map --refresh` to diff against existing docs).
-
-**Symbol intelligence (recommended):** If `codebase-memory-mcp` is available as an MCP server, use its graph tools (`search_graph`, `get_architecture`, `query_graph`) to query symbols, call graphs, and architecture instead of reading source files manually. This provides AST-parsed symbols across 66 languages, call-path tracing, and dead code detection — far more accurate than regex extraction.
-
-If `codebase-memory-mcp` is not available, fall back to reading source files directly to identify symbols and patterns.
+If `codebase-memory-mcp` is not indexed, run `index_repository` first. Only if the graph is genuinely unavailable, fall back to reading source files directly to identify boundaries and conventions.
 
 ## What It Produces
 
 `.grimoire/docs/` with:
-- **`index.yml`** — master index of all documented areas with descriptions and directory mappings
-- **Area docs** — one markdown file per area of the codebase, each covering:
-  - Purpose and boundaries of the module/area
-  - Key files and their responsibilities
-  - Reusable utilities, helpers, and shared functions (the "reuse inventory")
-  - Naming conventions and patterns in use
+- **`index.yml`** — registry of documented areas (descriptions + directory mappings) and the functional-story map that groups capabilities in the OVERVIEW
+- **Area docs** — one markdown file per significant area, **intent only**:
+  - Purpose of the area
+  - Boundaries (what belongs here, what doesn't, where related code lives)
+  - Conventions (naming + structural patterns, with example file references)
   - Where new code of this type should go
-  - Example references (point to specific files as exemplars, don't duplicate code)
+
+Area docs do NOT contain Key Files, a reusable-code inventory, or duplicate listings — those are structure, and the graph regenerates them live on demand (and would drift if frozen here). When a reader needs symbols or reuse candidates, they query the graph, not the doc.
 
 ## Workflow
 
-### 1. Load Snapshot and Graph
-Read `.grimoire/docs/.snapshot.json`. This gives you:
-- **directories** — every directory with file counts, extensions, key files, and subdirectories
-- **keyFiles** — significant files (entry points, configs, route files, etc.) with their detected type
-- **undocumented** — directories not yet covered by existing docs (only present on `--refresh`)
-- **removed** — directories that have docs but no longer exist (only present on `--refresh`)
+### 1. Load the Graph
+Query `codebase-memory-mcp` to understand the codebase live:
+- `get_architecture` — high-level module/dependency overview and directory layout (your roadmap of WHERE the areas are)
+- `search_graph` — symbols (functions, classes, types) in a directory, with signatures
+- `trace_path` — how modules connect (inbound/outbound calls)
+- `query_graph` — specific relationships (e.g., `MATCH (f:Function)-[:CALLS]->(g) WHERE f.file STARTS WITH 'src/api/' RETURN f.name, g.name`)
 
-Use this as your roadmap. The snapshot tells you WHERE to look; you add WHAT it means.
-
-If the snapshot includes a `duplicates` section (from `grimoire map --duplicates`), use it to populate "Known Duplicates" sections in area docs. This tells the plan skill where code is already duplicated so it can consolidate rather than add more.
-
-**If `codebase-memory-mcp` is available**, also query the graph for each area:
-- `search_graph` — find all symbols (functions, classes, types) in a directory
-- `trace_call_path` — understand how modules connect (inbound/outbound calls)
-- `get_architecture` — get a high-level module/dependency overview
-- `query_graph` — Cypher-like queries for specific relationships (e.g., `MATCH (f:Function)-[:CALLS]->(g) WHERE f.file STARTS WITH 'src/api/' RETURN f.name, g.name`)
-
-This replaces the need to manually read every source file to extract symbols. The graph gives you AST-accurate function signatures, call relationships, and dead code detection across 66 languages.
+The graph gives AST-accurate structure across many languages. You use it to *understand* each area so you can write its intent doc — you do NOT copy its output into the doc (that's what regenerating live avoids).
 
 ### 2. Determine Scope
 Ask the user what to document (or accept the scope passed in by a calling skill):
-- **Full scan** — document all areas from the snapshot (default for first run)
+- **Full scan** — document all significant areas (default for first run); use `get_architecture` to enumerate them
 - **Area scan** — document specific directories (e.g., "just the API layer")
-- **Gap fill** — only document areas flagged as `undocumented` in the snapshot
-- **Targeted refresh** — a list of directories is passed in (from `grimoire-precommit-review` doc freshness check or `grimoire-plan` staleness gate). Skip the full snapshot walk. Go directly to step 3 for each named directory, regenerate only those area docs, and update their `last_updated` entries in `index.yml`. This is the fast-path mode for post-change maintenance — it does not touch areas outside the passed list.
+- **Targeted refresh** — a list of directories is passed in (e.g. from `grimoire-plan`'s staleness gate). Regenerate only those area docs and update their `last_updated` entries in `index.yml`. Fast-path for when an area's *intent* changed; does not touch areas outside the passed list.
 
-Check `.grimoire/docs/index.yml` if it exists — don't redo work unless refreshing.
+Check `.grimoire/docs/index.yml` if it exists — don't redo work unless refreshing. Remember discover runs when **intent** changes (new area, shifted boundary), not on every code change — structure is always live from the graph.
 
 ### 3. Analyze Each Area
-For each directory cluster in the snapshot, read the actual code to understand:
+For each area, use the graph to understand it, then distill the **intent** a reader can't get from the graph:
 
-**From the snapshot (already known):**
-- Directory path and file counts
-- File extensions (tells you the language/type mix)
-- Key files (tells you what framework patterns are in use)
+**From the graph (read, don't transcribe):**
+- Symbols, signatures, call relationships, dead code — context for understanding what the area does
+- Cross-area import/HTTP links — informs the Boundaries section
 
-**From `codebase-memory-mcp` graph (if available):**
-- All symbols in the area: functions, classes, types, constants with signatures
-- Call graph: what calls what, both inbound and outbound
-- Dead code: functions with zero callers
-- Cross-service HTTP links: REST routes and their callers
-
-**From reading the code (your job — or to supplement the graph):**
-- What the module/area is responsible for
-- Reusable functions, classes, utilities that other code should import
-- Naming conventions and structural patterns
-- Where new code of this type should be created
-- Import relationships with other areas
-- **Data models and schemas** in or owned by this area (see Data Layer below)
+**What you write down (the graph can't infer this):**
+- What the area is *responsible for* (Purpose)
+- What belongs here vs. where related code lives (Boundaries)
+- Naming and structural conventions in use, with an exemplar file reference
+- Where new code of this type should go
+- **Data models and schemas** owned by this area (see Data Layer below)
 
 ### 4. Generate Area Docs
 For each significant area, create a doc file in `.grimoire/docs/`.
 
-**Area doc format:**
+**Area doc format (intent only — no structure tables):**
 
 ```markdown
 # <Area Name>
+> Last updated: YYYY-MM-DD
 
 ## Purpose
 <1-2 sentences: what this area of the codebase is responsible for>
@@ -110,40 +90,27 @@ For each significant area, create a doc file in `.grimoire/docs/`.
 ## Boundaries
 <What belongs here and what doesn't. Where related code lives instead.>
 
-## Key Files
-| File | Responsibility |
-|------|---------------|
-| `path/to/file.py` | <what it does> |
-| `path/to/other.py` | <what it does> |
-
-## Reusable Code
-Utilities and helpers in this area that MUST be reused (not re-implemented):
-
-| Function/Class | Location | What It Does |
-|----------------|----------|-------------|
-| `format_currency()` | `utils/formatters.py:42` | Formats decimal as currency string |
-| `BaseAPIView` | `api/base.py:15` | Base view with auth, pagination, error handling |
-
-## Patterns
-<How things are done in this area. Reference specific files as exemplars.>
+## Conventions
+<How things are done in this area. Reference specific files as exemplars — don't list every file.>
 
 ### Naming
-- <naming convention with example>
+- <naming convention with one example file>
 
 ### Structure
-- <structural pattern with example file>
+- <structural pattern with one exemplar file>
 
 ## Where New Code Goes
 - New <type> → `path/to/directory/`
 - New <type> → `path/to/other/`
 
-## Known Duplicates
-<Only if duplicates data exists in snapshot. List clones that touch this area.>
-
-| Files | Lines | What's Duplicated |
-|-------|-------|------------------|
-| `views.py:42-68` ↔ `api/views.py:15-41` | 26 | Request validation logic |
+## Structure (live)
+For key files, symbols, reusable utilities, call graphs, and duplicates in this area,
+query the graph — it is always current:
+- `get_architecture(area="<dir>")` · `search_graph(qn_pattern="<dir>.*")`
+- duplicates: `grimoire health` (config-driven `duplicates` metric)
 ```
+
+Do not hand-list files, functions, or "reusable code" — that's the graph's job, and a frozen copy drifts. The single pointer above replaces the old Key Files / Reusable Code / Known Duplicates tables.
 
 ### 5. Generate Data Schema
 
@@ -290,9 +257,22 @@ areas:
     path: .grimoire/docs/utils.md
     directory: src/utils
     description: Shared utilities, helpers, formatters
+
+# Functional stories — how capabilities group for a human reader.
+# `grimoire docs` uses this to group the OVERVIEW's Capabilities section.
+# `features` lists feature-file basenames (no .feature extension).
+stories:
+  chat-qa:
+    title: Chat & Q&A
+    features: [ai-chat, a2ui-integration, search]
+  extraction:
+    title: Document extraction
+    features: [document-pipeline, bbd-validation-rules]
 ```
 
-The `directory` field links each doc back to the source directory — this is what `grimoire map --refresh` uses to detect gaps.
+The `directory` field links each doc back to the source directory — it's how a targeted refresh maps a changed directory to the area doc that describes it.
+
+**Generate the `stories:` map.** Walk `features/`, then group the feature files by *functional story* — the user-facing capability area they serve, not the source directory. Propose the grouping to the user and let them rename/merge stories before writing. A feature not yet assigned to a story falls back to its feature-directory group in the OVERVIEW, so partial maps are fine. `stories` is the one place that grouping lives (DRY) — `grimoire docs` reads it, nothing else defines it.
 
 ### Freshness Tracking
 
@@ -323,38 +303,25 @@ areas:
 ### 8. Present Summary
 After generating, show the user:
 - How many areas documented
-- How many reusable utilities inventoried
-- Any areas that seem under-organized or have pattern inconsistencies
+- Any areas whose boundaries seem unclear or whose conventions are inconsistent
 - Suggest which area docs are most critical for the plan skill to read
-
-## Config Files
-
-Users can customize what gets scanned by editing files in `.grimoire/`:
-
-- **`.grimoire/mapignore`** — directories/patterns to skip during scanning (like .gitignore). Edit to exclude vendor code, generated files, etc.
-- **`.grimoire/mapkeys`** — key file definitions (format: `filename = type`). Edit to add project-specific indicators like `factories.py = test-factories` or `signals.py = django-signals`.
-
-These are read by `grimoire map` and affect the snapshot this skill consumes.
 
 ## Integration with Other Skills
 
-- The **plan** skill should read `.grimoire/docs/` before generating tasks — look for existing utilities in the reuse inventory, follow documented patterns
-- The **verify** skill can check new code against documented patterns
+- The **plan** skill reads `.grimoire/docs/` for Purpose/Boundaries/Conventions before generating tasks, and queries the **graph** for symbols and reusable utilities
+- The **verify** skill can check new code against documented conventions
 - The **audit** skill can trigger a discover pass as part of onboarding
 - The **design** skill reads `.grimoire/docs/components.md` first to avoid generating duplicate components
-- The **precommit-review** skill checks area doc freshness on every commit and invokes discover in targeted refresh mode for stale dirs — this is the primary maintenance trigger, not a periodic manual task
-- The **plan** skill gates on staleness for level 3-4 changes and directs the user to run targeted refresh before planning
+- The **plan** skill gates on staleness for level 3-4 changes (when an area's *intent* doc lags its directory) and directs the user to run a targeted refresh before planning
 
 ## Important
-- **Start from the snapshot.** Don't scan the filesystem yourself — `grimoire map` already did that. Read `.snapshot.json` for structure, then use `codebase-memory-mcp` graph queries for symbols and call graphs (if available), and read actual code files for meaning.
-- **Prefer graph queries over file reads.** If `codebase-memory-mcp` is available, use `search_graph` and `query_graph` to find symbols, call paths, and architecture rather than reading every source file. This is faster, more accurate (AST-parsed), and uses fewer tokens.
-- **Document what IS, not what should be.** This is a map of the actual codebase, not aspirational standards. If the code is inconsistent, note it — don't paper over it.
-- **Point, don't copy.** Reference files and line numbers as exemplars. Don't duplicate code into the docs — it goes stale.
-- **Focus on what helps LLMs.** The goal is preventing duplicate code and misplaced files. Prioritize: reusable utilities > file placement > naming conventions > architectural patterns.
-- **Keep docs lean.** Each area doc should be scannable in 30 seconds. If it's too long, split it.
-- **The reuse inventory is the most valuable output.** An LLM that knows `format_currency()` exists in `utils/formatters.py` won't write a new one.
-- **Don't document the obvious.** Skip areas that are self-explanatory from file names alone. Focus on areas where an LLM would make mistakes.
-- **Update, don't accumulate.** When refreshing, replace stale docs rather than appending. The docs should reflect the current codebase, not its history.
+- **Start from the graph.** Use `get_architecture` to enumerate areas and `search_graph`/`trace_path` to understand each one. Read source files only to pin down intent the graph can't express.
+- **Intent only — never transcribe structure.** Do not write Key Files lists, reusable-code inventories, or symbol tables into area docs. Those are derivable from the graph and would drift. The doc captures purpose, boundaries, and conventions; the doc points at the graph for everything else (DRY — one home per fact).
+- **Document what IS, not what should be.** This describes the actual codebase, not aspirational standards. If the code is inconsistent, note it — don't paper over it.
+- **Point, don't copy.** Reference one exemplar file per convention. Don't duplicate code into the docs.
+- **Keep docs lean.** Each area doc should be scannable in 30 seconds. If it's too long, it's probably transcribing structure — cut it back to intent.
+- **Don't document the obvious.** Skip areas self-explanatory from file names. Focus on areas where intent or boundaries are non-obvious.
+- **Update, don't accumulate.** When refreshing, replace stale docs rather than appending.
 
 ## Done
 When area docs, schema, context, and index are generated, the workflow is complete. Suggest `grimoire-audit` to document existing features and decisions as Gherkin specs and ADRs.

@@ -1,6 +1,6 @@
 ---
 name: grimoire-apply
-description: Implement tasks from a planned grimoire change with strict red-green BDD. Use when tasks.md exists and is ready for implementation.
+description: Implement tasks from a planned grimoire change, test-first at the right level (BDD scenario, unit-invariant, or characterization). Use when tasks.md exists and is ready for implementation.
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
@@ -9,7 +9,19 @@ metadata:
 
 # grimoire-apply
 
-Implement tasks from a planned grimoire change using strict red-green BDD: write the failing test first, then the production code that makes it pass. A task is not complete until its scenarios pass.
+Implement tasks from a planned grimoire change using **test-first discipline at the right level**: write the failing test first, then the production code that makes it pass. A task is not complete until its test passes.
+
+**Red-green is the discipline; the test vehicle matches the artifact the task came from** (set by `grimoire-plan` as each task's `verify:` tag):
+
+| `verify:` | Task came from | Test vehicle |
+|-----------|----------------|--------------|
+| `scenario` | a `.feature` (actor-observable behavior) | Gherkin scenario + step definitions |
+| `unit-invariant` | the constraints register (security/NFR/observability) | unit/integration test asserting the invariant |
+| `characterization` | internal change / refactor (no spec) | unit / characterization test |
+
+Do NOT write a `.feature` scenario for a `unit-invariant` or `characterization` task — forcing Gherkin where a unit test is correct is the antipattern that fills feature files with slop. One right way: behavior → scenario, everything else → unit test.
+
+**Artifacts are edited live on the feature branch.** Features, decisions, constraints, and schema are real files in `features/`, `.grimoire/decisions/`, `.grimoire/docs/`. There is no copy-into-change-folder and no promote step — `git diff` is the staging area. The change folder holds only ephemeral process scaffolding (`manifest.md`, `tasks.md`).
 
 ## CRITICAL: Two Rules That Must Not Be Broken
 
@@ -41,8 +53,8 @@ This applies to all LLMs: Claude, Codex, Cursor, Copilot, etc. The task list is 
 ## Prerequisites
 - A change exists in `.grimoire/changes/<change-id>/` with:
   - `manifest.md`
-  - `tasks.md` (from plan stage)
-  - At least one `.feature` file or decision record
+  - `tasks.md` (from plan stage, each task carrying a `verify:` tag)
+- The change's live artifacts exist on the branch — at least one `.feature` (in `features/`), constraint (in `.grimoire/docs/constraints.md`), or decision record (in `.grimoire/decisions/`)
 
 ## Workflow
 
@@ -185,26 +197,11 @@ Before writing any code, ensure you're on a feature branch for this change:
 git checkout -b <type>/<change-id>
 ```
 
-Where `<type>` is `feat`, `fix`, `refactor`, or `chore` based on the change. If a branch already exists (resuming work), switch to it. Update the manifest's `branch:` field with the branch name.
+Where `<type>` is `feat`, `fix`, `refactor`, or `chore` based on the change. If a branch already exists (`grimoire-branch-guard` or `grimoire-draft` usually created it), switch to it. Update the manifest's `branch:` field with the branch name.
 
-This links the git history to the grimoire change — `grimoire trace` and `grimoire log` depend on it.
+The branch links the git history to the change via the `Change: <change-id>` commit trailer. The branch IS the isolation and `git diff` IS the staging — there is no separate promote step.
 
-### 3b. Promote Feature Files
-
-Before writing any code, copy the proposed feature files from the change directory into the live `features/` tree:
-
-```
-cp -r .grimoire/changes/<change-id>/features/* features/
-```
-
-For extended files (scenarios added to an existing feature), overwrite — the change copy already contains the baseline scenarios plus the new ones. For new files, place them at the correct path under `features/`.
-
-**Why this comes first:** BDD test runners discover scenarios from `features/`. Scenarios that only exist in `.grimoire/changes/` are invisible to the test runner, so the red-green cycle cannot work. On a feature branch, `features/` is branch-local — promoting here has no effect on `main` until the PR merges.
-
-Commit the promoted files before writing any step definitions:
-```
-git add features/ && git commit -m "feat(<change-id>): promote feature specs to features/"
-```
+> **No promote.** Feature files, decisions, and constraints were drafted directly into their live locations (`features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`) on this branch. BDD runners already discover the scenarios from `features/`. Do not copy anything out of `.grimoire/changes/` — that folder holds only `manifest.md` and `tasks.md`.
 
 ### 4. Load Context
 
@@ -222,14 +219,15 @@ git add features/ && git commit -m "feat(<change-id>): promote feature specs to 
 3. Tell the user: "Context is getting large. I've updated tasks.md with progress. A fresh session can resume from here."
 
 ### 5. Implement Tasks
-Work through `tasks.md` sequentially. **Every task follows the same cycle: test → red → code → green → next.**
+Work through `tasks.md` sequentially. **Every task follows the same cycle: test → red → code → green → next.** The cycle is identical at every level; only the *test vehicle* changes per the task's `verify:` tag (`scenario` → step definitions; `unit-invariant` / `characterization` → unit/integration test). "Step definitions" below means *the failing test at the task's level* — for non-`scenario` tasks, write a unit test, not a `.feature`.
 
 **For each task:**
 1. Announce which task you're working on
+   - Read the task's `verify:` tag — it decides the test vehicle. `scenario` → write/extend step definitions for the named scenario. `unit-invariant` → write a unit/integration test asserting the constraint. `characterization` → write a unit test pinning current/intended behavior. If a `unit-invariant` task has no matching constraint in `.grimoire/docs/constraints.md`, STOP and flag — don't invent a scenario to fill the gap.
    - **Pattern brief** (before writing anything): classify code type → `search_graph` for 3–5 peers (excluding last 60 days) → `get_code_snippet` → extract modal pattern across the four critical seams (error handling, dependency access, abstraction depth, return shape) → write a 5–8 rule brief. Skip if graph not indexed or < 3 peers. Full instructions in `../references/pattern-guard.md`.
-2. Write the step definitions FIRST (the test that will verify this task)
-3. Run the step definitions — **they MUST FAIL (red)**
-4. If the test passes immediately, STOP. The test is broken — it's not actually testing anything. Fix the step definition so it makes a real assertion that fails without production code. Common causes:
+2. Write the test FIRST, at the task's level (step definitions for `scenario`; unit/integration test for `unit-invariant`/`characterization`)
+3. Run the test — **it MUST FAIL (red)**
+4. If the test passes immediately, STOP. The test is broken — it's not actually testing anything. Fix it so it makes a real assertion that fails without production code. Common causes:
    - Empty step definition body (passes by default)
    - Assertion against a mock/fixture that already satisfies the condition
    - Step wired to wrong function or missing the actual check
@@ -280,23 +278,21 @@ When all implementation tasks are complete:
 **The verify step is not optional. Do not proceed to finalize with failing tests.**
 
 ### 7. Finalize
-When all tests are green:
-1. Move new decision records to `.grimoire/decisions/` with proper sequential numbering
-2. Update MADR status from `proposed` to `accepted` and set the date
-3. If `data.yml` exists, merge the changes into `.grimoire/docs/data/schema.yml` — apply adds/modifies/removes so the baseline schema stays current
-4. Move `manifest.md` to `.grimoire/archive/YYYY-MM-DD-<change-id>/`
-5. Remove the change directory from `.grimoire/changes/`
-
-Feature files were already promoted to `features/` in step 3b — no copy needed here.
+When all tests are green. Features, decisions, and constraints were edited live on the branch — finalize flips states, applies the schema delta, and clears the ephemeral scaffolding:
+1. Decision records already live in `.grimoire/decisions/` (drafted there, numbered at draft time). Flip MADR status from `proposed` to `accepted` and set the date.
+2. Constraints (`.grimoire/docs/constraints.md`) were edited in place — nothing to move.
+3. If the change has a `data.yml` (schema delta), apply its `add`/`modify`/`remove` entries to the live `.grimoire/docs/data/schema.yml` so the baseline schema stays current. `data.yml` is a migration-delta spec (ephemeral scaffolding carrying nullability/safety/ordering intent a raw diff wouldn't), not a copy of the schema — `schema.yml` is the live target; the delta is discarded with the change folder.
+4. Refresh the project overview: run `grimoire docs`. It regenerates `.grimoire/docs/OVERVIEW.md` (the human entry point) from the now-current features, constraints, decisions, and schema — superseded decisions drop out automatically. This is the existing `docs` command, not a new one.
+5. Remove the change directory `.grimoire/changes/<change-id>/`. Its `manifest.md` + `tasks.md` (+ any `data.yml`) are ephemeral process scaffolding. The durable record is the branch, the PR, and `git log` — linked by the `Change: <change-id>` trailer. **There is no archive tree** (don't reinvent git history).
 
 ### 8. Commit
 
-Finalize must be complete before committing — the commit captures the finished state including archived manifest and promoted decisions, not mid-flight change artefacts.
+Finalize must be complete before committing — the commit captures the finished state (accepted decisions, cleared scaffolding), not mid-flight change artefacts.
 
-Stage everything:
+Stage the live artifacts and the scaffolding removal:
 ```
-git add features/ .grimoire/decisions/ .grimoire/archive/ .grimoire/docs/ src/ tests/
-git add -u  # picks up any deleted files (removed change directory)
+git add features/ .grimoire/decisions/ .grimoire/docs/ src/ tests/
+git add -u  # picks up the removed change directory
 ```
 
 Then commit using `/grimoire:commit` (reads change context for the message) or write a manual message following `AGENTS.md` commit trailer conventions:

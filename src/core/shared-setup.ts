@@ -12,7 +12,6 @@ export const GRIMOIRE_DIRS = [
   ".grimoire/decisions",
   ".grimoire/docs",
   ".grimoire/changes",
-  ".grimoire/archive",
   ".grimoire/bugs",
   ".grimoire/brand",
   ".grimoire/security/vulns",
@@ -23,9 +22,7 @@ export const TEMPLATE_FILES: Array<[string, string]> = [
   ["context.yml", ".grimoire/docs/context.yml"],
   ["debt-exceptions.yml", ".grimoire/debt-exceptions.yml"],
   ["accepted-risks.yml", ".grimoire/security/accepted-risks.yml"],
-  ["mapignore", ".grimoire/mapignore"],
-  ["mapkeys", ".grimoire/mapkeys"],
-  ["dupignore", ".grimoire/dupignore"],
+  ["constraints.md", ".grimoire/docs/constraints.md"],
 ];
 
 const SKILL_AGENTS: Record<string, string> = {

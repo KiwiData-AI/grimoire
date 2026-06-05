@@ -236,7 +236,6 @@ describe("updateProject", () => {
     const mkdirPaths = mockMkdir.mock.calls.map((c) => String(c[0]));
     expect(mkdirPaths.some((p) => p.includes("decisions"))).toBe(true);
     expect(mkdirPaths.some((p) => p.includes("changes"))).toBe(true);
-    expect(mkdirPaths.some((p) => p.includes("archive"))).toBe(true);
     expect(mkdirPaths.some((p) => p.includes("bugs"))).toBe(true);
   });
 

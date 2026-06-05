@@ -95,6 +95,12 @@ Persona scope for design review:
 - 4.6 Code Style Reviewer — **skip** (no code yet; runs only on diff reviews)
 - 4.7 Adversarial User — engage per matrix; criteria in `../references/adversarial-personas.md`
 - 4.8 Contrarian — runs last when any persona produced a blocker; calibrates other personas' findings post-hoc
+- 4.9 Principles Auditor — **runs on every review (complexity ≥ 2), always.** Audits the design against the four principles in `../references/principles.md` and raises a finding for each violation lacking a stated reason:
+  - **One right way** — does any artifact introduce a second way to do something the codebase already does? Does a spec leave two approaches open ("X or Y")? → blocker until one is chosen.
+  - **DRY** — is any fact given a second home (a capability in feature + MADR + constraint; a constant/rule duplicated)? Does any task store something derivable from code/mcp? → blocker.
+  - **Don't reinvent the wheel** — does any task build a mechanism that an existing tool/library/proven pattern already provides (custom crypto/auth, a bespoke change-tracking/diff/staging process where git suffices)? → blocker.
+  - **Keep it simple** — any abstraction, indirection, new dependency, or new file justified only by a hypothetical, or scope reaching past a non-goal? → suggestion (blocker if it adds a maintained surface).
+  - Also enforce the **artifact-jurisdiction** rule: any `.feature` scenario that is really a constraint (security/NFR/observability), an internal technical detail, or a non-functional concern is a blocker — it belongs in `constraints.md` or a MADR, not Gherkin.
 
 ### 5.5 Visual Fidelity (cheap tier)
 
@@ -143,6 +149,12 @@ Compile into the standard report layout (§5 of the personas reference):
 ### Accessibility (axe-core)
 - **[suggestion]** [axe-color-contrast] `designs/preview.html` — Element has insufficient color contrast 3.8. Impact: serious.
 (or: "axe-core: no violations." / "axe-core not installed — install `@axe-core/cli` for accessibility checks.")
+
+## Principles Auditor
+- **[blocker]** [DRY] PII-scrubbing behavior is specified in both `features/pii-log-scrubbing.feature` and ADR-0008 — one authoritative home. Move to `constraints.md`, link the MADR.
+- **[blocker]** [jurisdiction] `features/logging-observability.feature` describes internal log structure (no external actor) — belongs in `constraints.md`, not a `.feature`.
+- **[suggestion]** [KISS] Task 3.2 adds a `BaseExtractor` for a single caller — inline until a second extractor exists.
+(or: "No principle violations found.")
 
 ## Contrarian                      <!-- omit when zero findings from all personas -->
 - **[blocker upheld]** ...

@@ -1,5 +1,5 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { readdir, readFile, writeFile, access } from "node:fs/promises";
+import { join, relative, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
@@ -35,19 +35,20 @@ export async function runHealth(options: HealthOptions): Promise<void> {
   const metrics: Metric[] = [];
 
   // Run all checks in parallel where possible
-  const [features, decisions, areaDocs, dataSchema, testCoverage, unitCoverage, duplicates, complexity] =
+  const [features, decisions, areaDocs, dataSchema, conventionsDrift, testCoverage, unitCoverage, duplicates, complexity] =
     await Promise.all([
       checkFeatures(root),
       checkDecisions(root),
       checkAreaDocs(root),
       checkDataSchema(root),
+      checkConventionsDrift(root),
       checkTestCoverage(root),
       checkUnitTestCoverage(root, config),
       checkDuplicates(root, config),
       checkComplexity(root, config),
     ]);
 
-  metrics.push(features, decisions, areaDocs, dataSchema, testCoverage, unitCoverage, duplicates, complexity);
+  metrics.push(features, decisions, areaDocs, dataSchema, conventionsDrift, testCoverage, unitCoverage, duplicates, complexity);
 
   // Calculate overall (average of scored metrics)
   const scored = metrics.filter((m) => m.score !== null);
@@ -143,8 +144,10 @@ async function checkDecisions(root: string): Promise<Metric> {
 }
 
 async function checkAreaDocs(root: string): Promise<Metric> {
+  // Structure (which areas exist) comes from codebase-memory-mcp on demand,
+  // not a stored snapshot. Here we only report how many areas are documented
+  // in the index — intent grimoire owns, not derivable structure.
   const indexPath = join(root, ".grimoire", "docs", "index.yml");
-  const snapshotPath = join(root, ".grimoire", "docs", ".snapshot.json");
 
   let documented = 0;
   try {
@@ -157,34 +160,104 @@ async function checkAreaDocs(root: string): Promise<Metric> {
     return {
       name: "area_docs",
       score: 0,
-      label: "no area docs (run grimoire map + discover)",
+      label: "no area docs (run grimoire discover)",
     };
   }
 
-  // Count total areas from snapshot
-  let totalAreas = documented;
-  try {
-    const snapshotContent = await readFile(snapshotPath, "utf-8");
-    const snapshot = JSON.parse(snapshotContent) as {
-      directories?: Record<string, unknown>;
-    };
-    if (snapshot.directories) {
-      // Count top-level directories as areas
-      totalAreas = Math.max(
-        Object.keys(snapshot.directories).length,
-        documented
-      );
-    }
-  } catch {
-    // No snapshot — use documented count as total
-  }
-
-  const score =
-    totalAreas > 0 ? Math.round((documented / totalAreas) * 100) : 0;
   return {
     name: "area_docs",
-    score,
-    label: `${documented}/${totalAreas} areas documented`,
+    score: documented > 0 ? 100 : 0,
+    label: `${documented} area${documented !== 1 ? "s" : ""} documented`,
+  };
+}
+
+// --- Conventions drift ---
+// Ported from the retired `grimoire map` command. Checks that path rules
+// written in conventions docs still point at directories that exist.
+
+interface DriftItem {
+  conventionsFile: string;
+  path: string;
+  context: string;
+}
+
+const SCANNED_HEADERS = new Set(["## file placement", "## patterns"]);
+const SKIP_TOKENS = ["(", ";", "node_modules", "dist", "build", ".git"];
+
+export function extractPathRules(content: string, filename: string): DriftItem[] {
+  const items: DriftItem[] = [];
+  let inScannedSection = false;
+
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("## ")) {
+      inScannedSection = SCANNED_HEADERS.has(trimmed.toLowerCase());
+      continue;
+    }
+
+    if (!inScannedSection) continue;
+
+    const matches = [...line.matchAll(/`([a-z][^`]+\/)`/g)];
+    for (const match of matches) {
+      const token = match[1];
+      if (SKIP_TOKENS.some((s) => token.includes(s))) continue;
+      items.push({ conventionsFile: filename, path: token, context: trimmed });
+    }
+  }
+
+  return items;
+}
+
+async function detectConventionsDrift(root: string): Promise<DriftItem[] | null> {
+  const conventionsDir = join(root, ".grimoire", "docs", "conventions");
+
+  let files: string[];
+  try {
+    const entries = await readdir(conventionsDir);
+    files = entries.filter((f) => f.endsWith(".md"));
+  } catch {
+    return null;
+  }
+
+  if (files.length === 0) return null;
+
+  const driftItems: DriftItem[] = [];
+  for (const file of files) {
+    const content = await readFile(join(conventionsDir, file), "utf-8");
+    const rules = extractPathRules(content, file);
+
+    for (const rule of rules) {
+      const resolved = resolve(join(root, rule.path));
+      if (!resolved.startsWith(root + "/")) continue;
+
+      try {
+        await access(resolved);
+      } catch (err: unknown) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+          driftItems.push(rule);
+        }
+      }
+    }
+  }
+
+  return driftItems;
+}
+
+async function checkConventionsDrift(root: string): Promise<Metric> {
+  const drift = await detectConventionsDrift(root);
+
+  if (drift === null) {
+    return { name: "conventions_drift", score: null, label: "no conventions docs" };
+  }
+  if (drift.length === 0) {
+    return { name: "conventions_drift", score: 100, label: "no drift — paths match" };
+  }
+  return {
+    name: "conventions_drift",
+    score: 0,
+    label: `${drift.length} stale path${drift.length !== 1 ? "s" : ""}`,
+    detail: drift.map((d) => `${d.conventionsFile}: ${d.path}`).join("; "),
   };
 }
 

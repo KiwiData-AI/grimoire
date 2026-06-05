@@ -64,25 +64,25 @@ describe("traceFile", () => {
     expect(result.commits[0].changeId).toBe("add-auth");
   });
 
-  it("links change IDs to archive entries", async () => {
-    mockGitRaw.mockResolvedValue(gitLogOutput);
-
-    mockReaddir.mockImplementation(async (path: any) => {
-      if (String(path).includes("archive")) return ["2026-01-15-add-auth"] as any;
-      throw new Error("ENOENT");
+  it("links change IDs to merged git entries when no active change folder exists", async () => {
+    // git.raw is called twice: once for the file's commit log, once with
+    // --grep to resolve the change's merged history.
+    mockGitRaw.mockImplementation(async (args: any) => {
+      if (Array.isArray(args) && args.some((a: string) => String(a).startsWith("--grep"))) {
+        return "2026-01-15\x1fAdd authentication\n";
+      }
+      return gitLogOutput;
     });
 
-    mockReadFile.mockImplementation(async (path: any) => {
-      if (String(path).includes("manifest.md")) {
-        return "# Change: Add authentication\n\n## Why\nSecurity.\n" as any;
-      }
+    // No active change manifest in .grimoire/changes/.
+    mockReadFile.mockImplementation(async () => {
       throw new Error("ENOENT");
     });
 
     const result = await captureJson(() => traceFile("src/auth.ts", { json: true }));
     expect(result.changes).toHaveLength(1);
     expect(result.changes[0].changeId).toBe("add-auth");
-    expect(result.changes[0].archived).toBe(true);
+    expect(result.changes[0].status).toBe("merged");
     expect(result.changes[0].summary).toBe("Add authentication");
   });
 

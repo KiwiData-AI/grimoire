@@ -26,7 +26,7 @@ Systematically find, prioritize, and plan tech debt reduction. Combines automate
 ## Prerequisites
 - A grimoire-initialized project (`.grimoire/` exists)
 - Git history available (hotspot analysis needs `git log`)
-- Ideally: `grimoire map` + `/grimoire:discover` already run (area docs help contextualize findings)
+- Ideally: codebase-memory-mcp indexed (live structure/duplication intelligence) + `/grimoire:discover` run (area intent docs help contextualize findings)
 
 ## Debt Item Format
 
@@ -113,7 +113,7 @@ Run applicable scans from the categories in `../references/refactor-scan-categor
 - **Circular dependencies** — tight coupling between modules
 - **Dependency staleness** — uses `config.tools.dep_audit` or package manager outdated commands
 - **Broken promises** — aged TODO/FIXME/HACK comments via `grep` + `git blame`
-- **Duplication** — textual clones via `.snapshot.json` or `config.tools.duplicates`; plus semantic duplicate detection via `search_graph(semantic_query=[...])` to find re-implementations under different names (requires `codebase-memory-mcp`)
+- **Duplication** — textual clones via `config.tools.duplicates` or `grimoire health` (config-driven duplicates metric); plus semantic duplicate detection via `search_graph(semantic_query=[...])` to find re-implementations under different names (requires `codebase-memory-mcp`)
 - **Dead code** — uses `config.tools.dead_code` or `codebase-memory-mcp` graph queries
 - **Test debt** — high complexity + low coverage
 - **Pattern divergence** — code that contradicts established codebase patterns; uses `codebase-memory-mcp` peer group analysis + hallucinated reference detection (skip if graph not indexed)

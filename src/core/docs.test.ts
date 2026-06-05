@@ -101,7 +101,7 @@ describe("generateDocs", () => {
     await generateDocs({});
 
     const content = String(mockWriteFile.mock.calls[0][1]);
-    expect(content).toContain("## Features");
+    expect(content).toContain("## Capabilities");
     expect(content).toContain("User login");
     expect(content).toContain("Successful login");
     expect(content).toContain("Failed login");
@@ -187,20 +187,17 @@ Only accessed through the API layer.
     expect(content).toContain("Core business logic");
   });
 
-  it("includes recent changes from archive", async () => {
-    mockReaddir.mockImplementation(async (path: any) => {
-      if (String(path).includes("archive")) {
-        return [
-          { name: "2026-01-15-add-auth", isDirectory: () => true, isFile: () => false },
-        ] as any;
-      }
-      throw new Error("ENOENT");
-    });
+  it("includes a constraints section when constraints.md has real rows", async () => {
     mockReadFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.includes("package.json")) return '{"name": "test-project"}' as any;
-      if (p.includes("manifest.md")) {
-        return "# Change: Add authentication\n\n## Why\nSecurity requirement.\n" as any;
+      if (p.includes("constraints.md")) {
+        return [
+          "# Constraints",
+          "| Constraint (assertion) | Rationale | How verified | Links |",
+          "|---|---|---|---|",
+          "| Logs never contain PII | confidential data | tests/test_logs.py | ADR-0008 |",
+        ].join("\n") as any;
       }
       throw new Error("ENOENT");
     });
@@ -208,8 +205,8 @@ Only accessed through the API layer.
     await generateDocs({});
 
     const content = String(mockWriteFile.mock.calls[0][1]);
-    expect(content).toContain("## Recent Changes");
-    expect(content).toContain("Add authentication");
+    expect(content).toContain("## Constraints");
+    expect(content).toContain("Logs never contain PII");
   });
 
   it("includes active work section", async () => {

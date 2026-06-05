@@ -41,7 +41,7 @@ For contract regression tests: if the client starts reading a new field or stops
 Before importing a module, calling a function, or adding a dependency — confirm it exists.
 
 **Imports and functions:**
-- Check area docs' Reusable Code table first (exact paths and line numbers)
+- Query the graph first (`search_graph` / `get_code_snippet`) for the exact symbol, path, and signature
 - If importing from a file you haven't read, read it first
 - If an import fails, don't guess — read the actual module for the real export name
 

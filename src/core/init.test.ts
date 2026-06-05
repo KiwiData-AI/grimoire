@@ -88,7 +88,6 @@ describe("initProject", () => {
     expect(mkdirPaths.some((p) => p.includes("features"))).toBe(true);
     expect(mkdirPaths.some((p) => p.includes(".grimoire/decisions"))).toBe(true);
     expect(mkdirPaths.some((p) => p.includes(".grimoire/changes"))).toBe(true);
-    expect(mkdirPaths.some((p) => p.includes(".grimoire/archive"))).toBe(true);
     expect(mkdirPaths.some((p) => p.includes(".grimoire/docs"))).toBe(true);
     expect(mkdirPaths.some((p) => p.includes(".grimoire/brand"))).toBe(true);
   });
@@ -105,7 +104,7 @@ describe("initProject", () => {
     expect(copyPaths.some((p) => p.includes("template.md"))).toBe(true);
   });
 
-  it("copies mapignore and mapkeys config files", async () => {
+  it("does not install retired map structure-config templates", async () => {
     await initProject(".", {
       skipAgents: true,
       skipSkills: true,
@@ -113,9 +112,12 @@ describe("initProject", () => {
       agents: [],
     });
 
+    // mapignore/mapkeys/dupignore belonged to the deleted `grimoire map`
+    // command; structure now comes from codebase-memory-mcp on demand.
     const copyDests = mockCopyFile.mock.calls.map((c) => String(c[1]));
-    expect(copyDests.some((p) => p.includes("mapignore"))).toBe(true);
-    expect(copyDests.some((p) => p.includes("mapkeys"))).toBe(true);
+    expect(copyDests.some((p) => p.includes("mapignore"))).toBe(false);
+    expect(copyDests.some((p) => p.includes("mapkeys"))).toBe(false);
+    expect(copyDests.some((p) => p.includes("dupignore"))).toBe(false);
   });
 
   it("generates minimal config with noDetect", async () => {

@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
@@ -30,11 +30,12 @@ interface ChangeTrace {
   why: string;
   features: string[];
   decisions: string[];
-  archived: boolean;
+  status: "active" | "merged";
 }
 
 function printChangeEntry(ch: ChangeTrace): void {
-  const status = ch.archived ? chalk.green("archived") : chalk.yellow("active");
+  const status =
+    ch.status === "merged" ? chalk.green("merged") : chalk.yellow("active");
   console.log(`  ${chalk.cyan(ch.changeId)}  ${chalk.dim(ch.date)}  ${status}`);
   console.log(`  ${ch.summary}`);
   if (ch.why) console.log(`  ${chalk.dim("Why:")} ${ch.why}`);
@@ -172,58 +173,24 @@ async function lookupChanges(
   const changes: ChangeTrace[] = [];
 
   for (const changeId of changeIds) {
-    // Check archive first
-    const archiveEntry = await findInArchive(root, changeId);
-    if (archiveEntry) {
-      changes.push(archiveEntry);
-      continue;
-    }
-
-    // Check active changes
+    // An active change still has its manifest in .grimoire/changes/.
     const activeEntry = await findInActive(root, changeId);
     if (activeEntry) {
       changes.push(activeEntry);
+      continue;
+    }
+
+    // Otherwise the change is finalized/merged — its record is git history,
+    // not an archive tree. Reconstruct from the Change: commit trailer.
+    const mergedEntry = await findInGit(root, changeId);
+    if (mergedEntry) {
+      changes.push(mergedEntry);
     }
   }
 
   // Sort by date, newest first
   changes.sort((a, b) => b.date.localeCompare(a.date));
   return changes;
-}
-
-async function findInArchive(
-  root: string,
-  changeId: string
-): Promise<ChangeTrace | null> {
-  const archiveDir = join(root, ".grimoire", "archive");
-
-  let dirs: string[];
-  try {
-    const entries = await readdir(archiveDir);
-    dirs = entries.filter((d) => d.endsWith(`-${changeId}`));
-  } catch {
-    return null;
-  }
-
-  if (dirs.length === 0) return null;
-
-  const dir = dirs[0];
-  const match = dir.match(/^(\d{4}-\d{2}-\d{2})-/);
-  const date = match ? match[1] : "";
-
-  const manifestPath = join(archiveDir, dir, "manifest.md");
-  try {
-    const manifest = await readFile(manifestPath, "utf-8");
-    const parsed = parseManifest(manifest);
-    return {
-      changeId,
-      date,
-      archived: true,
-      ...parsed,
-    };
-  } catch {
-    return { changeId, date, summary: "(manifest not readable)", why: "", features: [], decisions: [], archived: true };
-  }
 }
 
 async function findInActive(
@@ -238,8 +205,43 @@ async function findInActive(
     return {
       changeId,
       date: "(active)",
-      archived: false,
+      status: "active",
       ...parsed,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function findInGit(
+  root: string,
+  changeId: string
+): Promise<ChangeTrace | null> {
+  const git = simpleGit(root);
+  try {
+    const stdout = await git.raw([
+      "log",
+      "--format=%as%x1f%s",
+      `--grep=Change: ${changeId}`,
+      "--fixed-strings",
+    ]);
+
+    const rows = stdout
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => l.split("\x1f"));
+    if (rows.length === 0) return null;
+
+    const [date, subject] = rows[0];
+    return {
+      changeId,
+      date: date ?? "",
+      status: "merged",
+      summary: subject ?? `(merged change ${changeId})`,
+      why: "",
+      features: [],
+      decisions: [],
     };
   } catch {
     return null;

@@ -128,7 +128,7 @@ For HTML output, write a single `.grimoire/changes/<change-id>/designs/preview.h
 Skip preview rendering when output is Figma (the Figma file IS the preview) or ASCII (the markdown table IS the preview).
 
 ### 9. Derive Gherkin
-Propose draft `.feature` files at `.grimoire/changes/<change-id>/features/<capability>/`. One Scenario per (component × state). Each Scenario has Given / When / Then steps grounded in the design.
+Propose draft scenarios as a **design artifact** at `.grimoire/changes/<change-id>/designs/scenarios.feature` (a proposal, not the live baseline). One Scenario per (component × state), Given / When / Then grounded in the design. `grimoire-draft` writes the user-approved scenarios live into `features/` — design does not edit the live baseline directly. Every proposed scenario must still pass draft's feature admission test (external actor, observable, domain language).
 
 Apply surface-conditional adversarial scenarios per `../references/adversarial-personas.md`:
 
@@ -210,7 +210,7 @@ Brand-drift lint cross-references hardcoded values in code against `.grimoire/br
 
 ### Scope
 - Default: scan **staged files** (`git diff --cached --name-only`) — fast, dev-loop-friendly
-- `--all` / "scan all" → scan all tracked files (slower; honor `.grimoire/mapignore`)
+- `--all` / "scan all" → scan all tracked files (slower; honor `.gitignore`)
 - File types: `.css`, `.scss`, `.less`, `.html`, `.jsx`, `.tsx`, `.vue`, `.svelte` (configurable per project conventions)
 
 ### What it looks for
@@ -249,7 +249,7 @@ Do not error — absence is a valid state for projects that haven't onboarded br
 ## Important
 - **Pure markdown.** This skill is interpreted by an LLM per ADR-0010. Do not generate executable code or shell scripts to satisfy any step. The variant HTML files are output artifacts; the workflow itself is prose the AI follows.
 - **Ask before scanning large codebases.** Component-inventory scans (step 4) and `--lint --all` scans can be expensive on monorepos. Confirm with the user before scanning more than ~500 files.
-- **Honor `.grimoire/mapignore`.** Any scan (component inventory, brand lint) must respect mapignore patterns. Reuse the same exclusion logic as `grimoire map`.
+- **Honor `.gitignore`.** Any scan (component inventory, brand lint) must skip vendored, generated, and version-control-ignored paths.
 - **Do not create `.grimoire/brand/` unprompted.** The directory only appears when the user opts in via onboarding or `--capture-brand`. Reading from a missing brand directory is a valid state — fall back to neutral defaults.
 - **Never log Figma access tokens.** The token lives in `FIGMA_ACCESS_TOKEN` env var, read by the MCP server. Never write it to config, never echo it in transcripts, never include it in artifacts.
 - **Soft gates are warnings, not blockers.** The problem-statement gate (step 2) and the state-enumeration gate (step 7) warn aggressively but accept user override. Record overrides as assumptions so they surface in review.

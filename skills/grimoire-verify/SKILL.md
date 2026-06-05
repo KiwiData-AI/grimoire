@@ -1,6 +1,6 @@
 ---
 name: grimoire-verify
-description: Verify that implementation matches feature specs and decision records. Use after apply is complete, before archiving the change.
+description: Verify that implementation matches feature specs and decision records. Use after apply is complete, before committing and opening a PR.
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
@@ -9,11 +9,11 @@ metadata:
 
 # grimoire-verify
 
-Verify that implementation matches the feature specs and decision records. Run after apply, before archive.
+Verify that implementation matches the feature specs and decision records. Run after apply, before commit and PR.
 
 ## Triggers
 - User wants to verify a grimoire change is correctly implemented
-- User asks to check, verify, or review a change before archiving
+- User asks to check, verify, or review a change before committing
 - Loose match: "verify", "check", "review" with a change reference
 
 ## Routing
@@ -236,8 +236,8 @@ Produce a structured report:
 
 ### 8. Recommend Next Steps
 Based on the report:
-- **All clear** → recommend archiving the change
-- **Critical issues** → must fix before archiving
+- **All clear** → recommend committing and opening a PR (git diff is the staging area, the PR is the changelog)
+- **Critical issues** → must fix before committing
 - **Warnings only** → user decides whether to fix or accept
 - **Dead features found** → suggest a removal change or updating the features
 
@@ -251,6 +251,6 @@ Based on the report:
 
 ## Done
 When the verification report is presented, the workflow is complete. Suggest next steps based on findings:
-- **All clear** → `grimoire archive <change-id>` or `grimoire-pr`
-- **Critical issues** → must fix before archiving
+- **All clear** → `grimoire-commit` then `grimoire-pr`
+- **Critical issues** → must fix before committing
 - **Warnings only** → user decides whether to fix or accept
