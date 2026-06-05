@@ -274,7 +274,8 @@ If none of the above pin a rule, **don't invent one**. Style preferences without
 - **Imports**: Order, grouping, and form match the project (relative vs absolute, `.js` extension policy, type-only imports)?
 - **Formatting**: Diff respects `.editorconfig` and formatter rules (indentation, line endings, trailing newline, max line length)? Any formatter-noisy hunks unrelated to the change?
 - **Comments — presence**: Is there a comment whose WHAT is already obvious from the code? Per most projects' comment policies (and grimoire's `AGENTS.md`), explanatory-of-what comments are noise — **suggestion** to remove.
-- **Comments — content**: Do comments reference current task / fix / PR / caller ("added for X", "used by Y", "fix for issue #123")? These rot — **suggestion** to remove or rewrite as durable rationale.
+- **Comments — self-contained**: Does a comment name an external artifact that moves independently — a feature/scenario/`.feature`, MADR/ADR number, change-id, ticket/PR, specific test, or tag code (`LOG-OBS-003`)? These orphan — **suggestion** to rewrite in terms of the code itself (`code-quality.md` §7). Generic descriptive words (test, feature) are fine; identifiers pointing elsewhere are not.
+- **Comments — no essays**: Does a docstring lead with a prose paragraph before its params, or restate types in prose? Keep the summary to 1–2 terse lines — **suggestion** to compress; design rationale belongs in a decision record.
 - **Comments — style**: Match the project's comment form (`//` vs `/* */` vs `#`, JSDoc/TSDoc/docstring conventions)?
 - **Docstrings**: New public functions/classes — does the project require docstrings? If yes (per `comment_style` or visible convention), missing docstring = **suggestion**. If no, added boilerplate docstrings = **suggestion** to remove.
 - **Dead comments**: Commented-out code in the diff = **suggestion** to delete.

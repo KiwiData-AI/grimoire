@@ -83,21 +83,53 @@ Keep:
 
 Fail: a new `BaseFoo` / `FooStrategy` / `FooFactory` introduced for a single caller.
 
-### 7. Comments earn their place
+### 7. Comments earn their place — terse, self-contained, no essays
 
-Default: no comments. Add a comment **only** when the *why* is non-obvious — a hidden constraint, a workaround for a specific bug, an invariant that would surprise a future reader.
+Write comments like a senior engineer with no time: dense, professional, zero filler.
+
+**Voice: terse.** "Resolve model by id; raises on unknown provider." — not "This function is responsible for resolving the model by its id, and it will raise an exception if the provider is not known." Drop "this function", "we", hedging, and restated types. Fragments are fine; full prose grammar is not required.
+
+**Self-contained.** A comment describes the function/class on its own terms only. It must NOT name an external artifact that changes independently — feature flags / `.feature` files / scenario names, unit or integration test names, MADR/ADR numbers, change-ids, issue/PR numbers, tag codes (`LOG-OBS-003`). Those orphan the moment the artifact moves, and rot silently. Describe the *behavior*, not where it's specced.
+- OK: `# skip third-party sinks (e.g. behave capture)` — generic, about the code.
+- Not OK: `# implements scenario LOG-OBS-003 from logging.feature` — points at an artifact that will move.
+
+**No paragraphs.** Summary is one line, two at most. No prose block explaining the whole design before the params. If the rationale needs a paragraph, it belongs in a decision record — not the code.
+
+**Params per `comment_style` are fine.** If the project's style (sphinx/google/jsdoc/…) calls for `:param`/`Args:`/`@param`, keep them — but describe a param only when its name + type don't already say it, and don't precede them with prose.
 
 Drop:
 - Comments that restate the code (`# loop over users`).
-- Comments referencing the current task / PR / ticket (`# added for issue #123`, `# used by the new flow`). These rot.
-- Multi-line docstrings on private functions whose name and signature already say everything.
+- Any reference to a task / PR / ticket / feature / scenario / ADR / specific test (`# added for issue #123`, `# covers scenario X`, `# see test_foo`). Self-contained or gone.
+- Multi-line prose docstrings on private functions whose name + signature already say everything.
 - Commented-out code. Delete it; git remembers.
 
 Keep:
-- One-line "why": the constraint, the gotcha, the link to the spec / ADR.
-- Docstrings the project's `comment_style` requires (check `.grimoire/config.yaml`).
+- One terse line of *why* when non-obvious — a hidden constraint, a workaround, a surprising invariant — stated in terms of the code itself.
+- The structured `comment_style` param/return section, terse.
 
-Fail: any comment whose removal would not confuse a future reader.
+Fail: any comment that (a) wouldn't confuse a future reader if removed, (b) names an external artifact, or (c) runs to a prose paragraph.
+
+**Before / after** (the offender this rule targets):
+```python
+# BEFORE — orphan-prone essay
+def build_chat(model_id):
+    """
+    Build and return a chat model for the given model id. This is the primary
+    entry point used by every agent and team in the system, as specified by
+    scenario LOG-OBS-003 in logging.feature and decided in ADR-0001. See
+    test_build_chat for the expected behavior. Added as part of add-2fa-login.
+
+    :param model_id: the id of the model to build
+    :return: the chat model
+    """
+
+# AFTER — terse, self-contained
+def build_chat(model_id):
+    """Resolve a chat model by id. Raises on an unknown provider.
+
+    :param model_id: provider-prefixed model id (e.g. "gpt-4.1-mini")
+    """
+```
 
 ---
 
@@ -110,7 +142,7 @@ Before marking a task `[x]`:
 - [ ] No guards / try-except / type-checks inside the trust boundary (§4)
 - [ ] No locals named `data`, `result`, `temp`, `info`, `obj` — names reveal intent (§5)
 - [ ] No new abstractions, interfaces, or wrappers with a single caller (§6)
-- [ ] No comments describing *what* the code does — only *why*, and only when non-obvious (§7)
+- [ ] Comments are terse, self-contained, ≤2 lines of prose — no *what*, no external-artifact refs (feature/scenario/ADR/test/ticket) (§7)
 - [ ] Diff stays inside the task's scope — no "while I'm here" refactors
 
 If any box can't be ticked, fix the code (not the checklist) and re-run tests.

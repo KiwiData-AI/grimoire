@@ -60,9 +60,81 @@ export async function checkDocStyle(
     } else if (isJs) {
       issues.push(...checkJsDocStyle(filePath, lines, style));
     }
+    // Self-containment applies under any comment_style.
+    issues.push(...checkVolatileRefs(filePath, lines));
   }
 
   return { filesChecked: sample.length, issues };
+}
+
+// --- Self-containment: comments must not name external, volatile artifacts ---
+// (ADR/MADR ids, .feature files, tag codes, change-ids, issue/PR refs, test files).
+// These orphan when the artifact moves. Generic words (test, feature, scenario)
+// used descriptively are fine — we match identifiers, not vocabulary.
+const VOLATILE_RE =
+  /\b(?:ADR|MADR)[-\s]?\d+|\b\d{4}-[a-z][a-z0-9-]{2,}\b|\b[A-Z]{2,}-[A-Z]{2,}-\d+\b|[\w./-]+\.feature\b|\bissues?\s*#?\d+\b|\bPR\s*#\d+\b|[\w-]+\.(?:test|spec)\.[jt]sx?\b/;
+
+function commentTextOf(line: string): string | null {
+  const t = line.trim();
+  if (
+    t.startsWith("#") ||
+    t.startsWith("//") ||
+    t.startsWith("*") ||
+    t.startsWith('"""') ||
+    t.startsWith("'''") ||
+    t.startsWith("/*")
+  ) {
+    return t;
+  }
+  const hash = line.indexOf("# ");
+  if (hash !== -1) return line.slice(hash);
+  const slash = line.indexOf("// ");
+  if (slash !== -1) return line.slice(slash);
+  return null;
+}
+
+function checkVolatileRefs(file: string, lines: string[]): DocStyleIssue[] {
+  const issues: DocStyleIssue[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const text = commentTextOf(lines[i]);
+    if (!text) continue;
+    const m = text.match(VOLATILE_RE);
+    if (m) {
+      issues.push({
+        file,
+        line: i + 1,
+        severity: "warning",
+        message: `Comment references an external artifact (\`${m[0]}\`) — make it self-contained; that reference orphans when the artifact moves.`,
+      });
+    }
+  }
+  return issues;
+}
+
+// --- No essays: summary prose before the params section stays to ~2 lines ---
+const PY_PARAM_RE = /^\s*(?:Args:|Arguments:|Parameters|:param\b|:returns?:|:rtype:|Returns:|Raises:|Yields:)/;
+const JS_PARAM_RE = /@(?:param|returns?|throws|yields)\b/;
+
+function proseLineCount(doc: string, paramRe: RegExp): number {
+  let prose = 0;
+  for (const raw of doc.split("\n")) {
+    const t = raw.replace(/^[\s*]*/, "").replace(/(\/\*\*|\*\/|"""|''')/g, "").trim();
+    if (paramRe.test(raw)) break;
+    if (t) prose++;
+  }
+  return prose;
+}
+
+function essayIssue(file: string, line: number, doc: string, paramRe: RegExp): DocStyleIssue | null {
+  if (proseLineCount(doc, paramRe) > 2) {
+    return {
+      file,
+      line,
+      severity: "warning",
+      message: "Docstring leads with a prose paragraph — keep the summary to 1–2 terse lines before any params; move design rationale to a decision record.",
+    };
+  }
+  return null;
 }
 
 function resolveGlobs(style: string, language?: string): string[] {
@@ -130,6 +202,8 @@ function checkPythonDocStyle(
     for (const msg of validatePythonDocStyle(doc.content, style)) {
       issues.push({ file, line: doc.line + 1, severity: "warning", message: msg });
     }
+    const essay = essayIssue(file, doc.line + 1, doc.content, PY_PARAM_RE);
+    if (essay) issues.push(essay);
   }
 
   return issues;
@@ -236,6 +310,10 @@ function checkJsDocStyle(
     const doc = findJsDoc(lines, i);
     const issue = getDocStyleIssue(file, name, i + 1, style, doc);
     if (issue) issues.push(issue);
+    if (doc) {
+      const essay = essayIssue(file, doc.line + 1, doc.content, JS_PARAM_RE);
+      if (essay) issues.push(essay);
+    }
   }
 
   return issues;

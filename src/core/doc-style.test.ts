@@ -128,4 +128,55 @@ export function processData(items: string[]): string[] {
     expect(report.filesChecked).toBe(0);
     expect(report.issues).toHaveLength(0);
   });
+
+  it("flags a comment referencing an external artifact", async () => {
+    mockFg.mockResolvedValue(["/fake/src/app.py"] as any);
+    mockReadFile.mockResolvedValue(`
+def build_chat(model_id):
+    """Resolve a chat model by id."""
+    # implements LOG-OBS-003 from logging.feature; see ADR-0001
+    return _resolve(model_id)
+`);
+
+    const report = await checkDocStyle("/fake", "google", "python");
+    const orphan = report.issues.find(i => i.message.includes("external artifact"));
+    expect(orphan).toBeDefined();
+  });
+
+  it("flags a docstring that leads with a prose paragraph", async () => {
+    mockFg.mockResolvedValue(["/fake/src/app.py"] as any);
+    mockReadFile.mockResolvedValue(`
+def build_chat(model_id):
+    """Build and return a chat model for the given id.
+
+    This is the primary entry point used by every agent and team.
+    It performs validation and falls back to defaults when needed.
+    Another line of explanation that goes on and on here.
+
+    Args:
+        model_id: the model id.
+    """
+    return _resolve(model_id)
+`);
+
+    const report = await checkDocStyle("/fake", "google", "python");
+    const essay = report.issues.find(i => i.message.includes("prose paragraph"));
+    expect(essay).toBeDefined();
+  });
+
+  it("passes a terse self-contained docstring", async () => {
+    mockFg.mockResolvedValue(["/fake/src/app.py"] as any);
+    mockReadFile.mockResolvedValue(`
+def build_chat(model_id):
+    """Resolve a chat model by id. Raises on an unknown provider.
+
+    Args:
+        model_id: provider-prefixed model id.
+    """
+    return _resolve(model_id)
+`);
+
+    const report = await checkDocStyle("/fake", "google", "python");
+    expect(report.issues).toHaveLength(0);
+  });
 });
