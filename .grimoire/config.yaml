@@ -3,8 +3,8 @@ project:
   commit_style: conventional
   language: typescript
   package_manager: npm
-  doc_tool: sphinx
-  comment_style: sphinx
+  doc_tool: vitepress
+  comment_style: tsdoc
   agents:
     - claude
   integrations:
@@ -23,10 +23,10 @@ tools:
     command: npx vitest run
   security:
     name: npm audit
-    command: npm audit
+    command: npm audit --omit=dev
   dep_audit:
     name: npm audit
-    check_command: npm audit --audit-level=high
+    check_command: npm audit --omit=dev --audit-level=high
   dead_code:
     name: knip
     command: npx knip
