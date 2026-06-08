@@ -96,13 +96,23 @@ grimoire <command>
 
 ### Tests
 
-Tests use vitest and live next to their modules (`src/core/detect.test.ts`). Coverage threshold is 50% lines. CLI commands are excluded from coverage (they're thin wrappers).
+Grimoire has two test layers:
+
+**Unit/integration (vitest)** — the primary surface. Tests live next to their modules (`src/core/detect.test.ts`) and own all the detail: flags, JSON shapes, error strings, edge cases. CLI command wrappers are excluded from coverage (they're thin).
 
 ```bash
 npx vitest                    # Watch mode
 npx vitest run                # Single run
 npx vitest run --coverage     # With coverage report
 ```
+
+**Behavioural (cucumber-js)** — black-box E2E over the built CLI. Each `features/*.feature` is a domain-language user journey; step definitions in `features/steps/` spawn the real `grimoire` binary in a throwaway project and assert on observable outcomes (output, exit code, files written).
+
+```bash
+npm run test:bdd              # builds, then runs cucumber (skips @manual)
+```
+
+Feature files are intentionally **few and domain-level**. A `.feature` earns its place only if it passes the admission test (external actor, observable, domain language, survives reimplementation) — it must NOT assert flag names, JSON keys, or exact output strings; that detail belongs in vitest. Journeys driven by an AI agent (draft, plan, review, apply, …) are tagged `@manual`: they're living documentation, not executed, because their outcome is the agent's behaviour, not a deterministic CLI result.
 
 ### Code style
 

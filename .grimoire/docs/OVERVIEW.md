@@ -25,492 +25,120 @@
 | secrets | gitleaks | `gitleaks detect --no-git` |
 | best_practices | llm | `LLM review` |
 | duplicates | jscpd | `npx jscpd --reporters console` |
+| bdd_test | cucumber-js | `npm run test:bdd` |
 
 
 ## Capabilities
 
 What the app does, for whom. Grouped by functional story; each scenario is an executable acceptance test.
 
-### Brand
-
-**Lint for brand drift** (`features/brand/lint-brand-drift.feature`)
-> As a project owner with brand guidelines · I want grimoire to detect when implementation drifts from `.grimoire/brand/tokens.json` · So that the brand stays consistent without manual audits
-
-- Standalone lint invocation
-- Suggest replacement token for hardcoded value
-- Flag value close to but not matching a token
-- Integration with precommit-review
-- Voice/tone drift checked on user-facing copy
-- Ignore non-design files
-- No tokens configured — lint skips gracefully
-- Clean state — no drift found
-- Malformed tokens.json — invalid JSON
-- Malformed tokens.json — missing required $value fields
-
-### Bug
-
-**Gap-aware exploratory testing** (`features/bug/explore.feature`)
-> As a tester or developer · I want grimoire to surface untested paths and edge cases · So that exploratory effort targets actual coverage gaps
-
-- Skill computes feature-to-test coverage
-- Skill generates edge case suggestions
-- Suggestions in tester mode are user-action shaped
-- Suggestions in developer mode reference code
-- Skill onboards a new tester to the codebase
-- Skill offers next-step handoffs after presenting gaps
-
-**Disciplined bug fix** (`features/bug/fix.feature`)
-> As a developer fixing a reported bug · I want grimoire to enforce reproduce-first methodology · So that the fix actually addresses the underlying defect
-
-- Skill demands a reproduction before any code change
-- Skill writes a failing test that captures the reproduction
-- Skill classifies the root cause
-- Skill produces a tester verification checklist
-- Skill links to the originating bug report
-
-**Bug reporting for testers** (`features/bug/report.feature`)
-> As a tester · I want grimoire to guide me through filing a reproducible bug · So that the report is actionable for whoever picks it up
-
-- Skill conducts an interview-style intake
-- Skill accepts output from testing tools
-- Skill links to existing feature specs when possible
-- Skill writes the report under .grimoire/bugs/<bug-id>/
-- Skill refuses to submit without minimum fields
-- Report stays local unless an MCP submission flow is invoked
-
-**Timeboxed exploratory testing session** (`features/bug/session.feature`)
-> As a tester · I want grimoire to run a structured exploratory session with charter, notes, and debrief · So that the session produces something usable, not just clicks
-
-- Skill opens with a charter
-- Skill tracks progress against the charter while the session is open
-- Skill enforces the timebox
-- Skill debriefs at the end
-- Skill writes session artifacts under .grimoire/sessions/
-- Skill writes session notes and debrief under the same session directory
-
-**Bug triage and routing** (`features/bug/triage.feature`)
-> As a maintainer picking up bug reports · I want grimoire to classify root cause and route the bug correctly · So that bugs land with the right team and the right severity
-
-- Skill classifies root cause from the eight categories
-- Skill suggests a routing target per classification
-- Skill flags security-sensitive bugs separately
-- Skill records the classification on the bug report
-- Skill handles incomplete reports
-
-### Design
-
-**Derive Gherkin scenarios from designs** (`features/design/derive-gherkin-scenarios.feature`)
-> As a designer using grimoire-design · I want grimoire to propose Gherkin scenarios for each component state · So that engineers receive concrete behavioral specs alongside the visual design
-
-- Scenarios proposed for each state
-- User reviews and edits before commit
-- Adversarial scenarios proposed conditionally
-- Adversarial scenarios for TUI project
-- Scenarios include security tags where applicable
-- Handoff to grimoire-draft
-
-**Enumerate component states before design is "done"** (`features/design/enumerate-component-states.feature`)
-> As a designer using grimoire-design · I want grimoire to require empty, loading, and error states for each interactive surface · So that engineers don't ship UIs that only handle the happy path
-
-- Mandatory states enumerated
-- User skips a required state — soft gate
-- Conditional state inferred from change context
-- Per-component preview rendered
-
-**Generate design variants** (`features/design/generate-design-variants.feature`)
-> As a designer using grimoire-design · I want to see multiple distinct design approaches for the same problem · So that I evaluate alternatives instead of committing to the first idea
-
-- Default 3 variants generated
-- User overrides variant count
-- Output to Figma when design tool is configured
-- Default to HTML when no design tool
-- ASCII for trivial changes
-- Component-library inventory triggered lazily
-- User requests revision
-
-**Initiate a design session with problem statement gate** (`features/design/initiate-design-session.feature`)
-> As a designer · I want grimoire-design to refuse generic design work until I articulate a problem · So that downstream designs and Gherkin scenarios stay grounded in user value
-
-- User provides problem statement up-front
-- User skips problem statement — soft gate fires
-- User picks problem-statement framework from menu
-- User flow captured at minimum-viable level
-- User pain points explicitly elicited
-- Pain points feed adversarial persona engagement
-- Success metrics captured
-
-### Cli
-
-**Branch-guard hook** (`features/cli/branch-check.feature`)
-> As a developer using grimoire skills via Claude Code · I want grimoire to catch new-feature work being started on the wrong branch · So that features get their own branch and don't piggy-back on unrelated work
-
-- Detects new-feature intent in the user prompt
-- Blocks new-feature work when branch is dirty
-- Blocks new-feature work when branch already has an active change
-- Allows non-feature prompts to proceed silently
-- Suggests a clean kebab-case branch name
-- Allows new-feature work on a clean branch and suggests a branch
-- Suggested branch name is sanitised against shell metacharacters
-- Suggested branch name has a bounded length
-- Hook does not persist or transmit prompt content
-
-**Pre-commit check pipeline** (`features/cli/check.feature`)
-> As a developer · I want to run quality checks before committing · So that code meets project standards
-
-- Run all configured check steps
-- Skip unconfigured steps
-- Continue past failures by default
-- Stop on first failure with --fail-fast
-- Skip specific steps
-- Run only specific steps
-- LLM-based check step
-- JSON output for programmatic use
-
-**CI orchestration** (`features/cli/ci.feature`)
-> As a CI pipeline owner · I want one command that runs validation, checks, and test-quality with CI-aware output · So that grimoire integrates cleanly into GitHub Actions and similar platforms
-
-- CI runs validate, check, and test-quality in sequence
-- CI emits GitHub Actions annotations when GITHUB_ACTIONS env is set
-- CI emits GitHub Actions annotations when --annotations flag is passed
-- CI escapes special characters in GHA messages
-- CI --setup scaffolds a workflow file
-- CI --setup does not overwrite an existing workflow
-- CI --skip omits the listed steps
-
-**Diff a proposed change against baseline** (`features/cli/diff.feature`)
-> As a reviewer of a grimoire change · I want to see which scenarios are added, modified, or removed by a proposed change · So that I can review the intent independent of the implementation
-
-- Diff lists added scenarios
-- Diff lists removed scenarios
-- Diff lists modified scenarios
-- Diff reports a brand-new feature file
-- Diff errors when the change does not exist
-- Diff in JSON mode emits structured data
-
-**Generate human-readable OVERVIEW.md** (`features/cli/docs.feature`)
-> As a stakeholder browsing the repository · I want a single readable document summarising features, decisions, and area docs · So that I can understand the project without opening many files
-
-- Docs aggregate features, decisions, area docs, and changes
-- Docs include a data model section when schema.yml exists
-- Docs detect project name from package.json or pyproject
-- Docs skip sections with no source content
-- Docs render external APIs from schema.yml
-
-**Project health scoring** (`features/cli/health.feature`)
-> As a developer · I want to see how well my project uses grimoire · So that I know where documentation and coverage gaps exist
-
-- Calculate health score from grimoire coverage
-- Write shields.io badges to README
-- JSON output
-
-**Project initialization** (`features/cli/init.feature`)
-> As a developer · I want to initialize grimoire in my project · So that my AI coding assistant follows a structured workflow
-
-- Initialize a new project with auto-detection
-- Initialize detects language and package manager
-- Initialize detects linter and formatter
-- Initialize installs Claude Code skills
-- Initialize sets up enforcement hooks
-- Initialize does not overwrite existing AGENTS.md content
-- Re-running init is safe
-- Init prints a two-step onboarding flow for existing projects
-- Init prints a one-step onboarding flow for greenfield projects
-
-**List grimoire artifacts** (`features/cli/list.feature`)
-> As a developer · I want to see active changes, baseline features, and decisions at a glance · So that I can pick up work or check what already exists
-
-- List shows active changes with status
-- List shows baseline features grouped by area
-- List shows decisions with status
-- List detects conflicting active changes
-- List in JSON mode emits structured data
-
-**PR generation** (`features/cli/pr.feature`)
-> As a developer · I want to generate PR descriptions from grimoire artifacts · So that PRs are well-documented and traceable
-
-- Generate PR description from manifest
-- Create PR via GitHub CLI
-- Post-implementation review
-- Warn about incomplete tasks
-
-**Single-change status** (`features/cli/status.feature`)
-> As a developer working on a grimoire change · I want a quick summary of a single change's stage and task progress · So that I know what is left to do
-
-- Status reports stage and task counts
-- Status handles missing tasks.md
-- Status fails when the change does not exist
-- Status in JSON mode emits the documented shape
-
-**Test quality analysis** (`features/cli/test-quality.feature`)
-> As a developer who relies on tests as a safety net · I want grimoire to flag weak tests that pass without proving anything · So that low-signal tests do not give a false sense of coverage
-
-- Flags tests with empty bodies
-- Flags tests with no assertions
-- Flags tautological conditions
-- Flags swallowed exceptions in tests
-- Flags weak-assertion patterns
-- Supports JavaScript and Python test files
-- Exits non-zero when any issue is found
-- JSON mode emits structured findings
-
-**Code traceability** (`features/cli/trace.feature`)
-> As a developer · I want to trace any file back to the change that created it · So that I understand why code exists and what requirement drove it
-
-- Trace a file to its originating change
-- Trace a specific line
-- Generate release notes from archive
-- Filter release notes by date range
-
-**Project update** (`features/cli/update.feature`)
-> As a developer with grimoire already installed · I want to refresh AGENTS.md, skills, templates, and config · So that the project benefits from new grimoire releases without losing local customisations
-
-- Update refreshes skill files
-- Update refreshes the AGENTS.md managed block
-- Update migrates legacy config fields
-- Update reports when a newer version is on npm
-- Update refreshes templates non-destructively
-- Update ensures new checks are in config
-- Update fails clearly when the project was never initialized
-- Update fails clearly when config.yaml is corrupt
-
-**Spec validation** (`features/cli/validate.feature`)
-> As a developer · I want to validate my feature files and decision records · So that specs are well-formed before implementation
-
-- Validate Gherkin feature files
-- Catch missing Feature keyword
-- Catch missing scenarios
-- Validate Scenario Outline has Examples
-- Validate MADR decision records
-- Catch missing MADR frontmatter
-- Validate manifest status field
-- Detect conflicting changes
-
-### Design-consult
-
-**Run technical consult before full design** (`features/design-consult/run-technical-consult.feature`)
-> As a designer · I want to ask security and data experts about my proposed change before doing full design work · So that I avoid investing in a design that engineering will block on technical grounds
-
-- Minimal input requested
-- Security and data personas activated by default
-- Personas ask, designer answers
-- Output captured as Q&A transcript
-- Handoff to grimoire-design
-- Engineer use case
-- User can add other personas
-- Skip the consult — soft suggestion only
-
-### Draft
-
-**grimoire-draft consumes Figma designs as input** (`features/draft/consume-figma-designs.feature`)
-> As a developer or designer · I want grimoire-draft to read Figma designs via MCP and propose Gherkin scenarios · So that designs translate directly into testable behavior without manual transcription
-
-- Draft asks for Figma reference
-- MCP reads frame metadata
-- Scenarios proposed from extracted states
-- Design from grimoire-design also consumed
-- No design tool — manual elicitation fallback
-- Brand-tokens grounding
-- Component-library awareness
-- Figma access token never leaves shell environment
-
-### Intelligence
-
-**Test quality analysis** (`features/intelligence/test-quality.feature`)
-> As a developer · I want to detect weak tests before they provide false confidence · So that my test suite actually catches bugs
-
-- Detect empty test bodies
-- Detect missing assertions
-- Detect weak assertions
-- Detect tautological tests
-- Support Python test files
-- Support JavaScript/TypeScript test files
-
-### Onboarding
-
-**Capture brand guidelines at onboarding** (`features/onboarding/capture-brand-guidelines.feature`)
-> As a project owner running grimoire init · I want to optionally capture brand guidelines in a machine-readable format · So that AI agents stop producing generic-looking UI and respect our brand
-
-- User opts in to brand capture
-- User skips brand capture
-- User has existing tokens.json in repo
-- Invalid hex color rejected
-- Optional fields can be skipped
-
-**Detect project surface to wire appropriate review personas** (`features/onboarding/detect-project-surface.feature`)
-> As a project owner running grimoire init · I want grimoire to detect whether my project is TUI / web / mobile / API · So that the right review personas auto-wire without manual config
-
-- Web project detected from framework signals
-- Mobile project detected from framework signals
-- TUI project detected from framework signals
-- API-only project detected
-- Mixed-surface project detected
-- Greenfield project — user picks surface
-- Greenfield project — user skips
-- User override during onboarding
-
-**Run audit skill** (`features/onboarding/run-audit.feature`)
-> As a developer adopting grimoire on an existing project · I want a collaborative audit that finds undocumented features and decisions · So that the grimoire baseline reflects what already ships
-
-- Audit reads the existing baseline before suggesting anything
-- Audit presents findings in small batches
-- Audit lets the user confirm, skip, clarify, or group items
-- Audit drafts confirmed items as one or more grimoire changes
-- Audit detects dead features
-- Audit detects stale decisions
-- Audit detects drifted conventions
-- Audit includes conventions drift in its scope options
-- Audit batches conventions drift with other findings
-- Audit lets the user narrow scope during the intake
-
-**Run discover skill** (`features/onboarding/run-discover.feature`)
-> As a developer onboarding grimoire onto an existing project · I want one skill to produce per-area conventions files and a data schema · So that downstream skills have stable project conventions without consulting stale docs
-
-- Discover refuses to run when MCP not configured
-- Discover generates one conventions file per area
-- Discover uses MCP for all symbol and structure intelligence
-- Discover archives existing area docs on first run
-- Discover writes a data schema only when a data layer exists
-- Discover skips component inventory when no UI library is present
-
-**Set up design-tool MCP integration at onboarding** (`features/onboarding/setup-design-tool-mcp.feature`)
-> As a project owner running grimoire init · I want grimoire to configure the design-tool MCP server when I pick a tool · So that AI agents can read designs directly without manual config wiring
-
-- User picks Figma and accepts MCP setup
-- User picks Sketch (no first-class MCP)
-- User declines design tool
-- User provides Figma URL during onboarding
-- MCP setup does not store secrets in config
-
-### Review
-
-**Adversarial user persona for design review** (`features/review/adversarial-user-persona.feature`)
-> As a reviewer of a UI/UX change · I want personas that simulate users hostile to the happy path · So that designs are stress-tested before they ship
-
-- Screen-reader persona on web design
-- Keyboard-only persona
-- Low-vision / color-blind persona
-- Low-bandwidth persona
-- RTL / i18n persona (conditional)
-- Hostile actor persona
-- Materiality gate applies
-- Steel-man before flagging
-
-**Conditional review persona selection by project surface** (`features/review/conditional-persona-selection.feature`)
-> As a project owner using grimoire-review · I want personas to auto-wire based on project surface (TUI / web / mobile / api) · So that I get relevant findings without persona noise
-
-- Web project — accessibility personas wired
-- TUI project — keyboard-only personas wired
-- API project — security/data only
-- Mixed project — all personas engage
-- User overrides at invocation
-- User skips a persona
-- No surface configured — falls back to mixed
-
-**Review a teammate's pull request** (`features/review/pr-review.feature`)
-> As a reviewer · I want grimoire to review a PR against the linked grimoire change · So that review feedback is grounded in the agreed-upon spec, not just the diff
-
-- Skill fetches the PR diff via gh
-- Skill loads linked grimoire artifacts via the Change trailer
-- Skill emits findings suitable for PR comments
-- Skill falls back to diff-only review when no Change trailer is present
-- Skill skips files outside the PR
-- Skill errors when the PR cannot be fetched
-
-**Pre-commit multi-persona review** (`features/review/precommit-review.feature`)
-> As a developer about to commit · I want a fast multi-persona review of my local diff · So that blocking issues are caught before the PR is opened
-
-- Skill targets the staged diff by default
-- Skill falls back to unstaged diff when nothing is staged
-- Skill loads personas from the shared reference
-- Skill outputs structured findings
-- Skill respects scope limits
-- Skill exits cleanly when there is no diff
-
-**Cheap visual fidelity checks** (`features/review/visual-fidelity-checks.feature`)
-> As a reviewer of a UI/UX change · I want lightweight automated checks for token compliance and accessibility · So that obvious drift is caught without expensive pixel-diff infrastructure
-
-- Token-compliance lint on HTML preview
-- axe-core on HTML preview
-- Token-compliance lint on implementation code (post-apply)
-- axe-core on rendered implementation
-- No brand tokens configured — checks skip gracefully
-- User opts out of fidelity checks
-- Expensive checks deferred
+### (root)
+
+**Assess the quality of tests** (`features/assess-test-quality.feature`)
+> As a developer · I want weak or meaningless tests flagged · So that my test suite gives real confidence
+
+- A weak test is flagged
+- Strong tests pass the assessment
+
+**Generate a human-readable project overview** (`features/generate-a-project-overview.feature`)
+> As a developer · I want a single browsable summary of what the project does and why · So that newcomers can understand it without reading every spec
+
+- An overview is produced from the project's specs and decisions
+
+**Initialize a project for spec-driven development** (`features/initialize-a-project.feature`)
+> As a developer adopting grimoire · I want to set grimoire up in my project · So that I can start capturing specs and running checks
+
+- Setting up grimoire makes the project ready to use
+
+**Prepare a pull request from a change** (`features/prepare-a-pull-request.feature`)
+> As a developer finishing a change · I want a pull request description generated from my work · So that reviewers understand the intent without me writing it by hand
+
+- A pull request description is generated from the change
+
+**Review the work currently in progress** (`features/review-active-work.feature`)
+> As a developer · I want to see the changes in progress and how far along they are · So that I know what is being worked on and what remains
+
+- Active changes are listed
+- A single change reports its progress
+
+**Run quality checks before committing** (`features/run-checks-before-committing.feature`)
+> As a developer · I want to run the project's quality checks on demand · So that I catch problems before they reach a commit
+
+- Checks report what passed and what did not
+
+**See how well a project uses grimoire** (`features/see-project-health.feature`)
+> As a developer · I want an at-a-glance view of my project's spec and test coverage · So that I know where the documentation and coverage gaps are
+
+- Health reports coverage and an overall score
+
+**Trace code back to the change that introduced it** (`features/trace-code-to-its-requirement.feature`)
+> As a developer · I want to follow a file back to the change that created it · So that I understand why the code exists
+
+- A file is traced to its originating change
+
+**Validate the project's specifications** (`features/validate-specifications.feature`)
+> As a developer · I want to confirm my specs are well-formed · So that downstream planning and review can trust them
+
+- Well-formed specifications pass validation
+- A malformed specification is reported
 
 ### Workflow
 
-**Applying changes with red-green BDD** (`features/workflow/apply.feature`)
-> As a developer · I want the AI to implement changes with strict test discipline · So that every behavior is verified before and after implementation
+**Build each task test-first** (`features/workflow/build-test-first.feature`)
+> As a developer · I want each task implemented with a failing test before the code · So that every behaviour is covered by a test that genuinely exercises it
 
-- Execute tasks in order
-- Red-green cycle for each task
-- Reject tests that pass immediately
-- Test quality gate after each task
-- Stuck detection after repeated failures
-- Fresh subagent per task group
-- Git trailers on every commit
+- A task is implemented only after its test fails first
+- Repeated failure stops the work instead of looping
 
-**Branch-guard skill** (`features/workflow/branch-guard.feature`)
-> As a developer about to start a new feature · I want grimoire to verify my branch is appropriate before any drafting happens · So that new work doesn't piggy-back on unrelated in-progress changes
+**Design a UI grounded in a user problem** (`features/workflow/design-a-ui-from-a-problem.feature`)
+> As a designer or developer · I want UI design to start from a stated user problem and end in testable scenarios · So that the design is justified and ready to build against
 
-- Skill creates the new branch when user accepts the suggestion
-- Skill sanitises the new branch name before passing it to git
-- Skill hands off to /grimoire:draft after the branch switch
-- Skill declines to create a branch when the user rejects the suggestion
+- A design starts from a problem and yields scenarios
+- Every required state is accounted for
 
-**Generate contextual commit message** (`features/workflow/commit.feature`)
-> As a developer wrapping up work on a grimoire change · I want a commit message that summarises the diff and links the change · So that git history maps cleanly back to grimoire artifacts
+**Capture an intent as the right kind of spec** (`features/workflow/draft-an-intent.feature`)
+> As a developer · I want to describe what I want in plain language · So that it is captured in the form the team can review and build against
 
-- Commit message subject summarises the diff
-- Commit refuses when no change context is available
-- Commit message includes a Change trailer
-- Commit uses conventional-commit prefix when project config requests it
-- Commit reads the manifest "Why" to inform the body
+- A desired behaviour becomes a testable behaviour spec
+- A technical choice becomes a recorded decision
+- An invariant is recorded as a constraint, not a behaviour
+- A defect is redirected to the bug workflow
 
-**Drafting specs** (`features/workflow/draft.feature`)
-> As a developer · I want to describe what I'm building in natural language · So that it becomes a structured, testable spec
+**Fix a bug reproduction-first** (`features/workflow/fix-a-bug.feature`)
+> As a developer · I want a bug reproduced by a failing test before it is fixed · So that the fix is proven and the bug cannot silently return
 
-- Route a behavioral request to Gherkin
-- Route an architecture request to MADR
-- Route a bug report to the bug workflow
-- Create data schema change
-- Manifest tracks change metadata
+- A bug is reproduced before it is fixed
+- A defect is not turned into a new feature spec
 
-**Plan implementation tasks** (`features/workflow/plan.feature`)
-> As a developer with an approved feature spec and decision record · I want grimoire to break the work into ordered tasks · So that implementation follows a deliberate sequence aligned with the spec
+**Isolate new feature work on its own branch** (`features/workflow/isolate-feature-work-on-a-branch.feature`)
+> As a developer · I want new feature work to start on a dedicated branch · So that unrelated changes never get entangled
 
-- Plan reads only approved artifacts
-- Plan writes tasks to tasks.md in the change directory
-- Plan reuses utilities documented in area docs
-- Plan accounts for non-goals stated in the manifest
-- Plan flags missing prerequisites
+- Starting a feature on a shared branch is interrupted
+- Accepting the suggestion moves work onto a fresh branch
 
-**Find and prioritise tech debt** (`features/workflow/refactor.feature`)
-> As a developer responsible for codebase health · I want a prioritised register of tech-debt candidates with reasoning · So that I can pick a manageable refactor without inventing one from scratch
+**Turn an approved spec into a plan** (`features/workflow/plan-the-work.feature`)
+> As a developer · I want an approved spec broken into concrete, ordered tasks · So that implementation follows a reviewed plan instead of improvisation
 
-- Refactor scans across documented categories
-- Refactor reads existing duplicate report
-- Refactor produces a register in the documented format
-- Refactor honours debt-exceptions allowlist
-- Refactor offers to draft a change for the top entry
+- An approved spec becomes an ordered task list
+- Planning refuses when nothing is approved
 
-**Remove a feature or deprecate a decision** (`features/workflow/remove.feature`)
-> As a maintainer decommissioning functionality · I want grimoire to track the removal through the normal change pipeline · So that the deletion has a manifest, impact assessment, and archive entry
+**Review a change before coding begins** (`features/workflow/review-a-change-before-coding.feature`)
+> As a developer · I want a change examined from several expert perspectives before implementation · So that gaps and risks are caught while they are still cheap to fix
 
-- Removal creates a tracked change
-- Removal performs impact assessment
-- Removing a decision supersedes rather than deletes
-- Removal pipeline ends with archive
-- Refuses to remove a feature with active dependent changes
+- A change is reviewed from multiple perspectives
+- Blocking findings are called out distinctly
 
-**Post-implementation verification** (`features/workflow/verify.feature`)
-> As a developer · I want to verify that implementation matches the spec · So that nothing was missed or implemented incorrectly
+**Safely decommission a feature** (`features/workflow/safely-remove-a-feature.feature`)
+> As a maintainer · I want removal to show impact before anything is deleted · So that I never delete something other work still depends on
 
-- Check task completeness
-- Check scenario coverage
-- Detect weak test assertions
-- Check decision coherence
-- Detect dead features
+- Impact is shown and confirmed before deletion
+- Removal is blocked while other work depends on it
+
+**Verify an implementation against its spec** (`features/workflow/verify-the-implementation.feature`)
+> As a developer finishing a change · I want confirmation the implementation matches the spec · So that I can hand it off knowing nothing was missed
+
+- Verification confirms the spec is fully met
+- A spec with no implementation is flagged
 
 
 ## Constraints

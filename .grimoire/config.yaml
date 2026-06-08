@@ -39,6 +39,9 @@ tools:
   duplicates:
     name: jscpd
     command: npx jscpd --reporters console
+  bdd_test:
+    name: cucumber-js
+    command: npm run test:bdd
 checks:
   - lint
   - format
