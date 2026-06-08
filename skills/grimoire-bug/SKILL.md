@@ -45,6 +45,9 @@ If the user's report is vague, ask one clarifying question. Don't start fixing u
 
 **Scenario is wrong** → Rare, but possible. The spec itself describes incorrect behavior. Flag this to the user — it may need a grimoire draft to update the feature properly.
 
+### 2b. Capture Test Baseline
+Before you write the reproduction test, run the configured suites once and note which tests are **already** failing. A bug fix has no change folder, so record this inline — in the repro test's note and the eventual commit — and present pre-existing failures to the user. This is what lets step 4/7's "no regressions" mean something: a failure already red here is not yours. Capture this *before* the repro test exists, so the repro's intended red isn't mistaken for a pre-existing failure. Skippable if no test command is configured (say so). Full protocol: `../references/test-baseline.md`.
+
 ### 3. Write a Reproduction Test
 Before touching any production code:
 
@@ -126,7 +129,7 @@ Then:
 1. Make the smallest change that fixes the failing test
 2. **Hallucination check:** Before running tests, verify every external function/method the fix calls actually exists: `search_graph(name_pattern="<name>")` for each new call. If not found: locate the correct function or stop and flag to user. (Full instructions in `../references/pattern-guard.md` Step 6. Skip if graph not indexed.)
 3. Run the reproduction test — it should pass
-4. Run ALL existing tests — no regressions
+4. Run ALL existing tests — no *new* failures vs the step 2b baseline. A test already failing in the baseline is pre-existing and accepted; a test failing now that wasn't then is a regression you introduced — fix it.
 5. If the fix is more than a few lines, pause and consider whether the approach is the simplest one
 6. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix and re-run tests.
 
@@ -134,8 +137,8 @@ Then:
 
 ### 7. Verify
 - Reproduction test passes (`config.tools.bdd_test`)
-- All existing feature scenarios pass (`config.tools.bdd_test`)
-- All existing unit/integration tests pass (`config.tools.unit_test`)
+- No *new* failures vs the step 2b baseline — pre-existing failures stay pre-existing; anything newly red is the fix's fault
+- All existing unit/integration tests pass (`config.tools.unit_test`), baseline-failures aside
 - If a new scenario was added in step 2, it passes with the fix
 
 ### 8. Tester Verification Checklist
@@ -186,6 +189,7 @@ Report to the user:
 **Before writing the fix**, read both:
 - `../references/code-quality.md` — anti-slop rules to apply *while writing*: reuse before write, trust callers, names reveal intent, branching budget, function size, no premature abstraction, comments only for non-obvious why. Includes a seven-point quality gate to run before declaring the fix done.
 - `../references/pattern-guard.md` Step 6 only — after writing the fix, verify every new external function call exists in the graph via `search_graph`. Skip the full pattern brief (over-constrains bug fixes). Skip entirely if graph not indexed.
+- `../references/test-baseline.md` — capture which tests were already failing before the fix (step 2b), so "no regressions" means "no *new* failures," not "zero failures."
 
 ## Important
 - **Reproduce before you fix.** No exceptions. If you can't reproduce it, you don't understand it, and your fix is a guess.

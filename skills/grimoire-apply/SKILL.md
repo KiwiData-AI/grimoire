@@ -201,6 +201,11 @@ Where `<type>` is `feat`, `fix`, `refactor`, or `chore` based on the change. If 
 
 The branch links the git history to the change via the `Change: <change-id>` commit trailer. The branch IS the isolation and `git diff` IS the staging — there is no separate promote step.
 
+### 3b. Capture Test Baseline
+Before writing the first test, run the configured suites once to record the starting state, then **present any pre-existing failures to the user and get acceptance before proceeding**. This is the run you'd do anyway to understand where you're starting — just save the result. Write it to `.grimoire/changes/<change-id>/baseline.md` so `grimoire-verify` can tell a regression you introduced from a failure that was already red. Skippable when no test command is configured or the user opts out (record the skip — don't leave it silent). Full protocol: `../references/test-baseline.md`.
+
+The point: a failure is "pre-existing" only if it's in `baseline.md`. This replaces end-of-run "that's a pre-existing failure" surprises with a start-of-run acceptance the user signed off on.
+
 > **No promote.** Feature files, decisions, and constraints were drafted directly into their live locations (`features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`) on this branch. BDD runners already discover the scenarios from `features/`. Do not copy anything out of `.grimoire/changes/` — that folder holds only `manifest.md` and `tasks.md`.
 
 ### 4. Load Context
@@ -274,6 +279,7 @@ When all implementation tasks are complete:
 - If existing scenarios break, you've introduced a regression — fix it before proceeding
 - Check ADR confirmation criteria if applicable
 - Run the project's full test suite (`config.tools.unit_test`) if configured — grimoire tests don't replace existing tests
+- **Diff against the baseline** (`baseline.md` from step 3b): a failure already in the baseline is pre-existing and accepted; a failure NOT in the baseline is a regression you introduced — fix it before finalize. If the baseline was skipped, say so and list all failures for the user rather than claiming "existing tests pass."
 
 **The verify step is not optional. Do not proceed to finalize with failing tests.**
 
@@ -320,6 +326,7 @@ Present a brief summary:
 - `../references/pattern-guard.md` — run before each task: (1) classify code type, (1b) reuse discovery — two `search_graph` calls (semantic_query by concept + name_pattern by likely name) to find existing code to call instead of writing new code, (2) find 3–5 peers, extract modal pattern across four seams (error handling, dependency, abstraction depth, return shape), write a pattern brief. Apply the brief while writing. Run hallucination check after writing (verify called functions exist in graph). Skip if graph not indexed.
 - `../references/code-quality.md` — anti-slop rules to apply *while writing*: reuse before write, trust callers, names reveal intent, branching budget, function size, no premature abstraction, zero comments by default (only non-obvious *why*, never *what*). Includes a seven-point quality gate to run before marking each task `[x]`.
 - `../references/testing-contracts.md` — verify-before-using rules (imports, packages, APIs), mocking strategy (HTTP boundary not client), fixture management, contract tests, and step definition quality checks.
+- `../references/test-baseline.md` — capture which tests were already failing at change start, save to `baseline.md`, get user acceptance; verify diffs against it so only new failures count as regressions.
 
 ## Important
 - **Tests are not optional.** Every task produces both production code and passing step definitions. No exceptions.
