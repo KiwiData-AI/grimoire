@@ -29,7 +29,6 @@ export async function generatePr(options: PrOptions): Promise<void> {
   const config = await loadConfig(root);
   const changesDir = join(root, ".grimoire", "changes");
 
-  // Find the change
   const changeId = options.changeId ?? (await detectActiveChange(changesDir));
   if (!changeId) {
     throw new Error("No active change found. Specify a change ID.");
@@ -37,25 +36,21 @@ export async function generatePr(options: PrOptions): Promise<void> {
 
   const changeDir = resolveChangePath(root, changeId);
 
-  // Read artifacts
   const manifest = await readFileOrEmpty(join(changeDir, "manifest.md"));
   const tasks = await readFileOrEmpty(join(changeDir, "tasks.md"));
   const features = await readArtifactFiles(changeDir, "features", ".feature");
   const decisions = await readArtifactFiles(changeDir, "decisions", ".md");
 
-  // Parse manifest
   const whySection = extractSection(manifest, "Why");
   const featureChanges = extractSection(manifest, "Feature Changes");
   const scenarios = extractScenarios(features);
   const decisionTitles = extractDecisionTitles(decisions);
   const taskProgress = countTasks(tasks);
 
-  // Generate title
   const manifestTitle = extractTitle(manifest);
   const commitStyle = config.project.commit_style ?? "conventional";
   const title = formatTitle(manifestTitle, changeId, commitStyle);
 
-  // Generate body
   const body = composePrBody({
     why: whySection,
     featureChanges,
@@ -65,7 +60,6 @@ export async function generatePr(options: PrOptions): Promise<void> {
     changeId,
   });
 
-  // Optional review
   let reviewOutput: string | undefined;
   if (options.review) {
     reviewOutput = await runPostImplReview(root, config.llm.coding.command, body);
@@ -78,7 +72,6 @@ export async function generatePr(options: PrOptions): Promise<void> {
     return;
   }
 
-  // Display
   console.log(chalk.bold("\nPR Preview\n"));
   console.log(chalk.bold("Title: ") + title);
   console.log(chalk.dim("─".repeat(60)));
@@ -98,7 +91,6 @@ export async function generatePr(options: PrOptions): Promise<void> {
     console.log(reviewOutput);
   }
 
-  // Create PR if requested
   if (options.create) {
     await createPr(root, title, body);
   } else {

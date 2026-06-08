@@ -253,17 +253,11 @@ Key decisions recorded as MADR (Markdown Any Decision Records).
 | 0018 | Figma MCP is the canonical design input; HTML/ASCII fallback only | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
 | 0019 | Conditionally wire review personas by project surface; keep all available | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
 | 0020 | `grimoire-design-consult` is a separate skill, not a flag on `grimoire-review` | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
-| 0021 | Use Vitest as the test framework | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
-| 0022 | Use commander.js for CLI argument parsing | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
-| 0023 | Use simple-git for git interactions | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
-| 0024 | Use jscpd for duplicate code detection | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
-| 0025 | Colocate test files next to source | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
-| 0026 | Use native ES modules with .js import suffixes in TypeScript source | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
-| 0027 | Extract shared init/update logic into shared-setup.ts | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
 | 0028 | Intent-gated branch-guard via Claude UserPromptSubmit hook | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
 | 0029 | Delegate symbol and call-graph intelligence to codebase-memory-mcp | accepted | Sat May 16 2026 19:00:00 GMT-0500 (Central Daylight Time) |
 | 0031 | Artifact-model redesign: one home per fact, git as history, live-edit on branch | accepted | Thu Jun 04 2026 19:00:00 GMT-0500 (Central Daylight Time) |
 | 0032 | codebase-memory-mcp is the recommended structure source, with a source-reading fallback | accepted | Thu Jun 04 2026 19:00:00 GMT-0500 (Central Daylight Time) |
+| 0033 | Tooling and convention baseline | accepted | Sun Jun 07 2026 19:00:00 GMT-0500 (Central Daylight Time) |
 
 ### Use Gherkin instead of custom WHEN/THEN format
 
@@ -434,52 +428,6 @@ Should this designer-friendly pre-design consult be a flag on `grimoire-review` 
 - Outputs an `.grimoire/changes/<id>/consult.md` file w/ Q&A transcript and inferred assumptions/givens
 - Hands off: assumptions populate `manifest.md` Assumptions section when designer later runs `grimoire-design` or `grimoire-draft`
 
-### Use Vitest as the test framework
-
-The grimoire CLI is written in TypeScript with ES modules. It needs a test framework that runs the suite quickly, integrates with TypeScript without a separate compile step, and supports ESM natively. The two mainstream options are Jest (the long-standing default) and Vitest (a younger framework built on Vite).
-
-**Outcome:** Chosen option: **Vitest**, because it gives us native ESM + TypeScript with zero config, a watch mode that's noticeably faster than Jest, and a near-identical API so contributors who know Jest can read the tests immediately. The `vitest.config.ts` in the repo is intentionally minimal — Vitest infers most of what we need from `tsconfig.json` and the project layout.
-
-### Use commander.js for CLI argument parsing
-
-The grimoire CLI exposes ~17 subcommands with options, arguments, and a `--json` flag. We need a CLI parser library that handles subcommand registration, option parsing, help generation, and validation without us hand-rolling argv parsing.
-
-**Outcome:** Chosen option: **commander.js**, because its declarative `new Command(...)` API maps cleanly onto our one-file-per-command convention (see `src/commands/*.ts`), and the subcommand registration pattern in `src/cli/index.ts` is a small, scannable list. The library is mature (>15 years), depends on nothing, and contributors don't need to learn an unusual API.
-
-### Use simple-git for git interactions
-
-Several grimoire commands (`pr`, `trace`, `branch-check`, `commit`, hooks) need to read git state — current branch, uncommitted changes, commit history, trailers, log lines. We can either shell out to `git` directly via `child_process` or use a library wrapper.
-
-**Outcome:** Chosen option: **simple-git**, because it gives us a typed promise-based API on top of the system `git` binary, handles output parsing across `git` versions, and works on Windows/Mac/Linux without any native build step. It assumes `git` is on `PATH`, which is already a requirement for using grimoire at all.
-
-**Scope exception — hot-path hooks.** `src/core/branch-check.ts` runs on every Claude `UserPromptSubmit` event and shells out to `git` via `execFile` (rather than simple-git) for two calls: `git branch --show-current` and `git status --porcelain`. Both are simple, well-defined, and stable across git versions; using simple-git here would add startup cost on the hot path with no readability gain. New code in this category (hot-path hooks calling one or two stable git plumbing commands) may use `execFile` directly. All other git access in `src/core/` should use simple-git.
-
-### Use jscpd for duplicate code detection
-
-The grimoire `map` and `health` commands report duplicate code blocks across the repo. The `discover` skill uses the duplicate list to populate "Known Duplicates" sections in area docs. We need a duplicate detector that handles multiple languages, runs without configuration, and writes JSON output we can consume.
-
-**Outcome:** Chosen option: **jscpd**, because it's a Node-native dev dep (fits our `package.json`), supports all the languages grimoire targets, emits JSON we can consume with no parsing layer, and the configuration is one file (`.jscpd.json`). It runs as a child process from `src/core/map.ts` so a failure in the detector doesn't crash `grimoire map`.
-
-### Colocate test files next to source
-
-TypeScript/JavaScript projects typically choose between two test file layouts: tests in a top-level `tests/` mirror tree, or tests colocated next to the source they cover (`detect.ts` and `detect.test.ts` in the same directory). Grimoire needs a convention so new tests land in a predictable place.
-
-**Outcome:** Chosen option: **Colocate**, because it makes the relationship between source and test immediately visible in any file listing, simplifies import paths (always `./<module>.js`), and ensures that when a module is moved or deleted, its tests come along automatically. Vitest's default `**/*.test.ts` glob picks them up with no configuration.
-
-### Use native ES modules with .js import suffixes in TypeScript source
-
-Node.js supports two module systems: CommonJS (`require`/`module.exports`) and ES modules (`import`/`export`). When using TypeScript with the ESM target, imports must reference the *output* file extension (`.js`) even though the source file is `.ts`. This is surprising for contributors who haven't worked with TypeScript+ESM before.
-
-**Outcome:** Chosen option: **ESM with `.js` suffix in source**. Modern dependencies require it, Node's ESM resolver requires the exact extension at runtime, and TypeScript's `--module nodenext` produces correct output when we author imports this way. The suffix surprises newcomers but is the canonical TypeScript+ESM pattern in 2026.
-
-`package.json` has `"type": "module"`, `tsconfig.json` uses `"module": "NodeNext"`, and every internal import inside `src/` references `./<name>.js`.
-
-### Extract shared init/update logic into shared-setup.ts
-
-`src/core/init.ts` (first-time setup) and `src/core/update.ts` (refresh in an already-initialised project) share substantial logic: directory scaffolding, AGENTS.md upsert with marker-based blocks, skill installation, template installation. Earlier snapshots showed ~70+ duplicated lines between them. We needed a way to share that logic without forcing one command to import from the other.
-
-**Outcome:** Chosen option: **Extract to `shared-setup.ts`**, because it gives both `init.ts` and `update.ts` a clean, named dependency without making them aware of each other. The module exports verbs (`ensureDirectories`, `installSkillFiles`, `installTemplates`, `upsertAgentsFile`, `upsertManagedBlock`, `buildManagedBlock`, `generateAgentFiles`) that read like a setup vocabulary. Future commands (e.g. a hypothetical `grimoire repair`) can compose the same helpers.
-
 ### Intent-gated branch-guard via Claude UserPromptSubmit hook
 
 Grimoire wants to catch the common failure mode of starting new-feature work on the wrong branch (dirty branch, branch already mid-feature, branch named for something unrelated). The catch needs to happen *before* drafting begins — once a manifest is written on the wrong branch, recovery is fiddly.
@@ -539,3 +487,26 @@ ADR 0030 therefore describes a model the codebase does not implement. It needs t
 - `/grimoire:discover` generates **intent-focused area docs** in `.grimoire/docs/` — Purpose, Boundaries, Conventions (with exemplar file references) — plus the data schema and `index.yml` registry. Area docs deliberately do **not** contain Key Files or reusable-code inventories; that's structure, regenerated live by the graph.
 
 ADR 0030 is superseded. Its driver (one consistent code-discovery path, no silent doc drift) is preserved — structure is always live — but the "hard requirement + conventions files" mechanism is replaced.
+
+### Tooling and convention baseline
+
+The grimoire CLI makes a handful of tooling and convention choices that are the industry default for a TypeScript/ESM Node project: a test runner, a CLI parser, a git wrapper, a duplicate detector, a test-file layout, and the ESM import style. Each is the obvious pick with no project-specific trade-off — none is a novel decision. They were originally backfilled as one ADR per choice (former 0021–0027), which is itself over-documentation: a reader scanning the register for real architectural decisions has to wade through seven records that each say "we used the standard tool."
+
+This record consolidates them. It exists so the conventions are written down once, not to justify a trade-off. Only the **load-bearing rules** (the parts that govern where future code goes) are kept; the alternatives-considered narrative lives in git history.
+
+**Outcome:** | Choice | Pick | Why (industry default) |
+|--------|------|------------------------|
+| Test framework | **Vitest** | Native ESM + TypeScript, no compile step, Jest-compatible API. Config inferred from `tsconfig.json`. |
+| CLI parser | **commander.js** | Declarative subcommand API maps onto one-file-per-command (`src/commands/*.ts`); zero deps, mature. |
+| Git access | **simple-git** | Typed promise API over the system `git` binary; handles output parsing across versions; no native build. |
+| Duplicate detection | **jscpd** | Node dev-dep, multi-language, JSON output consumed by `health`/`discover`; runs as a child process so a detector failure can't crash the command. |
+| Test-file layout | **Colocated** | `foo.ts` + `foo.test.ts` in the same directory. One-glance discovery; moves/deletes carry tests along; Vitest's `**/*.test.ts` glob needs no config. |
+| Module system | **ESM with `.js` import suffixes** | `package.json` `"type": "module"`, `tsconfig` `"module": "NodeNext"`. Modern deps (chalk ≥5, commander ≥14) are ESM-only; Node's resolver needs the exact runtime extension, so internal imports reference `./<name>.js` from `.ts` source. |
+
+### Load-bearing conventions
+
+These govern where new code goes — follow them:
+
+- **Git access goes through simple-git** in `src/core/`, with one exception: **hot-path hooks** (`src/core/branch-check.ts` runs on every Claude `UserPromptSubmit`) may call `git` directly via `execFile` for one or two simple, stable plumbing commands (`git branch --show-current`, `git status --porcelain`) to avoid startup cost. New code in that category may use `execFile`; everything else uses simple-git.
+- **Shared init/update logic lives in `src/core/shared-setup.ts`.** `init.ts` (first-time setup) and `update.ts` (refresh) share directory scaffolding, marker-based AGENTS.md block upserts, and skill/template installation. Neither imports from the other; both import the shared module. New logic common to both goes there, not duplicated.
+- **Internal imports carry the `.js` suffix** even though the source is `.ts`. This surprises newcomers but is the canonical TypeScript+ESM pattern.

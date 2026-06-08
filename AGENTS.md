@@ -148,17 +148,16 @@ Skills also have a **Done** section that signals when the workflow is complete. 
 
 ## Workflow: Creating or Changing a Feature
 
-This is the end-to-end flow for the most common operation — adding or modifying behavior:
+The end-to-end flow for adding or modifying behavior is six stages, each owned by a skill:
 
-1. **User describes what they want**
-2. **Draft** (`/grimoire:draft`): Qualify the request. Draft `.feature` files and/or ADRs. Write manifest. Collaborate until the user approves. Update manifest status to `approved`.
-3. **Plan** (`/grimoire:plan`): Read approved artifacts. Generate `tasks.md` with red-green test pairs for each scenario. Review with user.
-4. **Review** (`/grimoire:review`): *Optional.* Multi-persona design review — product manager (completeness), senior engineer (simplicity and feasibility), security engineer (vulnerabilities), QA engineer (testability and edge cases). Fix blockers before coding.
-5. **Apply** (`/grimoire:apply`): Work through tasks. For each: write the test at its level (must fail), write code (must pass), mark done. Update manifest status to `implementing`. Features, decisions, constraints, and schema are edited **live on the feature branch** — there is no copy-into-change-folder and no promote step.
-6. **Verify** (`/grimoire:verify`): Confirm all scenarios pass, no regressions, decisions followed. Generate report.
-7. **PR** (`grimoire pr`): Generate the PR description from the branch diff, features, decisions, and task progress. Finalize flips decision status to `accepted` and removes the ephemeral change folder. There is no archive step — the PR diff *is* the change, and git history + the `Change: <id>` commit trailer are the record.
+**Draft** (`/grimoire:draft`) → **Plan** (`/grimoire:plan`) → **Review** (`/grimoire:review`, optional) → **Apply** (`/grimoire:apply`) → **Verify** (`/grimoire:verify`) → **PR** (`grimoire pr`).
 
-Each stage has a skill. The user drives the pace. In review mode (default), every file change is approved before writing. In autonomous mode, the agent works through the full task list, stopping only on blockers.
+Each skill's SKILL.md is the authoritative home for that stage's mechanics; the README "Workflow" section is the narrative walkthrough. Do not re-derive stage steps here — invoke the skill. The operational invariants that bind every stage:
+
+- **Manifest status tracks progress:** `approved` after draft, `implementing` during apply, `accepted` at PR.
+- **Live on the branch.** Features, decisions, constraints, and schema are edited directly on the feature branch — no copy-into-change-folder, no promote step.
+- **No archive step.** The PR diff *is* the change; git history plus the `Change: <id>` commit trailer are the record. PR finalize just flips decision status to `accepted` and removes the ephemeral change folder.
+- **The user drives the pace.** Review mode (default) approves every file change before writing; autonomous mode works the full task list, stopping only on blockers.
 
 ### IMPORTANT: tasks.md Is the Plan
 

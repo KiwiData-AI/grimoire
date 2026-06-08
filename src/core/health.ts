@@ -95,8 +95,7 @@ async function checkFeatures(root: string): Promise<Metric> {
     totalScenarios += scenarios?.length ?? 0;
   }
 
-  // We can't run tests here (that's what grimoire check does),
-  // so we report scenario count. Score based on having scenarios at all.
+  // Report scenario presence, not pass/fail — running tests is `grimoire check`.
   const hasScenarios = totalScenarios > 0;
   return {
     name: "features",
@@ -144,9 +143,8 @@ async function checkDecisions(root: string): Promise<Metric> {
 }
 
 async function checkAreaDocs(root: string): Promise<Metric> {
-  // Structure (which areas exist) comes from codebase-memory-mcp on demand,
-  // not a stored snapshot. Here we only report how many areas are documented
-  // in the index — intent grimoire owns, not derivable structure.
+  // Count documented areas in the index — the intent grimoire owns. Live
+  // structure (which areas exist) comes from codebase-memory-mcp, not here.
   const indexPath = join(root, ".grimoire", "docs", "index.yml");
 
   let documented = 0;

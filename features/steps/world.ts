@@ -67,6 +67,16 @@ export class GrimoireWorld extends World {
     return this.result.stdout + this.result.stderr;
   }
 
+  /** Parse the command's stdout as JSON (commands invoked with --json emit
+   *  nothing else on stdout). Throws with the raw output if it isn't JSON. */
+  json<T = unknown>(): T {
+    try {
+      return JSON.parse(this.result.stdout) as T;
+    } catch {
+      throw new Error(`expected JSON on stdout but got:\n${this.out}`);
+    }
+  }
+
   cleanup(): void {
     rmSync(this.dir, { recursive: true, force: true });
   }

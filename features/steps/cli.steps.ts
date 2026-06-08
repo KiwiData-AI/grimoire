@@ -146,15 +146,15 @@ When("I set up grimoire in it", function (this: GrimoireWorld) {
 });
 
 When("I run the quality checks", function (this: GrimoireWorld) {
-  this.run(["check"]);
+  this.run(["check", "--json"]);
 });
 
 When("I validate the specifications", function (this: GrimoireWorld) {
-  this.run(["validate"]);
+  this.run(["validate", "--json"]);
 });
 
 When("I check the project's health", function (this: GrimoireWorld) {
-  this.run(["health"]);
+  this.run(["health", "--json"]);
 });
 
 When("I generate the project overview", function (this: GrimoireWorld) {
@@ -162,23 +162,23 @@ When("I generate the project overview", function (this: GrimoireWorld) {
 });
 
 When("I trace that file", function (this: GrimoireWorld) {
-  this.run(["trace", "src/auth.js"]);
+  this.run(["trace", "src/auth.js", "--json"]);
 });
 
 When("I list the active work", function (this: GrimoireWorld) {
-  this.run(["list"]);
+  this.run(["list", "--json"]);
 });
 
 When("I check the status of {string}", function (this: GrimoireWorld, change: string) {
-  this.run(["status", change]);
+  this.run(["status", change, "--json"]);
 });
 
 When("I assess test quality", function (this: GrimoireWorld) {
-  this.run(["test-quality"]);
+  this.run(["test-quality", "--json"]);
 });
 
 When("I prepare a pull request", function (this: GrimoireWorld) {
-  this.run(["pr", "add-login"]);
+  this.run(["pr", "add-login", "--json"]);
 });
 
 // ── Then: assertions (loose — domain outcomes, not exact output) ────────
@@ -199,20 +199,44 @@ Then("it tells me what to do next", function (this: GrimoireWorld) {
 });
 
 Then("I am shown which checks passed and which did not", function (this: GrimoireWorld) {
-  assert.match(this.out, /pass|fail|skip/i);
+  const { results, summary } = this.json<{
+    results: Array<{ step: string; status: string }>;
+    summary: { passed: number; failed: number; skipped: number; errored: number };
+  }>();
+  assert.ok(Array.isArray(results) && results.length > 0, "no checks were reported");
+  for (const r of results) {
+    assert.match(r.status, /^(pass|fail|skip|error)$/, `unexpected status: ${r.status}`);
+  }
+  // Every reported check is accounted for in exactly one summary bucket.
+  const counted = summary.passed + summary.failed + summary.skipped + summary.errored;
+  assert.equal(counted, results.length, "summary counts do not match reported checks");
 });
 
 Then("I am given an overall result", function (this: GrimoireWorld) {
-  assert.match(this.out, /\d+ passed|\d+ failed|overall/i);
+  const { summary } = this.json<{
+    summary: { passed: number; failed: number; skipped: number; errored: number };
+  }>();
+  for (const k of ["passed", "failed", "skipped", "errored"] as const) {
+    assert.equal(typeof summary[k], "number", `summary.${k} is not a number`);
+  }
+  // Exit code agrees with the failure count.
+  assert.equal(this.result.code === 0, summary.failed + summary.errored === 0);
 });
 
 Then("I am told the specifications are well-formed", function (this: GrimoireWorld) {
   assert.equal(this.result.code, 0, `validate should pass:\n${this.out}`);
-  assert.match(this.out, /valid|well-formed|pass|✓|no (issues|errors)/i);
+  // validate only emits an entry for a file that has problems, so a clean
+  // project reports none. Assert nothing was flagged as malformed.
+  const results = this.json<Array<{ file: string; errors: string[] }>>();
+  const flagged = results.filter((r) => r.errors.length > 0);
+  assert.equal(flagged.length, 0, `unexpected errors: ${flagged.map((r) => r.file).join(", ")}`);
 });
 
 Then("I am told which specification is malformed", function (this: GrimoireWorld) {
-  assert.match(this.out, /broken\.feature|invalid|error|malformed|fail/i);
+  const results = this.json<Array<{ file: string; errors: string[] }>>();
+  const bad = results.find((r) => r.errors.length > 0);
+  assert.ok(bad, "no malformed specification was reported");
+  assert.match(bad.file, /broken\.feature$/, `wrong file flagged: ${bad.file}`);
 });
 
 Then("the validation does not pass", function (this: GrimoireWorld) {
@@ -220,13 +244,16 @@ Then("the validation does not pass", function (this: GrimoireWorld) {
 });
 
 Then("I see how well specs and decisions are covered", function (this: GrimoireWorld) {
-  assert.match(this.out, /feature/i);
-  assert.match(this.out, /decision/i);
+  const { metrics } = this.json<{ metrics: Array<{ name: string; score: number | null }> }>();
+  const names = metrics.map((m) => m.name.toLowerCase());
+  assert.ok(names.some((n) => n.includes("feature")), "no feature coverage metric");
+  assert.ok(names.some((n) => n.includes("decision")), "no decision coverage metric");
 });
 
 Then("I am given an overall health score", function (this: GrimoireWorld) {
-  assert.match(this.out, /overall/i);
-  assert.match(this.out, /%/);
+  const { overall } = this.json<{ overall: number }>();
+  assert.equal(typeof overall, "number", "overall score is not a number");
+  assert.ok(overall >= 0 && overall <= 100, `overall score out of range: ${overall}`);
 });
 
 Then("a browsable overview of the project is produced", function (this: GrimoireWorld) {
@@ -238,19 +265,42 @@ Then("a browsable overview of the project is produced", function (this: Grimoire
 });
 
 Then("I am shown the change that introduced it", function (this: GrimoireWorld) {
-  assert.match(this.out, /add-login/);
+  const { changes, commits } = this.json<{
+    changes: Array<{ changeId: string }>;
+    commits: Array<{ changeId?: string }>;
+  }>();
+  const ids = [...changes.map((c) => c.changeId), ...commits.map((c) => c.changeId)];
+  assert.ok(ids.includes("add-login"), `change add-login not traced; got ${ids.join(", ")}`);
 });
 
 Then("I see the change {string} among the work in progress", function (this: GrimoireWorld, change: string) {
-  assert.match(this.out, new RegExp(change));
+  const { changes } = this.json<{ changes: Array<{ id: string }> }>();
+  assert.ok(
+    changes.some((c) => c.id === change),
+    `change ${change} not listed; got ${changes.map((c) => c.id).join(", ")}`
+  );
 });
 
 Then("I am shown how much of the change is complete", function (this: GrimoireWorld) {
-  assert.match(this.out, /\d+\s*\/\s*\d+|\d+%|task/i);
+  const { artifacts } = this.json<{
+    artifacts: { tasks: { total: number; completed: number } | null };
+  }>();
+  assert.ok(artifacts.tasks, "no task progress reported");
+  // Fixture has 2 of 3 tasks checked off.
+  assert.equal(artifacts.tasks.total, 3, "wrong task total");
+  assert.equal(artifacts.tasks.completed, 2, "wrong completed count");
 });
 
 Then("I am warned that the test is weak", function (this: GrimoireWorld) {
-  assert.match(this.out, /weak|empty|no assertion|assert|issue|warn/i);
+  const { issues, summary } = this.json<{
+    issues: Array<{ file: string; severity: string }>;
+    summary: { critical: number; warning: number };
+  }>();
+  assert.ok(summary.critical + summary.warning > 0, "no weak-test issue was raised");
+  assert.ok(
+    issues.some((i) => /weak\.test\.js$/.test(i.file)),
+    "the weak test file was not among the issues"
+  );
 });
 
 Then("the assessment does not pass", function (this: GrimoireWorld) {
@@ -259,12 +309,16 @@ Then("the assessment does not pass", function (this: GrimoireWorld) {
 
 Then("I am told the tests look sound", function (this: GrimoireWorld) {
   assert.equal(this.result.code, 0, `test-quality should pass:\n${this.out}`);
+  const { summary } = this.json<{ summary: { critical: number } }>();
+  assert.equal(summary.critical, 0, "a sound suite should report no critical issues");
 });
 
 Then("a pull request description summarising the change is produced", function (this: GrimoireWorld) {
   assert.equal(this.result.code, 0, `pr failed:\n${this.out}`);
-  assert.ok(this.out.trim().length > 20, "pr produced no description");
-  assert.match(this.out, /add-login|login|summary|##/i);
+  const { title, body, changeId } = this.json<{ title: string; body: string; changeId: string }>();
+  assert.equal(changeId, "add-login", "wrong change id on the PR");
+  assert.ok(title.trim().length > 0, "PR has no title");
+  assert.match(body, /login/i, "PR body does not mention the change");
 });
 
 After(function (this: GrimoireWorld) {

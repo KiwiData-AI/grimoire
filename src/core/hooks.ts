@@ -1,6 +1,7 @@
-import { readFile, writeFile, mkdir, access, chmod } from "node:fs/promises";
+import { readFile, writeFile, mkdir, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
+import { fileExists } from "../utils/fs.js";
 
 interface HookConfig {
   hooks: {
@@ -48,7 +49,7 @@ async function setupClaudeHooks(root: string): Promise<void> {
 
   await mkdir(claudeDir, { recursive: true });
 
-  if (await exists(hooksPath)) {
+  if (await fileExists(hooksPath)) {
     // Merge with existing hooks — don't overwrite user config
     try {
       const existing = JSON.parse(await readFile(hooksPath, "utf-8")) as HookConfig;
@@ -72,12 +73,12 @@ async function setupGitHooks(root: string): Promise<void> {
   const gitHooksDir = join(root, ".git", "hooks");
 
   // Only create if .git exists (this is a git repo)
-  if (!(await exists(join(root, ".git")))) return;
+  if (!(await fileExists(join(root, ".git")))) return;
 
   const preCommitPath = join(gitHooksDir, "pre-commit");
 
   // Don't overwrite existing hooks
-  if (await exists(preCommitPath)) {
+  if (await fileExists(preCommitPath)) {
     const existing = await readFile(preCommitPath, "utf-8");
     if (existing.includes("grimoire check")) {
       console.log(`  ${chalk.yellow("exists")}  .git/hooks/pre-commit (already has grimoire)`);
@@ -131,7 +132,7 @@ const BRANCH_GUARD_MARKER = "grimoire branch-check";
 
 async function setupClaudeSettings(root: string): Promise<void> {
   const settingsPath = join(root, ".claude", "settings.json");
-  const existed = await exists(settingsPath);
+  const existed = await fileExists(settingsPath);
 
   let settings: ClaudeSettings = {};
   let wasMalformed = false;
@@ -198,13 +199,4 @@ function mergeHooks(existing: HookConfig, additions: HookConfig): HookConfig {
   }
 
   return merged;
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
 }

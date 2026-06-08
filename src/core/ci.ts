@@ -6,6 +6,7 @@ import { validateChange } from "./validate.js";
 import { runCheck } from "./check.js";
 import { analyzeTestQuality } from "./test-quality.js";
 import { fileExists } from "../utils/fs.js";
+import fg from "fast-glob";
 
 interface CiOptions {
   annotations: boolean;
@@ -48,8 +49,7 @@ async function runTestQualityPhase(isGha: boolean): Promise<{ critical: number; 
   if (!isGha) console.log(chalk.bold("\n── Test quality ──\n"));
   try {
     const root = await findProjectRoot();
-    const glob = (await import("fast-glob")).default;
-    const testFiles = await glob(
+    const testFiles = await fg(
       ["**/*.test.ts", "**/*.test.js", "**/*.spec.ts", "**/*.spec.js", "**/test_*.py", "**/*_test.py"],
       { cwd: root, absolute: true, ignore: ["**/node_modules/**"] }
     );

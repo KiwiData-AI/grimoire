@@ -3,6 +3,7 @@ import { join } from "node:path";
 import chalk from "chalk";
 import matter from "gray-matter";
 import { findProjectRoot, resolveChangePath } from "../utils/paths.js";
+import fg from "fast-glob";
 
 interface StatusOptions {
   json: boolean;
@@ -95,10 +96,9 @@ export async function getChangeStatus(
   await readManifestStatus(changePath, status);
 
   try {
-    const glob = (await import("fast-glob")).default;
     const [features, decisions] = await Promise.all([
-      glob("features/**/*.feature", { cwd: changePath }),
-      glob("decisions/**/*.md", { cwd: changePath }),
+      fg("features/**/*.feature", { cwd: changePath }),
+      fg("decisions/**/*.md", { cwd: changePath }),
     ]);
     status.artifacts.features = features;
     status.artifacts.decisions = decisions;

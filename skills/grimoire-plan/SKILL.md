@@ -63,41 +63,17 @@ These are gates, not aspirations — a task that adds a duplicate home or a rein
 
 ### 2. Read All Artifacts
 
-**Grimoire docs first, codebase second.** The `.grimoire/docs/` directory is a pre-computed map of the codebase — it tells you where code lives, what utilities exist, what patterns to follow, and what the data layer looks like. Read these *instead of* exploring the raw codebase. Only read specific source files when the docs don't have what you need.
+Read the change's artifacts following `../references/artifact-map.md` — it defines what each file is, the grimoire-docs-first / graph-for-structure discipline, and the staleness gate. Plan-specific reading on top of that:
 
-**Always read:**
-- `manifest.md` for the change summary, **including complexity level, Assumptions, Pre-Mortem, and Prior Art sections**
-- All `.feature` files for this change (edited live in `features/` on the branch)
-- All decision records for this change (edited live in `.grimoire/decisions/`), **including Cost of Ownership sections**
-- `.grimoire/docs/constraints.md` — any constraints (security/NFR/observability) this change adds or touches. These produce `unit-invariant` tasks, not scenarios.
-- The current baseline (`features/`, `.grimoire/decisions/`) via `git diff main` to see exactly what this change adds vs. what already existed
+- `.grimoire/docs/constraints.md` — any constraints (security/NFR/observability) this change touches. These produce `unit-invariant` tasks, not scenarios.
+- The current baseline (`features/`, `.grimoire/decisions/`) via `git diff main` — exactly what this change adds vs. what already existed.
+- Existing duplication in areas you're touching — `search_graph` for similar functions, or `grimoire health` (its `duplicates` metric) — so tasks consolidate rather than clone.
 
 **Validate the build-vs-buy decision:**
 - Check that `manifest.md` has a **Prior Art** section documenting what existing solutions were researched. If it's missing or empty, **stop and tell the user** — planning without a build-vs-buy analysis produces plans that ignore cheaper alternatives.
 - If the decision was to **adopt** a library/service, the plan tasks should focus on integration, configuration, and contract testing — not reimplementation.
 - If the decision was to **build custom**, verify the manifest documents (1) what existing tools were considered, (2) the specific requirements they don't meet, and (3) what design patterns are being borrowed from prior art.
 - If the decision was **hybrid** (adopt for part, build for part), ensure the boundary between adopted and custom code is clear in the tasks.
-
-**Read from grimoire docs (these replace codebase exploration):**
-- **`.grimoire/docs/<area>.md`** for each area the change touches — these contain Purpose, Boundaries, Conventions (naming/structure), and "Where New Code Goes" guidance. For key files, exact symbols, reusable utilities (function names, file paths, line numbers), and call graphs, **query the graph** — `search_graph` / `get_code_snippet` / `get_architecture`. Area docs give you intent and placement; the graph gives you the live structure to write exact file paths and reuse existing code.
-- **`.grimoire/docs/data/schema.yml`** — the full data model: every table/collection, field types, relationships, indexes, and external API contracts with `source:` pointers to ORM code. Read this instead of reading individual model files.
-- **`.grimoire/docs/context.yml`** — the project's deployment environment, related services, infrastructure dependencies, CI/CD pipelines, and observability setup. Read this to understand deployment constraints (e.g., Lambda means no long-running processes, Kubernetes means you may need health check endpoints), cross-service boundaries (e.g., auth is handled by a sibling service, not this project), and infrastructure available at runtime (e.g., Redis is available for caching, RabbitMQ for async tasks).
-- Existing duplication in areas you're touching — query codebase-memory-mcp (`search_graph` for similar functions) or run `grimoire health` (its config-driven `duplicates` metric) so tasks consolidate rather than add more clones.
-
-**Read proposed data changes:**
-- **`data.yml`** if present — proposed schema changes need migration and model tasks
-
-**Staleness gate:** For each area doc loaded, check its `last_updated` date against `git log -1 --format=%ci <directory>`. If any doc is older than the most recent commit to its directory, it's stale — the file paths, utility names, and patterns it describes may no longer be accurate.
-
-- **Level 1-2:** Warn ("Area doc for `<area>` is behind recent commits — its boundaries/conventions may be wrong; rely on the graph for structure") and proceed. Note inferred paths with `<!-- inferred: area doc may be stale -->`.
-- **Level 3-4:** Treat as a blocker. Do not generate tasks until the user refreshes stale docs via `grimoire-discover` targeted refresh. Planning with stale docs at this complexity produces wrong file paths and misses recent utilities — the cost of re-planning outweighs the cost of refreshing first.
-
-**Read specific source files only when:**
-- Area docs don't exist yet (tell the user to run `/grimoire:discover` first — planning without area docs produces worse tasks)
-- Area docs exist but you need to verify a specific implementation detail (e.g., exact function signature, exact import path)
-- You need to read existing step definitions to understand the test setup
-
-**Do NOT read the entire codebase** for "context." The plan skill's job is to produce tasks with specific file paths and specific assertions. Area docs + data schema give you this. Reading dozens of source files wastes context window and doesn't produce better plans.
 
 ### 3. Check Specification Completeness
 

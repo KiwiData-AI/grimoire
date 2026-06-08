@@ -17,7 +17,6 @@ export async function generateDocs(options: DocsOptions): Promise<void> {
 
   const sections: string[] = [];
 
-  // Title + byline as one header block (no separator between them).
   const projectName = await detectProjectName(root);
   sections.push(
     `# ${projectName}\n\n` +
@@ -25,8 +24,7 @@ export async function generateDocs(options: DocsOptions): Promise<void> {
       `> Portable CommonMark — include it in your doc tool; edit the source artifacts, not this file.`
   );
 
-  // Fixed section order — the human entry point reads top to bottom:
-  // what it is → capabilities → constraints → data → architecture → decisions.
+  // Fixed reading order: what it is → capabilities → constraints → data → architecture → decisions.
   const summary = buildProjectSummary(config);
   if (summary) sections.push(summary);
 
@@ -49,9 +47,8 @@ export async function generateDocs(options: DocsOptions): Promise<void> {
   const active = await buildActiveSection(root);
   if (active) sections.push(active);
 
-  // Blank-line-separated sections (CommonMark). No `---` thematic breaks —
-  // they render as setext headings under preceding text in some parsers and
-  // add noise when the file is included into another doc tool's tree.
+  // Blank-line separators, not `---` breaks: `---` renders as a setext heading
+  // under preceding text in some parsers.
   const output = sections.join("\n\n").trimEnd() + "\n";
 
   const outputPath = options.output
@@ -603,10 +600,7 @@ async function safeRead(path: string): Promise<string | null> {
   }
 }
 
-// findFiles imported from utils/fs.js
-
 async function detectProjectName(root: string): Promise<string> {
-  // Try package.json
   try {
     const pkg = JSON.parse(
       await readFile(join(root, "package.json"), "utf-8")
@@ -616,7 +610,6 @@ async function detectProjectName(root: string): Promise<string> {
     // ignore
   }
 
-  // Try pyproject.toml
   try {
     const pyproject = await readFile(
       join(root, "pyproject.toml"),
@@ -628,6 +621,5 @@ async function detectProjectName(root: string): Promise<string> {
     // ignore
   }
 
-  // Fall back to directory name
   return root.split("/").pop() ?? "Project";
 }
