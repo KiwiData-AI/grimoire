@@ -34,7 +34,6 @@ export async function updateProject(
 ): Promise<void> {
   const root = join(process.cwd(), projectPath);
 
-  // Verify this is a grimoire project
   if (!(await fileExists(join(root, ".grimoire")))) {
     throw new Error("No .grimoire/ directory found. Run grimoire init first.");
   }
@@ -43,45 +42,37 @@ export async function updateProject(
 
   await printUpgradeBanner();
 
-  // 1. Migrate config if needed
   if (!options.skipConfig) {
     await migrateConfig(root);
   }
 
-  // 2. Ensure all directories exist
   await ensureDirectories(root);
 
-  // 3. Update templates (create missing, optionally force-overwrite)
   if (!options.skipTemplates) {
     await installTemplates(root, PACKAGE_ROOT, options.forceTemplates);
   }
 
-  // 4. Update AGENTS.md
   if (!options.skipAgents) {
     await updateAgentsFile(root);
   }
 
-  // 5. Determine agents from config (fallback to auto-detect for legacy projects)
+  // legacy projects predate the agents config — fall back to auto-detect
   const config = await loadConfig(root);
   const { instructionAgents, skillAgents } = await resolveTargetAgents(config, root);
 
-  // 6. Update agent-specific instruction files (cursor, copilot)
   if (!options.skipAgents && instructionAgents.length > 0) {
     await generateAgentFiles(root, PACKAGE_ROOT, instructionAgents, "updated");
   }
 
-  // 7. Update skills (install to every selected agent's skill dir)
   if (!options.skipSkills) {
     const targets = skillAgents.length > 0 ? skillAgents : ["claude"];
     await updateSkills(root, targets);
   }
 
-  // 8. Update hooks
   if (!options.skipHooks) {
     await setupHooks(root);
   }
 
-  // 9. Write version stamp
   await writeVersionStamp(root);
 
   console.log(`\n${chalk.bold.green("Done!")} Grimoire updated.`);

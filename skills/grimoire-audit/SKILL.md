@@ -59,7 +59,10 @@ Scan for implicit architecture decisions:
 - **Deployment** — Docker, K8s, serverless? CI/CD pipeline?
 - **Data model** — multi-tenant? event-sourced? CQRS?
 
-For each pattern found, check if a corresponding ADR exists. If not, note it as undocumented.
+For each pattern found, check if a corresponding ADR exists. If not, apply the **novelty gate** before proposing one:
+
+- **Only propose an ADR for a novel decision** — one with a real, project-specific trade-off between viable alternatives. An industry-default pick on this stack (the standard test runner, CLI parser, git wrapper, linter; the ecosystem-forced module convention) is **not** novel. Test: *would a competent engineer on this stack pick differently, and need the reasoning to understand the choice?* If no, do not backfill an ADR for it.
+- **Do NOT mint one ADR per default tooling pick.** That is the most common audit-backfill failure — it floods the register with "we used the standard tool" records. Collect the obvious tooling/convention defaults into a single `Tooling and convention baseline` ADR (one row each: choice → why), and reserve sequential ADRs for genuine trade-offs (e.g. "Huey instead of Celery", "regex over tree-sitter").
 
 ### 3.5. Conventions Drift Detection
 Read each file in `.grimoire/docs/conventions/`. For each file:

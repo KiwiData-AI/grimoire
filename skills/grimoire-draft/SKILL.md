@@ -124,6 +124,7 @@ Never silently fill in an open question. Either ask, defer to a non-goal, or rec
 Present a Requirements Summary (template in the reference) and wait for user confirmation before proceeding.
 
 ### 5. Check Existing State
+See `../references/artifact-map.md` for what each artifact is and the reading discipline.
 - Read `features/` to understand the current behavioral baseline
 - Read `.grimoire/decisions/` to understand existing architecture decisions
 - Read `.grimoire/docs/context.yml` (if it exists) to understand the deployment environment, related services, and infrastructure — this tells you what's available (caches, queues, sibling services) and what constraints apply (deployment target, environments)
@@ -212,6 +213,9 @@ Anything that failed the feature admission test because it's an invariant rather
 - If the constraint stems from a decision, link the MADR; don't restate the decision (DRY).
 
 **For architecture decisions:**
+
+- **Novelty gate — record only novel decisions.** A MADR is for a decision with a real, project-specific trade-off between viable alternatives. It is NOT for industry-default tooling picks (the standard test runner, CLI parser, git wrapper, linter) or for conventions the ecosystem forces (ESM `.js` import suffix, where the framework expects files). If the honest "Considered Options" would be "the obvious default vs. things nobody would pick here", do not write an ADR. Before writing one, ask: *would a competent engineer on this stack make a different choice, and would they need our reasoning to understand ours?* If no, skip it.
+- **Obvious tooling/conventions go in the baseline record, not their own ADR.** When you do need to write down a default pick (e.g. a new dev dependency), add a row to the existing `Tooling and convention baseline` ADR (one line: choice → why) rather than minting a new sequential record. Reserve sequential ADRs for genuine trade-offs.
 - Write the MADR record directly into the live `.grimoire/decisions/` with the next sequential number (`NNNN-title.md`)
 - Use the template from `.grimoire/decisions/template.md` or the AGENTS.md format
 - Include considered options, decision drivers, and consequences

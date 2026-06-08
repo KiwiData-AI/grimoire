@@ -71,6 +71,7 @@ If present:
 If no `Change:` trailer exists, that's itself a finding for a grimoire-managed repo: flag as **suggestion** ("commits missing audit trailer — `grimoire trace` won't find this PR") unless the project clearly doesn't use grimoire.
 
 ### 4. Gather Project Context
+See `../references/artifact-map.md` for what each artifact is and the grimoire-docs-first / staleness discipline.
 - `.grimoire/config.yaml` — language, tools, `commit_style`, `comment_style`, `project.compliance`, `dep_audit`
 - `.grimoire/docs/context.yml` — deployment environment, related services
 - `.grimoire/docs/data/schema.yml` — current data baseline

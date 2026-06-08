@@ -42,7 +42,7 @@ This step is optional. The user can skip it by saying "skip review" or "go strai
 - If only one, confirm it
 
 ### 2. Gather Context
-Read all artifacts for the change:
+Read all artifacts for the change — see `../references/artifact-map.md` for what each is and the grimoire-docs-first / staleness discipline:
 - `manifest.md` — change summary, scope, **and Prior Art section** (build-vs-buy rationale)
 - All `.feature` files — behavioral specifications
 - All decision records — architectural choices

@@ -10,11 +10,8 @@ import { analyzeTestQuality, TEST_FILE_GLOBS, TEST_FILE_IGNORE } from "./test-qu
 import { checkDocStyle } from "./doc-style.js";
 import { loadAcceptedRiskIds, partitionAdvisories } from "./risk-register.js";
 
-// Steps whose tool emits CVE/GHSA advisory ids in its output and can therefore
-// be suppressed by the risk-acceptance register (.grimoire/security/accepted-risks.yml).
-// Only meaningful for advisory-id-emitting scanners (npm audit, pip-audit, osv,
-// trivy, ...); suppression is a no-op for tools whose failures aren't keyed by a
-// CVE/GHSA id, since no ids will match the register.
+// Steps whose scanner prints CVE/GHSA ids, so the risk-acceptance register can
+// suppress them. No-op for tools that don't key failures by advisory id.
 const REGISTER_AWARE_STEPS = new Set(["dep_audit", "security"]);
 
 const execFileAsync = promisify(execFile);
@@ -140,12 +137,8 @@ async function runStep(
   return result;
 }
 
-/**
- * For a failed vuln-scan step, suppress advisories that are risk-accepted in
- * .grimoire/security/accepted-risks.yml. If every advisory in the output is an
- * unexpired accepted entry, the step passes (with a note). If some remain
- * unaccepted, it still fails — but annotates which were suppressed vs outstanding.
- */
+// Pass a failed vuln scan only if every advisory it printed is unexpired-accepted;
+// otherwise still fail, annotating which were suppressed vs. outstanding.
 async function applyRiskRegister(result: StepResult, root: string): Promise<StepResult> {
   const acceptedIds = await loadAcceptedRiskIds(root, new Date());
   if (acceptedIds.size === 0) return result;

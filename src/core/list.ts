@@ -4,6 +4,7 @@ import chalk from "chalk";
 import matter from "gray-matter";
 import { findProjectRoot } from "../utils/paths.js";
 import { fileExists } from "../utils/fs.js";
+import fg from "fast-glob";
 
 interface ChangeInfo {
   id: string;
@@ -20,8 +21,7 @@ interface ChangeInfo {
 async function buildChangeInfo(changePath: string, changeName: string): Promise<ChangeInfo> {
   const hasManifest = await fileExists(join(changePath, "manifest.md"));
   const hasTasks = await fileExists(join(changePath, "tasks.md"));
-  const glob = (await import("fast-glob")).default;
-  const featureFiles = await glob("features/**/*.feature", { cwd: changePath });
+  const featureFiles = await fg("features/**/*.feature", { cwd: changePath });
   const hasFeatures = featureFiles.length > 0;
   const hasDecisions = await dirHasFiles(join(changePath, "decisions"), ".md");
 
@@ -128,8 +128,7 @@ function detectConflicts(changes: ChangeInfo[]): Conflict[] {
 
 export async function listFeatures(json: boolean): Promise<void> {
   const root = await findProjectRoot();
-  const glob = (await import("fast-glob")).default;
-  const features = await glob("features/**/*.feature", {
+  const features = await fg("features/**/*.feature", {
     cwd: root,
     absolute: false,
   });
@@ -150,8 +149,7 @@ export async function listFeatures(json: boolean): Promise<void> {
 
 export async function listDecisions(json: boolean): Promise<void> {
   const root = await findProjectRoot();
-  const glob = (await import("fast-glob")).default;
-  const decisions = await glob(".grimoire/decisions/[0-9]*.md", {
+  const decisions = await fg(".grimoire/decisions/[0-9]*.md", {
     cwd: root,
     absolute: false,
   });
@@ -172,8 +170,6 @@ export async function listDecisions(json: boolean): Promise<void> {
     }
   }
 }
-
-// fileExists imported from utils/fs.js
 
 async function dirHasFiles(dir: string, ext: string): Promise<boolean> {
   try {
