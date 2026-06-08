@@ -36,7 +36,7 @@ npm install -g @kiwidata/grimoire
 Requires Node.js 20+ and git.
 
 ```bash
-git clone https://github.com/kiwi-data/grimoire.git
+git clone https://github.com/Neo-License/grimoire.git
 cd grimoire
 npm install
 npm run build
@@ -540,6 +540,8 @@ grimoire check
 
 Auto-detected during `grimoire init`. Any tool can use `name: llm` with a `prompt:` for AI-powered review. Also sets up enforcement hooks for Claude Code (`.claude/hooks.json`) and git (`.git/hooks/pre-commit`).
 
+> ⚠️ **Security: `.grimoire/config.yaml` is trusted code.** `grimoire check` and `grimoire health` execute the shell commands defined in your config's tool steps (`command:` / `check_command:`), and the installed pre-commit hook runs `grimoire check` automatically on every commit. This is the same trust model as `npm` scripts, `Makefile`s, or git hooks — the config can run any command on your machine. **Do not run `grimoire check`/`health`, commit, or let an AI agent commit in a freshly cloned untrusted repository** until you have reviewed its `.grimoire/config.yaml`. Grimoire never sends your code anywhere: the only network calls are an npm version check (your package name only; opt out with `GRIMOIRE_NO_UPDATE_CHECK=1`) and piping diffs to the LLM CLI *you* configured.
+
 ### Test Quality
 
 ```bash
@@ -697,11 +699,13 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | `grimoire init --skip-agents` | Skip generating AGENTS.md instructions |
 | `grimoire init --skip-skills` | Skip installing skills for selected agents |
 | `grimoire init --no-detect` | Skip auto-detection of project tools |
+| `grimoire init --full` | Also run all deferred configure sections (compliance, design, LLM models, bug trackers, testing tools) |
 | `grimoire init --install-codebase-memory-mcp` | Mark codebase-memory-mcp as a recommended integration |
 | `grimoire init --install-caveman-plugin` | Mark caveman skill plugin as a recommended integration |
 | `grimoire update [path]` | Update AGENTS.md, skills, and hooks to latest version |
 | `grimoire update --skip-agents\|--skip-skills\|--skip-hooks\|--skip-templates\|--skip-config` | Skip parts of the update |
 | `grimoire update --force-templates` | Overwrite existing template files |
+| `grimoire configure [section]` | Configure options deferred from init: compliance, design tool, LLM models, bug trackers, testing tools (omit section for interactive menu) |
 | `grimoire list` | List active changes (with conflict detection) |
 | `grimoire list --features` | List feature files |
 | `grimoire list --decisions` | List decision records |
@@ -829,7 +833,7 @@ testing_tools:
 
 ## Contributing
 
-Issues and pull requests welcome at [github.com/kiwi-data/grimoire](https://github.com/kiwi-data/grimoire). Grimoire dogfoods itself — `.grimoire/` in this repo is built using grimoire skills, so contributions are expected to go through the same `draft → plan → apply → verify → pr` workflow described above.
+Issues and pull requests welcome at [github.com/Neo-License/grimoire](https://github.com/Neo-License/grimoire). Grimoire dogfoods itself — `.grimoire/` in this repo is built using grimoire skills, so contributions are expected to go through the same `draft → plan → apply → verify → pr` workflow described above.
 
 **Before opening a PR:**
 
@@ -845,7 +849,7 @@ Issues and pull requests welcome at [github.com/kiwi-data/grimoire](https://gith
 ### Development Setup
 
 ```bash
-git clone https://github.com/kiwi-data/grimoire.git
+git clone https://github.com/Neo-License/grimoire.git
 cd grimoire
 npm install
 npm run build        # Compile TypeScript

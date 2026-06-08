@@ -1,48 +1,27 @@
 # Templates
-> Last updated: 2026-05-17
+> Last updated: 2026-06-07
 
 ## Purpose
-Static files copied into the target project during `grimoire init` (and refreshed by `grimoire update` where non-destructive). These are the starting-point artifacts users customize per project.
+Static files copied into a target project during `grimoire init` (and refreshed non-destructively by `grimoire update`). These are starting-point artifacts users customize per project.
 
 ## Boundaries
 - Templates are plain text/JSON/YAML with no executable logic.
-- Copied by `installTemplates()` in `src/core/shared-setup.ts` — never read at runtime by grimoire itself except `mapignore`/`mapkeys`/`dupignore` which `src/core/map.ts` falls back to as defaults.
-- Init checks `fileExists()` before copying each template — existing files are never overwritten.
+- Files in the `TEMPLATE_FILES` map are copied by `installTemplates()` in `src/core/shared-setup.ts`; init/update check `fileExists()` first so existing files are never overwritten unless `--force` is passed.
+- Some templates are not in the copy map — they are referenced by skills at runtime instead (e.g. `example.feature`, `manifest.md`, `design-tool-setup-stub.md`, `brand-tokens-example.json`, `brand-voice-example.md`).
 
-## Key Files
-| File | Responsibility / Destination |
-|------|------------------------------|
-| `templates/example.feature` | Sample Gherkin feature with 2FA login scenarios — reference only |
-| `templates/manifest.md` | Template for change manifests — YAML frontmatter + required sections (Why, Feature Changes). Skills create per-change manifests from this. |
-| `templates/decision.md` | Template for MADR decision records → `.grimoire/decisions/template.md` |
-| `templates/mapignore` | Patterns skipped by `grimoire map` → `.grimoire/mapignore` |
-| `templates/mapkeys` | Key file definitions (`filename = type`) → `.grimoire/mapkeys` |
-| `templates/dupignore` | Patterns excluded from jscpd duplicate scan → `.grimoire/dupignore` |
-| `templates/debt-exceptions.yml` | Allowlist of accepted tech-debt items → `.grimoire/debt-exceptions.yml` |
-| `templates/context.yml` | Project deployment + infra context scaffold → `.grimoire/docs/context.yml` |
-| `templates/brand-tokens-example.json` | DTCG-format brand token example for the design skill |
-| `templates/brand-voice-example.md` | Brand voice/tone reference for the design skill |
-| `templates/design-tool-setup-stub.md` | Stub doc written when no design tool MCP is configured |
+## Conventions
 
-## Patterns
+### Naming
+- Named after the artifact they seed: `decision.md`, `constraints.md`, `context.yml`, `accepted-risks.yml`. Exemplar: `templates/constraints.md`.
 
-### Template destinations
-| Template | Copied to |
-|----------|-----------|
-| `decision.md` | `.grimoire/decisions/template.md` |
-| `mapignore`, `mapkeys`, `dupignore` | `.grimoire/` (root) |
-| `debt-exceptions.yml` | `.grimoire/debt-exceptions.yml` |
-| `context.yml` | `.grimoire/docs/context.yml` |
-| `brand-tokens-example.json`, `brand-voice-example.md` | `.grimoire/brand/` (when user opts in during init) |
-| `example.feature`, `manifest.md`, `design-tool-setup-stub.md` | Not directly copied — referenced by skills |
-
-### Non-destructive copying
-Init checks `fileExists()` before copying each template. Existing files are never overwritten — the user gets an "exists" message instead.
-
-### Publishing
-All files in `templates/` are published to npm via the `files` array in `package.json`.
+### Structure
+- Copy destinations live in the `TEMPLATE_FILES` array in `src/core/shared-setup.ts` as `[source, destination]` pairs (e.g. `decision.md → .grimoire/decisions/template.md`, `accepted-risks.yml → .grimoire/security/accepted-risks.yml`, `constraints.md → .grimoire/docs/constraints.md`). Add a new copied template by appending a pair there.
+- All files under `templates/` are published to npm via the `files` array in `package.json`, so new template files ship automatically.
 
 ## Where New Code Goes
-- New template files → `templates/<name>`
-- Copy logic → add to `installTemplates()` in `src/core/shared-setup.ts`
-- Remember the `files` array in `package.json` already includes `templates/` — new files ship automatically
+- New template file → `templates/<name>`.
+- To have it copied during init/update → add a `[source, destination]` pair to `TEMPLATE_FILES` in `src/core/shared-setup.ts`. Otherwise reference it directly from the consuming skill.
+
+## Structure (live)
+For the current template files and their copy destinations, read live:
+- `templates/*` · `TEMPLATE_FILES` in `src/core/shared-setup.ts`

@@ -22,7 +22,7 @@ These principles govern all grimoire work — drafting, planning, reviewing, and
 
 **Errors at the boundary.** Validate user input and external data at the edges. Internal code can trust its callers — don't defensive-program against situations that can't happen.
 
-**Verify before using.** Before importing a module, calling a function, or adding a dependency — confirm it exists. Check `.grimoire/docs/<area>.md` for reusable code with exact paths. Check `.grimoire/docs/data/schema.yml` for real model fields and API endpoints. If you haven't read the file you're importing from, read it (or its area doc) first. Never guess at package names, function signatures, or API paths.
+**Verify before using.** Before importing a module, calling a function, or adding a dependency — confirm it exists. Query the codebase graph (codebase-memory-mcp: `search_graph`, `get_code_snippet`) for reusable code, exact symbols, and file paths — structure is read live, never from a frozen doc. Read `.grimoire/docs/<area>.md` for an area's purpose, boundaries, and conventions, and the data schema for real model fields and API endpoints. If you haven't read the file you're importing from, read it first. Never guess at package names, function signatures, or API paths.
 
 ## Anti-Loop Protocol
 
@@ -131,7 +131,7 @@ User has a request
 │
 ├─ "Setting up grimoire on an existing project"
 │  1. `grimoire init` → creates .grimoire/ directory and config
-│  2. `/grimoire:discover` → generates conventions files, data schema, project context (requires codebase-memory-mcp)
+│  2. `/grimoire:discover` → generates intent-focused area docs + data schema (queries codebase-memory-mcp for live structure when available)
 │  3. `/grimoire:audit` → discovers undocumented features and decisions
 │  4. Start working: `/grimoire:draft` for new changes, `/grimoire:bug` for fixes
 │
@@ -154,9 +154,9 @@ This is the end-to-end flow for the most common operation — adding or modifyin
 2. **Draft** (`/grimoire:draft`): Qualify the request. Draft `.feature` files and/or ADRs. Write manifest. Collaborate until the user approves. Update manifest status to `approved`.
 3. **Plan** (`/grimoire:plan`): Read approved artifacts. Generate `tasks.md` with red-green test pairs for each scenario. Review with user.
 4. **Review** (`/grimoire:review`): *Optional.* Multi-persona design review — product manager (completeness), senior engineer (simplicity and feasibility), security engineer (vulnerabilities), QA engineer (testability and edge cases). Fix blockers before coding.
-5. **Apply** (`/grimoire:apply`): Work through tasks. For each: write test (must fail), write code (must pass), mark done. Update manifest status to `implementing`.
+5. **Apply** (`/grimoire:apply`): Work through tasks. For each: write the test at its level (must fail), write code (must pass), mark done. Update manifest status to `implementing`. Features, decisions, constraints, and schema are edited **live on the feature branch** — there is no copy-into-change-folder and no promote step.
 6. **Verify** (`/grimoire:verify`): Confirm all scenarios pass, no regressions, decisions followed. Generate report.
-7. **Archive** (`grimoire archive <id>`): Sync features/decisions to baseline. Archive manifest. Update manifest status to `complete`.
+7. **PR** (`grimoire pr`): Generate the PR description from the branch diff, features, decisions, and task progress. Finalize flips decision status to `accepted` and removes the ephemeral change folder. There is no archive step — the PR diff *is* the change, and git history + the `Change: <id>` commit trailer are the record.
 
 Each stage has a skill. The user drives the pace. In review mode (default), every file change is approved before writing. In autonomous mode, the agent works through the full task list, stopping only on blockers.
 
@@ -179,24 +179,22 @@ If a task seems wrong or impossible during apply:
 
 ## Directory Structure
 
+Features, decisions, constraints, and schema are edited **live on the feature branch** — `git diff` is the staging area. A change folder holds only the ephemeral coordination artifacts (manifest + tasks) and is removed at finalize; the PR diff and git history are the record. There is no proposed-copy tree and no archive tree.
+
 ```
 project-root/
-├── features/                 # Gherkin baseline — behavioral truth
+├── features/                 # Gherkin specs — behavioral truth (edited live)
 │   └── <capability>/
 │       └── <name>.feature
 ├── .grimoire/
-│   ├── decisions/            # MADR baseline — architectural truth
+│   ├── decisions/            # MADR records — architectural truth (edited live)
 │   │   ├── 0001-short-title.md
 │   │   └── template.md
-│   ├── changes/              # proposed changes (in progress)
-│   │   └── <change-id>/
-│   │       ├── manifest.md
-│   │       ├── tasks.md
-│   │       ├── features/     # proposed .feature file state
-│   │       └── decisions/    # new/updated ADRs
-│   └── archive/              # completed changes (manifests only)
-│       └── YYYY-MM-DD-<change-id>/
-│           └── manifest.md
+│   ├── docs/                 # intent-focused area docs, data schema, constraints.md register, OVERVIEW.md
+│   └── changes/              # ephemeral per-change coordination — removed at finalize
+│       └── <change-id>/
+│           ├── manifest.md
+│           └── tasks.md
 ```
 
 ## Conventions
@@ -206,9 +204,8 @@ Every manifest has a `status` field in YAML frontmatter:
 - `draft` — being written, not yet reviewed
 - `approved` — reviewed by user, ready for planning/implementation
 - `implementing` — tasks are being worked on
-- `complete` — all tasks done, ready to archive
 
-Update the status as the change progresses. The CLI reads this to report change state.
+Update the status as the change progresses. The CLI reads this to report change state. There is no `complete`/archive state — finalize removes the ephemeral change folder once the PR is opened; git history is the record.
 
 ### Change IDs
 - Kebab-case, verb-led: `add-two-factor-auth`, `update-login-flow`, `remove-legacy-api`
@@ -237,7 +234,7 @@ Change: add-2fa-login
 Scenarios: "Login with valid TOTP code", "Login with expired TOTP code"
 ```
 
-This is what makes `grimoire trace` and `grimoire log` work. Without it, the commit is invisible to the audit trail. `Scenarios:` and `Decisions:` trailers are included when relevant.
+This is what makes `grimoire trace` work. Without it, the commit is invisible to the audit trail. `Scenarios:` and `Decisions:` trailers are included when relevant.
 
 ### Feature Organization
 - One capability per directory: `features/auth/`, `features/documents/`

@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by 0032-mcp-recommended-with-source-fallback
 date: 2026-05-22
 decision-makers: [Fred]
 supersedes: 0029-delegate-symbol-intelligence-to-codebase-memory-mcp

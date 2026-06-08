@@ -27,7 +27,8 @@
     "templates/",
     "skills/",
     "AGENTS.md",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [
     "gherkin",
@@ -42,6 +43,14 @@
   ],
   "author": "Kiwi Data",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Neo-License/grimoire.git"
+  },
+  "homepage": "https://github.com/Neo-License/grimoire#readme",
+  "bugs": {
+    "url": "https://github.com/Neo-License/grimoire/issues"
+  },
   "engines": {
     "node": ">=20.0.0"
   },

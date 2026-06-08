@@ -1,4 +1,11 @@
+# Local Claude Code config (machine-specific permissions/paths)
 .claude/settings.local.json
+
+# Local dogfood skill install — regenerated from canonical skills/ via `grimoire update`
+.claude/skills/
+
+# Generated tool reports
+.grimoire/docs/jscpd-report.json
 
 # Dependencies
 node_modules/
