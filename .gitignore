@@ -13,6 +13,11 @@ node_modules/
 # Build output
 dist/
 
+# Docs site (VitePress build + cache) and generated CLI reference
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+docs/reference/cli.md
+
 # Test coverage
 coverage/
 

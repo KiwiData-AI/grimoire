@@ -1,6 +1,6 @@
 {
   "name": "@kiwidata/grimoire",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Gherkin + MADR spec-driven development for AI coding assistants",
   "type": "module",
   "bin": {
@@ -18,6 +18,10 @@
     "test": "vitest",
     "test:bdd": "npm run build && NODE_OPTIONS=\"--import tsx\" cucumber-js",
     "lint": "eslint src/",
+    "docs:gen": "tsx scripts/gen-cli-docs.ts",
+    "docs:dev": "npm run docs:gen && vitepress dev docs",
+    "docs:build": "npm run docs:gen && vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "clean": "rm -rf dist/",
     "prepublishOnly": "npm run clean && npm run build"
   },
@@ -75,6 +79,7 @@
     "jscpd": "^4.0.9",
     "tsx": "^4.22.4",
     "typescript": "^5.7.0",
+    "vitepress": "^1.6.4",
     "vitest": "^3.0.0"
   }
 }
