@@ -45,11 +45,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Neo-License/grimoire.git"
+    "url": "git+https://github.com/KiwiData-AI/grimoire.git"
   },
-  "homepage": "https://github.com/Neo-License/grimoire#readme",
+  "homepage": "https://github.com/KiwiData-AI/grimoire#readme",
   "bugs": {
-    "url": "https://github.com/Neo-License/grimoire/issues"
+    "url": "https://github.com/KiwiData-AI/grimoire/issues"
   },
   "engines": {
     "node": ">=20.0.0"

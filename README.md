@@ -36,7 +36,7 @@ npm install -g @kiwidata/grimoire
 Requires Node.js 20+ and git.
 
 ```bash
-git clone https://github.com/Neo-License/grimoire.git
+git clone https://github.com/KiwiData-AI/grimoire.git
 cd grimoire
 npm install
 npm run build
@@ -833,7 +833,7 @@ testing_tools:
 
 ## Contributing
 
-Issues and pull requests welcome at [github.com/Neo-License/grimoire](https://github.com/Neo-License/grimoire). Grimoire dogfoods itself — `.grimoire/` in this repo is built using grimoire skills, so contributions are expected to go through the same `draft → plan → apply → verify → pr` workflow described above.
+Issues and pull requests welcome at [github.com/KiwiData-AI/grimoire](https://github.com/KiwiData-AI/grimoire). Grimoire dogfoods itself — `.grimoire/` in this repo is built using grimoire skills, so contributions are expected to go through the same `draft → plan → apply → verify → pr` workflow described above.
 
 **Before opening a PR:**
 
@@ -849,7 +849,7 @@ Issues and pull requests welcome at [github.com/Neo-License/grimoire](https://gi
 ### Development Setup
 
 ```bash
-git clone https://github.com/Neo-License/grimoire.git
+git clone https://github.com/KiwiData-AI/grimoire.git
 cd grimoire
 npm install
 npm run build        # Compile TypeScript
