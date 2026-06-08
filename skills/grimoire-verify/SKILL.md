@@ -41,6 +41,7 @@ Two modes:
 ### 2. Load Artifacts
 For change verification:
 - Read `manifest.md`, proposed `.feature` files, decision records, `tasks.md`
+- Read `baseline.md` if present (the test state captured at change start) — it's how you tell a regression from a failure that was already red
 
 For baseline verification:
 - Read all `features/**/*.feature` and `.grimoire/decisions/*.md`
@@ -75,6 +76,17 @@ Flag issues:
 - Decision says "use PostgreSQL" but code uses SQLite → CRITICAL
 - Decision's Confirmation criteria not verifiable → WARNING
 - Decision consequences not addressed → WARNING
+
+### 3.C2 Regression vs Baseline
+
+Run the configured suites (`config.tools.unit_test`, `config.tools.bdd_test`) and classify each failure against `baseline.md`:
+
+- Failing now **and** in the baseline → **pre-existing**, already accepted by the user at change start. Not a regression. Do not blame the change.
+- Failing now, **not** in the baseline → **regression** introduced by this change → CRITICAL. Must be fixed before the change finalizes.
+- Passing now, failing in the baseline → incidentally fixed; note it, don't require it.
+- **No `baseline.md` / baseline skipped** → you cannot classify. List all failures and say plainly they're untriaged. Do NOT assert "existing tests pass" or call anything "pre-existing" without a baseline to back it.
+
+The rule: a failure is "pre-existing" only if it's in `baseline.md`. Otherwise it's the change's. Full protocol: `../references/test-baseline.md`.
 
 ### 3.D Test Quality Intelligence
 
