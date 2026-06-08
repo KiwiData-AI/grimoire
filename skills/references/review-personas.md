@@ -227,12 +227,18 @@ Every security finding gets OWASP 2021 + CWE tags. See CWE quick-reference in `.
 
 Skip if change is purely internal.
 
+**Coverage-gap routing (apply before recommending any new artifact).** A coverage gap does NOT default to "write a `.feature`." Route each gap to its one home using the feature-file admission test in `../grimoire-draft/SKILL.md` (§ jurisdiction table + the four admission gates):
+- A `.feature` scenario is warranted **only** for an actor-observable behavior that passes all four gates (external actor, observable outcome, domain language, survives reimplementation).
+- An invariant — observability/logging guarantee, perf budget, security control, compliance rule — is a **constraint**. Recommend it be recorded/verified in `.grimoire/docs/constraints.md`, never as a new `.feature`.
+- When a behavior gap belongs in features, the default is **extend an existing feature file** in the same domain — recommend a new file only if no existing file fits, and say which were considered. Don't propose a `.feature` per finding.
+- Test gaps for already-specified behavior are a *missing test*, not a missing feature — recommend the test, not a new spec.
+
 Evaluate:
-- **Test presence**: Every new user-facing behavior has a test? Every scenario from linked feature file has step definitions?
+- **Test presence**: Every new user-facing behavior has a test? Every scenario from a linked feature file has step definitions? Missing test = recommend the test; only recommend a new/extended `.feature` if the behavior itself is unspecified *and* passes the admission test.
 - **Test quality**: Tests asserting outputs, or just that code "ran"? Over-mocked tests = red flag.
 - **Negative paths**: For each happy path, is there a failure-path test?
-- **Edge cases**: Empty states, concurrent users, interruptions, boundary values?
-- **Observability**: New feature — how will it be debugged in prod? Structured logs / metrics / error surfaces?
+- **Edge cases**: Empty states, concurrent users, interruptions, boundary values? A missing edge case is a missing test/scenario in the relevant existing feature — not grounds for a new feature file.
+- **Observability**: New feature — how will it be debugged in prod? Structured logs / metrics / error surfaces? Observability is a **constraint**: verify it's asserted in `constraints.md`; do not recommend a `.feature` for it.
 - **Regression risk** *(PR/pre-commit)*: Which existing tests cover the touched code? Were any tests removed or weakened?
 - **Accessibility**: New UI — keyboard nav, aria labels, contrast?
 
