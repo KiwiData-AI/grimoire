@@ -303,6 +303,7 @@ function buildMinimalConfig(): GrimoireConfig {
     version: 1,
     project: {
       commit_style: "conventional",
+      comment_lint: "block",
     },
     features_dir: "features",
     decisions_dir: ".grimoire/decisions",

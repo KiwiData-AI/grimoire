@@ -2,8 +2,9 @@ import { join, resolve } from "node:path";
 import { fileExists } from "./fs.js";
 
 
-export async function findProjectRoot(): Promise<string> {
-  let dir = process.cwd();
+export async function findProjectRoot(startDir?: string): Promise<string> {
+  const start = startDir ?? process.cwd();
+  let dir = start;
   const root = resolve("/");
 
   while (dir !== root) {
@@ -16,8 +17,8 @@ export async function findProjectRoot(): Promise<string> {
     dir = resolve(dir, "..");
   }
 
-  // Fall back to cwd
-  return process.cwd();
+  // Fall back to the starting directory
+  return start;
 }
 
 export function resolveChangePath(root: string, changeId: string): string {
