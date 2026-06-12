@@ -71,7 +71,7 @@ export async function checkDocStyle(
 // (ADR/MADR ids, .feature files, tag codes, change-ids, issue/PR refs, test files).
 // These orphan when the artifact moves. Generic words (test, feature, scenario)
 // used descriptively are fine — we match identifiers, not vocabulary.
-const VOLATILE_RE =
+export const VOLATILE_RE =
   /\b(?:ADR|MADR)[-\s]?\d+|\b\d{4}-[a-z][a-z0-9-]{2,}\b|\b[A-Z]{2,}-[A-Z]{2,}-\d+\b|[\w./-]+\.feature\b|\bissues?\s*#?\d+\b|\bPR\s*#\d+\b|[\w-]+\.(?:test|spec)\.[jt]sx?\b/;
 
 function commentTextOf(line: string): string | null {

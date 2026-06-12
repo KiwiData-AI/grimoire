@@ -129,50 +129,69 @@ interface ClaudeHookEntry {
 
 const BRANCH_GUARD_COMMAND = "grimoire branch-check --hook";
 const BRANCH_GUARD_MARKER = "grimoire branch-check";
+const COMMENT_LINT_COMMAND = "grimoire lint-comments --hook";
+const COMMENT_LINT_MARKER = "grimoire lint-comments";
+
+/** True if any entry already wires a command containing `marker`. */
+function hasHook(entries: ClaudeHookEntry[], marker: string): boolean {
+  return entries.some((entry) => entry.hooks?.some((h) => h.command?.includes(marker)));
+}
+
+interface LoadedSettings {
+  settings: ClaudeSettings;
+  existed: boolean;
+  wasMalformed: boolean;
+}
+
+async function readClaudeSettings(settingsPath: string): Promise<LoadedSettings> {
+  if (!(await fileExists(settingsPath))) {
+    return { settings: {}, existed: false, wasMalformed: false };
+  }
+  const raw = await readFile(settingsPath, "utf-8");
+  try {
+    return { settings: JSON.parse(raw) as ClaudeSettings, existed: true, wasMalformed: false };
+  } catch {
+    await writeFile(settingsPath + ".bak", raw);
+    return { settings: {}, existed: true, wasMalformed: true };
+  }
+}
+
+function logSettings(existed: boolean, wasMalformed: boolean): void {
+  const verb = !existed ? "created" : wasMalformed ? "replaced" : "updated";
+  const color = verb === "created" ? "green" : verb === "replaced" ? "yellow" : "blue";
+  console.log(`  ${chalk[color](verb)} .claude/settings.json (branch-check + comment-lint hooks)`);
+}
 
 async function setupClaudeSettings(root: string): Promise<void> {
   const settingsPath = join(root, ".claude", "settings.json");
-  const existed = await fileExists(settingsPath);
-
-  let settings: ClaudeSettings = {};
-  let wasMalformed = false;
-  if (existed) {
-    const raw = await readFile(settingsPath, "utf-8");
-    try {
-      settings = JSON.parse(raw) as ClaudeSettings;
-    } catch {
-      await writeFile(settingsPath + ".bak", raw);
-      wasMalformed = true;
-      settings = {};
-    }
-  }
+  const { settings, existed, wasMalformed } = await readClaudeSettings(settingsPath);
 
   const hooks = settings.hooks ?? {};
   const userPromptSubmit = hooks.UserPromptSubmit ?? [];
+  const preToolUse = hooks.PreToolUse ?? [];
 
-  const alreadyWired = userPromptSubmit.some((entry) =>
-    entry.hooks?.some((h) => h.command?.includes(BRANCH_GUARD_MARKER))
-  );
+  let changed = false;
+  if (!hasHook(userPromptSubmit, BRANCH_GUARD_MARKER)) {
+    userPromptSubmit.push({ hooks: [{ type: "command", command: BRANCH_GUARD_COMMAND }] });
+    changed = true;
+  }
+  if (!hasHook(preToolUse, COMMENT_LINT_MARKER)) {
+    preToolUse.push({ matcher: "Write|Edit", hooks: [{ type: "command", command: COMMENT_LINT_COMMAND }] });
+    changed = true;
+  }
 
-  if (alreadyWired) {
-    console.log(`  ${chalk.yellow("exists")}  .claude/settings.json (UserPromptSubmit branch-check)`);
+  if (!changed) {
+    console.log(`  ${chalk.yellow("exists")}  .claude/settings.json (branch-check + comment-lint hooks)`);
     return;
   }
 
-  userPromptSubmit.push({
-    hooks: [{ type: "command", command: BRANCH_GUARD_COMMAND }],
-  });
   hooks.UserPromptSubmit = userPromptSubmit;
+  hooks.PreToolUse = preToolUse;
   settings.hooks = hooks;
 
   await mkdir(join(root, ".claude"), { recursive: true });
   await writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-
-  let verb: string;
-  if (!existed) verb = "created";
-  else if (wasMalformed) verb = "replaced";
-  else verb = "updated";
-  console.log(`  ${chalk[verb === "created" ? "green" : verb === "replaced" ? "yellow" : "blue"](verb)} .claude/settings.json (UserPromptSubmit branch-check)`);
+  logSettings(existed, wasMalformed);
 }
 
 function trailerCheckScript(): string {

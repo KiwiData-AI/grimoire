@@ -106,7 +106,32 @@ describe("setupHooks", () => {
     expect(written.hooks.UserPromptSubmit[0].hooks[0].command).toContain("grimoire branch-check");
   });
 
-  it("does not duplicate UserPromptSubmit branch-check if already wired", async () => {
+  it("does not rewrite settings when both hooks are already wired", async () => {
+    const existing = {
+      hooks: {
+        UserPromptSubmit: [
+          { hooks: [{ type: "command", command: "grimoire branch-check --hook" }] },
+        ],
+        PreToolUse: [
+          { matcher: "Write|Edit", hooks: [{ type: "command", command: "grimoire lint-comments --hook" }] },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/settings.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("/.claude/settings.json")) return JSON.stringify(existing) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const settingsWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("/.claude/settings.json")
+    );
+    expect(settingsWrite).toBeUndefined();
+  });
+
+  it("adds the comment-lint PreToolUse hook when only branch-check is wired", async () => {
     const existing = {
       hooks: {
         UserPromptSubmit: [
@@ -125,7 +150,11 @@ describe("setupHooks", () => {
     const settingsWrite = mockWriteFile.mock.calls.find((c) =>
       String(c[0]).endsWith("/.claude/settings.json")
     );
-    expect(settingsWrite).toBeUndefined();
+    expect(settingsWrite).toBeDefined();
+    const written = JSON.parse(String(settingsWrite![1]));
+    expect(written.hooks.UserPromptSubmit).toHaveLength(1);
+    expect(written.hooks.PreToolUse[0].matcher).toBe("Write|Edit");
+    expect(written.hooks.PreToolUse[0].hooks[0].command).toContain("grimoire lint-comments");
   });
 
   it("preserves existing UserPromptSubmit hooks and appends branch-check", async () => {

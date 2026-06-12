@@ -12,6 +12,8 @@ export interface ToolConfig {
 
 export type CavemanLevel = "none" | "lite" | "full" | "ultra";
 
+export type CommentLintMode = "block" | "warn" | "off";
+
 export const CURRENT_CONFIG_VERSION = 2;
 
 interface DesignToolConfig {
@@ -37,6 +39,7 @@ interface ProjectConfig {
   commit_style: string;
   doc_tool?: string;
   comment_style?: string;
+  comment_lint?: CommentLintMode;
   caveman?: CavemanLevel;
   compliance?: string[];
   design_tool?: DesignToolConfig;
@@ -175,6 +178,10 @@ function parsePrecommitReview(projectRaw: Record<string, unknown>): PrecommitRev
   };
 }
 
+function parseCommentLint(val: unknown): CommentLintMode | undefined {
+  return val === "block" || val === "warn" || val === "off" ? val : undefined;
+}
+
 function parseSurface(projectRaw: Record<string, unknown>): ProjectSurface | undefined {
   const surfaceRaw = str(projectRaw.surface);
   return PROJECT_SURFACES.includes(surfaceRaw as ProjectSurface) ? (surfaceRaw as ProjectSurface) : undefined;
@@ -192,6 +199,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     commit_style: String(projectRaw.commit_style ?? raw.commit_style ?? DEFAULT_CONFIG.project.commit_style),
     doc_tool: str(projectRaw.doc_tool ?? raw.doc_tool),
     comment_style: str(projectRaw.comment_style ?? raw.comment_style),
+    comment_lint: parseCommentLint(projectRaw.comment_lint),
     caveman: str(projectRaw.caveman) as ProjectConfig["caveman"],
     compliance: parseStringArray(projectRaw.compliance),
     design_tool: parseDesignTool(projectRaw),

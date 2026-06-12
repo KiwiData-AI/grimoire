@@ -44,6 +44,7 @@ export async function updateProject(
 
   if (!options.skipConfig) {
     await migrateConfig(root);
+    await ensureCommentLint(root);
   }
 
   await ensureDirectories(root);
@@ -135,6 +136,28 @@ async function migrateConfig(root: string): Promise<void> {
   console.log(
     `  ${chalk.blue("migrated")} config.yaml (v${currentVersion} → v${CURRENT_CONFIG_VERSION})`
   );
+}
+
+// The comment-lint hook is wired by setupHooks on every update, but it is inert
+// unless project.comment_lint is set. Default existing projects to block so the
+// hook actually runs; never override an explicit choice (including off).
+async function ensureCommentLint(root: string): Promise<void> {
+  const configPath = join(root, ".grimoire", "config.yaml");
+  if (!(await fileExists(configPath))) return;
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = (yamlParse(await readFile(configPath, "utf-8")) as Record<string, unknown>) ?? {};
+  } catch {
+    return;
+  }
+
+  const project = (raw.project && typeof raw.project === "object" ? raw.project : (raw.project = {})) as Record<string, unknown>;
+  if (project.comment_lint !== undefined) return;
+
+  project.comment_lint = "block";
+  await writeFile(configPath, yamlStringify(raw));
+  console.log(`  ${chalk.blue("enabled")} comment linting (project.comment_lint: block)`);
 }
 
 interface Migration {

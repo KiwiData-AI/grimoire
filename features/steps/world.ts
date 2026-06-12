@@ -18,9 +18,10 @@ export class GrimoireWorld extends World {
   dir = mkdtempSync(join(tmpdir(), "grimoire-bdd-"));
   result: RunResult = { stdout: "", stderr: "", code: 0 };
 
-  /** Run the built grimoire CLI in the temp project. stdin is closed so any
-   *  prompt receives EOF and falls back to a default. */
-  run(args: string[]): RunResult {
+  /** Run the built grimoire CLI in the temp project. When `input` is given it is
+   *  fed on stdin (for hook commands); otherwise stdin is closed so any prompt
+   *  receives EOF and falls back to a default. */
+  run(args: string[], input?: string): RunResult {
     // Strip NODE_OPTIONS so the tsx loader (used to run these step defs) does
     // not leak into the child CLI, which runs in a temp dir without tsx and
     // only needs the compiled dist JS.
@@ -28,7 +29,8 @@ export class GrimoireWorld extends World {
     const r: SpawnSyncReturns<string> = spawnSync("node", [CLI, ...args], {
       cwd: this.dir,
       encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
+      input,
+      stdio: [input != null ? "pipe" : "ignore", "pipe", "pipe"],
       env,
     });
     this.result = {

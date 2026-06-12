@@ -340,7 +340,30 @@ describe("updateProject", () => {
     expect(written).toContain("best_practices");
   });
 
-  it("skips config migration when already current version", async () => {
+  it("does not rewrite config when already current and comment_lint is set", async () => {
+    mockFileExists.mockImplementation(async (path: string) => {
+      if (path.endsWith(".grimoire")) return true;
+      if (path.endsWith("config.yaml")) return true;
+      return false;
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("config.yaml")) {
+        return "version: 2\nproject:\n  commit_style: conventional\n  comment_lint: block\n" as any;
+      }
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      return "# content" as any;
+    });
+
+    await updateProject(".", { ...ALL_SKIPPED, skipConfig: false });
+
+    const configWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("config.yaml")
+    );
+    expect(configWrite).toBeUndefined();
+  });
+
+  it("enables comment_lint on update when it is absent", async () => {
     mockFileExists.mockImplementation(async (path: string) => {
       if (path.endsWith(".grimoire")) return true;
       if (path.endsWith("config.yaml")) return true;
@@ -360,7 +383,8 @@ describe("updateProject", () => {
     const configWrite = mockWriteFile.mock.calls.find((c) =>
       String(c[0]).includes("config.yaml")
     );
-    expect(configWrite).toBeUndefined();
+    expect(configWrite).toBeDefined();
+    expect(String(configWrite![1])).toContain("comment_lint: block");
   });
 
   it("skips config migration when skipConfig is true", async () => {
