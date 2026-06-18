@@ -8,7 +8,8 @@ Loaded by skills that read a change's specs before acting (`grimoire-plan`, `gri
 
 Per-change (under `.grimoire/changes/<change-id>/`):
 
-- **`manifest.md`** — change summary, complexity level, and the Why. Level 3-4 also carry Assumptions, Pre-Mortem, and **Prior Art** (the build-vs-buy rationale).
+- **`draft.md`** — the living design doc the change was designed on (diagram/sketch, decision ledger, pseudo-code, Decided/Open ledger). The single source the other artifacts were **projected** from at the end of `grimoire-draft`. Ephemeral: retained read-only as the agreed-design reference through the pipeline, deleted when `grimoire-apply` clears the change folder. Read it for the *intent and rationale* behind the projected artifacts; the features/constraints/decisions remain the authoritative homes.
+- **`manifest.md`** — change summary, complexity level, and the Why. Level 3-4 also carry Assumptions, Pre-Mortem, and **Prior Art** (the build-vs-buy rationale). Generated from `draft.md` at projection.
 - **`features/*.feature`** — behavioral specifications. Edited live in `features/` on the branch.
 - **decision records** — architectural choices for this change, edited live in `.grimoire/decisions/`, including Cost of Ownership sections.
 - **`tasks.md`** — the implementation plan (present once planned).

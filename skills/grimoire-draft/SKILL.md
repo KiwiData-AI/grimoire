@@ -1,15 +1,22 @@
 ---
 name: grimoire-draft
-description: Draft or update Gherkin features and MADR architecture decisions collaboratively with the user. Use when the user describes new functionality, requirements, or architecture choices.
+description: Design a change collaboratively on one living draft.md, then project it into Gherkin features, constraints, and MADR decisions. Use when the user describes new functionality, requirements, or architecture choices.
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
-  version: "0.1"
+  version: "0.2"
 ---
 
 # grimoire-draft
 
-Draft or update Gherkin features and MADR architecture decisions collaboratively with the user.
+Design a change on **one living document** (`draft.md`), iterating with the user, then
+**project** the agreed design into its durable homes (features, constraints, decisions).
+
+The core idea: spread-out artifacts hinder the thinking. So you do all the designing in a
+single coherent doc — diagram/sketch, a decision ledger, pseudo-code, an open-question
+ledger — and only fragment it into separate homes **after agreement**. `draft.md` is
+ephemeral: retained as reference through the pipeline, deleted when `grimoire-apply` clears
+the change folder. Git history preserves it.
 
 ## Triggers
 - User describes new functionality, behavior changes, or feature requests
@@ -17,244 +24,184 @@ Draft or update Gherkin features and MADR architecture decisions collaboratively
 - User describes a technology choice, architecture decision, or trade-off
 - Loose match: contains "feature", "requirement", "spec", "decision", "grimoire" with "create", "draft", "plan", "start", "new"
 
-## Routing
+## Routing (coarse — up front)
+
+Decide only whether to design at all, and in which skill. The **fine** routing (which fact
+becomes a feature vs. a constraint vs. a decision) happens later, at projection (step 7).
+
 - Bug report ("something is broken") → `grimoire-bug` or `grimoire-bug-report`
 - Pure refactoring (no behavior change) → no grimoire artifact needed. Suggest an ADR only if architecturally significant.
 - Config, deps, formatting → not grimoire territory. Just do it.
-- If unclear, apply the jurisdiction table + admission test in step 1. Do NOT default to drafting a feature — default to finding the fact's correct home, and ask one clarifying question if the test is inconclusive.
+- Otherwise → design it here. If genuinely unclear whether this is a grimoire change, ask one clarifying question rather than guessing.
 
 ## Workflow
 
-### 1. Qualify the Request — Jurisdiction
+### 1. Qualify the Request — Jurisdiction (coarse)
 
-Before doing anything, route the change to the **one** artifact type that owns it. Each fact has exactly one home (see `../references/principles.md` — one right way, DRY). **The default is NOT "draft a feature."** The default is: figure out which home this fact belongs in.
+Confirm this is a change worth designing, and which skill owns it (table above). You do
+**not** need to assign each fact to a home yet — during design everything lives in one
+`draft.md`; per-fact routing is a projection concern (step 7, D13).
 
-| What the change is | Home | Not |
-|--------------------|------|-----|
-| **Actor-observable behavior** — an external actor does something and observes a result | `.feature` (Gherkin) | — |
-| **Constraint** — security control, NFR, performance budget, observability/logging guarantee, compliance rule | `.grimoire/docs/constraints.md` (assertion + rationale + how-verified) | NOT a `.feature` |
-| **Architecture decision** — a trade-off or structural choice | MADR in `.grimoire/decisions/` | NOT a `.feature` |
-| **Data model / external API contract** | data schema | NOT a `.feature` |
-| **Both behavior + decision** | features AND a MADR | — |
-| **Bug fix** | STOP → `grimoire-bug`. "The spec already describes correct behavior; just fix the code." | — |
-| **Refactoring** (no behavior change) | STOP. No artifact. Suggest an ADR only if architecturally significant. | — |
-| **Config / deps / formatting** | STOP. Not grimoire territory. | — |
+The one up-front question that matters: **is this a behavior/feature/architecture change**
+(→ design it here), or a bug / pure refactor / config tweak (→ route away, per the table)?
+If unclear, ask one question. Do not default to "draft a feature".
 
-#### The feature-file admission test
+### 2. Triviality Gate
 
-A scenario may be written **only if it passes all four gates.** If it fails any, it is not a feature — route it to the home above.
+Complexity is an **output** of design, not an input — you cannot score it honestly before
+the design exists. Up front, make only one binary call:
 
-1. **External actor** — a user, operator, or external system does the thing. "As a developer, I want structured logs" / "the system retries" → fails. The actor is internal → it's a constraint or a decision, not a feature.
-2. **Observable** — the actor can see the outcome without reading code or logs. "logs are scrubbed of PII", "request completes in <200ms" → fails (not observable by an actor) → constraint.
-3. **Domain language** — the scenario uses domain nouns, zero implementation detail. If a step names a library, log level, function, table, or framework (`loguru`, `INFO`, `bcrypt`, `users` table) → fails → it's leaking implementation; rewrite declaratively or move to a constraint/MADR.
-4. **Survives reimplementation** — if the internals were rewritten from scratch, would the scenario still read the same? If it would change, it's pinned to implementation → not a feature.
+- **Trivial** — config, typo, copy change, single-file fix, dependency bump. Skip the
+  `draft.md` loop: make the change directly, record a minimal `manifest.md` (Why + file
+  list), done.
+- **Non-trivial** — anything else. Build a `draft.md` and design the change (steps 3–8).
 
-Common slop this catches (all belong in `constraints.md`, not `.feature`): "PII is scrubbed from logs", "all endpoints require auth", "responses are gzipped", "errors are logged with a trace id". These are invariants, not behaviors.
+The full **complexity level (1–4)** is scored at **projection** (step 7), once the design
+is settled, and written to `manifest.md` — not before (a premature number biases the design
+to fit it). During design, use the table below only as a rough guide for how deep to
+research and elicit; depth grows with the change, it is not pre-allocated.
 
-If unclear after applying the test, ask the user one clarifying question to route correctly. **Do not guess the routing and proceed.** A wrong routing wastes both your context and the user's time — one question costs less.
+| Level | Label | Signals | Drives (recorded at projection) |
+|-------|-------|---------|---------------------------------|
+| 1 | Trivial | Config, typo, copy, single-file fix | handled by the gate above — no `draft.md` |
+| 2 | Simple | Single capability, ≤3 files, no architecture/data changes | Plan: coarser tasks · Review: Senior Engineer only |
+| 3 | Moderate | Multiple capabilities, architecture decisions, data/dep changes | Plan: fine-grained · Review: all relevant personas · manifest carries Assumptions + Pre-Mortem |
+| 4 | Complex | Cross-cutting, multiple services, security-sensitive, new infra | Plan: fine-grained · Review: all personas mandatory (`grimoire-review` not optional) · Assumptions + Pre-Mortem |
 
-### 2. Score Complexity
-
-Assess the change's complexity to determine how much ceremony is appropriate. Score based on these signals:
-
-| Level | Label | Signals | Ceremony |
-|-------|-------|---------|----------|
-| 1 | **Trivial** | Config, typo, copy change, single-file fix | Skip research (step 3). Minimal manifest (Why + Feature/Decision list only). No Pre-Mortem. |
-| 2 | **Simple** | Single capability, ≤3 files, no architecture decisions, no data changes | Light research (step 3 — check built-ins and first-party only). Standard manifest. |
-| 3 | **Moderate** | Multiple capabilities, architecture decisions, data model changes, new dependencies | Full research (step 3). Full manifest with Assumptions and Pre-Mortem. |
-| 4 | **Complex** | Cross-cutting concerns, multiple services/systems, security-sensitive, new infrastructure | Full research (step 3). Full manifest. Mandatory `grimoire-review` after plan (not optional). |
-
-Record the level in `manifest.md` frontmatter as `complexity: <1-4>`. Downstream skills use this:
-- **Plan** adjusts task granularity (level 1-2: coarser tasks; level 3-4: fine-grained with context blocks)
-- **Review** adjusts persona depth (level 1: skip review; level 2: Senior Engineer only; level 3: all relevant personas; level 4: all personas mandatory)
-
-If unsure between two levels, pick the higher one. The user can override: "this is simpler than you think" or "treat this as complex."
+If unsure between two levels at projection, pick the higher. The user can override ("treat this as complex").
 
 ### 3. Research Existing Solutions
+
 Before designing, research what already exists. Do not ask the user to research — do it yourself.
 
-- **Level 1**: Skip this step.
-- **Level 2**: Light research — check built-ins and first-party ecosystem only.
-- **Level 3-4**: Full research across all categories.
+- Trivial changes never reach this step (handled by the gate).
+- Otherwise research **proportional to scope**: a single first-party capability needs only a
+  built-ins / first-party check; architecture decisions, new dependencies, or cross-cutting
+  concerns need full research across all categories.
 
-Follow the methodology in `../references/build-vs-buy.md`. Present findings to the user and wait for agreement before proceeding.
+Follow the methodology in `../references/build-vs-buy.md`. The findings feed the `draft.md`
+**Why** (and, for an adopt/build/hybrid call, the manifest **Prior Art** at projection).
+Present findings to the user and get agreement on direction before designing deeply.
 
-### 4.0 Design Input Check
+### 4. Design Input Check
 
-Before interviewing, check whether design artifacts already exist for this change. If so, the interview is grounded in real components and states rather than imagined ones.
+Check whether design artifacts already exist for this change, so the design is grounded in
+real components and states rather than imagined ones. Consumed output anchors the `draft.md`
+**At a glance** section.
 
-- **Existing design output**: If `.grimoire/changes/<change-id>/designs/` is already populated (a prior `grimoire-design` run produced `problem.md`, `variants.md`, `variant-{n}.html`, or `figma-snapshot.json`), read those artifacts now. Treat them as authoritative for component shape, states, and visual tokens — do not re-query Figma.
-- **Figma MCP available, no design folder**: If `project.design_tool.mcp` is configured and `designs/` is absent, ask: "Figma file URL or node ID? (or skip)". On a URL or node reference, query the Figma MCP for frame data and cache the response at `.grimoire/changes/<change-id>/designs/figma-snapshot.json` per `../references/design-input-formats.md` §1 Cache. On "skip" or empty input, continue to standard elicitation.
-- **No MCP and no design folder**: skip this step silently. Fall back to the standard interview elicitation in step 4 below.
+- **Existing design output**: If `.grimoire/changes/<change-id>/designs/` is already populated (a prior `grimoire-design` run produced `problem.md`, `variants.md`, `variant-{n}.html`, or `figma-snapshot.json`), read those now. Treat them as authoritative for component shape, states, and visual tokens — do not re-query Figma. The visual + component/state material becomes the **At a glance** anchor and seeds the behavioral **Sketches**.
+- **Figma MCP available, no design folder**: If `project.design_tool.mcp` is configured and `designs/` is absent, ask: "Figma file URL or node ID? (or skip)". On a URL or node reference, query the Figma MCP for frame data and cache the response at `.grimoire/changes/<change-id>/designs/figma-snapshot.json` per `../references/design-input-formats.md` §1 Cache. On "skip" or empty input, continue.
+- **No MCP and no design folder**: skip this step silently.
 
-When design input is consumed (either path), carry the extracted component list, states, and any token references into the elicitation in step 4 — these become concrete anchors for the questions you ask the user, replacing generic prompts.
+### 5. Scaffold & Map Existing State
 
-### 4. Elicit Requirements
+- Choose a `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`).
+- Ensure you're on a feature branch for this change (`grimoire-branch-guard` usually created it). The branch is where `draft.md` and, later, the projected artifacts are edited live.
+- Create `.grimoire/changes/<change-id>/draft.md` from `templates/draft.md`, setting `kind: greenfield | refactor`.
 
-**Interview, don't assume.** The most common drafting failure is filling in gaps with plausible-sounding guesses. Every unstated detail is either (a) something the user has an opinion on and you must ask, or (b) something project conventions answer unambiguously. Never a third option where you invent.
+Then map what already exists so the design isn't blind:
 
-Now that you know whether you're building, adopting, or going hybrid, surface the requirements the user hasn't specified.
+- Read `features/` for the current behavioral baseline, `.grimoire/decisions/` for existing decisions, `.grimoire/docs/context.yml` for the deployment environment and sibling services. Check `.grimoire/changes/` for in-progress changes that overlap — flag conflicts. See `../references/artifact-map.md` for reading discipline.
+- **For `kind: refactor` — build the Current state section (required).** Map how the touched system works **today**, with `file:line` breadcrumbs, into `draft.md` → *Current state*, followed by a severity-ranked Gaps/drift list. **Mandate the codebase graph**: if the repo isn't indexed, run `index_repository` first, then use `search_graph` / `trace_path` / `get_code_snippet` for qualified names, callers, and call chains. This map is the load-bearing grounding for a refactor — you cannot redesign what you haven't located.
+- If `.grimoire/changes/<change-id>/consult.md` exists (from `grimoire-design-consult`), parse `## Inferred assumptions` and `## Inferred givens` and carry them into the `draft.md` design: assumptions → *Decided/Open* (each becomes an Open row, or a Decided row if the consult resolved it); givens → context for the *Decisions* ledger. The H2 headers `## Inferred assumptions` and `## Inferred givens` are load-bearing — they are the exact section names `grimoire-design-consult` writes; do not paraphrase, retitle, or fuzzy-match. **Open questions from `consult.md` are NOT copied** — they remain in `consult.md` as designer follow-up items.
 
-- **Level 1**: Skip this step.
-- **Level 2+**: Follow `../references/elicitation-personas.md` at the depth matching your complexity level.
+### 6. Design the Change — the loop (the interview happens HERE)
 
-The build-vs-buy outcome shapes which questions matter:
-- **Adopting**: Focus on integration — how it fits, what config is needed. Skip deep business-rule elicitation.
-- **Building custom**: Full elicitation — business rules, edge cases, data contracts, security, NFRs.
-- **Hybrid**: Elicit deeply for custom parts. For adopted parts, focus on integration boundaries.
+This single loop replaces what used to be separate "elicit requirements", "draft", and
+"collaborate" steps. **Interviewing IS iterating on `draft.md`.** There is no gather-then-
+transcribe split — requirements surface, get questioned, and resolve inside the doc.
 
-#### Interview protocol
+Iterate with the user, directly on `draft.md`:
 
-1. **Outcome & Non-goals first.** Always ask these two before any persona questions — they set scope. Restate the answers back to the user before continuing.
-2. **Batch questions, then wait.** Ask 3-5 questions at a time, grouped by persona. Stop. Wait for the user's reply. Do not draft scenarios until the batch is answered.
-3. **Ask the question; don't pre-answer it.** "Should locked accounts get an email?" — not "I'll assume locked accounts get an email, let me know if not." The pre-answered form lets the user nod through assumptions they'd otherwise correct.
-4. **One question per ambiguity, not a checklist dump.** If the user said "users can reset password", do not ask 12 generic questions. Ask the 3 that matter for *this* feature.
-5. **Disambiguate immediately.** If the user's answer is vague ("yeah, handle errors gracefully"), ask the specific follow-up ("for invalid tokens, do we redirect to login with a flash message, return a 400, or something else?"). Never leave a vague answer in the spec.
-6. **Capture, don't extrapolate.** If the user explicitly says "out of scope for now", note it as a non-goal and stop. Don't draft a scenario "just in case".
-7. **When the user pushes back on a question** ("just write something reasonable"), record their delegation explicitly: "Defaulting to <choice> per user delegation — flag in review if wrong." This makes the assumption visible later.
+```
+loop:
+  propose   → decisions into the Decisions ledger; shapes into Sketches; a diagram/sketch into At a glance
+  question  → unknowns become rows under Open (use ../references/elicitation-personas.md as lenses)
+  user reacts → answers / edits the doc
+  resolve   → strike the Open row IN PLACE: `RESOLVED: <answer> (Dn)` — never delete it
+until Decided is stable AND Open is empty-or-deferred.
+```
 
-#### Open-question discipline
+Discipline for the loop:
 
-After the interview, list every open question that wasn't answered. These become:
-- **Manifest Assumptions** (level 3-4) — each open question becomes an unvalidated assumption with the reading you chose.
-- **Open questions in the Requirements Summary** — explicitly listed so the user sees what you guessed.
+1. **Outcome & Non-goals first.** Pin these (into *Why*) before anything else — they set scope. Restate them back to the user.
+2. **Batch questions, then wait.** Ask 3–5 at a time, grouped by concern, as Open rows. Stop. Wait. Do not propose decisions past an unanswered batch.
+3. **Ask the question; don't pre-answer it.** "Should locked accounts get an email?" — not "I'll assume locked accounts get an email." The pre-answered form lets the user nod through assumptions they'd otherwise correct.
+4. **One question per real ambiguity, not a checklist dump.** Ask the few that matter for *this* change.
+5. **Disambiguate immediately.** If an answer is vague ("handle errors gracefully"), ask the specific follow-up and record the concrete answer. Never leave a vague answer in the ledger.
+6. **Capture, don't extrapolate.** "Out of scope for now" → record as a non-goal and stop. Don't design a scenario "just in case".
+7. **When the user delegates** ("just write something reasonable"), record it explicitly as an Open→RESOLVED row: "Defaulting to <choice> per user delegation — flag in review if wrong." The assumption stays visible.
+8. **Sort facts by kind as they emerge.** An invariant (security control, NFR, performance budget, observability guarantee) is not a behavior — capture it in the *Constraints* section, not as a behavioral sketch. Apply the rough behaviour-vs-invariant test as you design (does an external actor observe it without reading code/logs?) so projection's admission test (step 7) gets clean input instead of slop to reroute. The fine fact-to-home routing still happens at projection; this just keeps the design honest while you think.
 
-Never silently fill in an open question. Either ask, defer to a non-goal, or record the inference.
+**Never silently fill an open question.** Either ask it (as an *Open* row), defer it to a non-goal, or record the inference explicitly in *Decided*. The *Decided/Open* ledger IS the requirements summary — before declaring the design done, walk it back to the user so they see every call and every guess.
 
-Present a Requirements Summary (template in the reference) and wait for user confirmation before proceeding.
+**Nothing is written to `features/`, `.grimoire/docs/constraints.md`, or `.grimoire/decisions/` during this loop.** Everything lives in `draft.md`. The design is "done" when *Decided* is stable and *Open* is empty-or-deferred — and the user agrees.
 
-### 5. Check Existing State
-See `../references/artifact-map.md` for what each artifact is and the reading discipline.
-- Read `features/` to understand the current behavioral baseline
-- Read `.grimoire/decisions/` to understand existing architecture decisions
-- Read `.grimoire/docs/context.yml` (if it exists) to understand the deployment environment, related services, and infrastructure — this tells you what's available (caches, queues, sibling services) and what constraints apply (deployment target, environments)
-- Check `.grimoire/changes/` for any in-progress changes that might overlap
-- If there's a conflict with an active change, flag it
-- If `.grimoire/changes/<change-id>/consult.md` exists (from a prior `grimoire-design-consult` run), parse the `## Inferred assumptions` and `## Inferred givens` sections verbatim. Copy the contents of `## Inferred assumptions` into the manifest's Assumptions section, and copy `## Inferred givens` into a new Givens section at the same heading level (Givens applies to level 3-4 only — skip for level 1-2). The H2 headers `## Inferred assumptions` and `## Inferred givens` are load-bearing — they are the exact section names `grimoire-design-consult` writes; do not paraphrase, retitle, or fuzzy-match. Open questions from `consult.md` are NOT copied — they remain in `consult.md` as designer follow-up items.
+Do NOT proceed to projection without explicit user approval of the design.
 
-### 6. Scaffold the Change
-- Choose a `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`)
-- Ensure you're on a feature branch for this change (`grimoire-branch-guard` usually created it). The branch is where all artifacts are edited live.
-- Create `.grimoire/changes/<change-id>/` — this folder holds **only ephemeral process scaffolding**: `manifest.md` (and later `tasks.md`). It does NOT hold copies of features, decisions, or constraints — those are edited live in their real locations and tracked by `git diff`. The folder is deleted at finalize; the branch + PR + git log are the durable record.
+### 7. Projection — generate the homes from draft.md
 
-### 7. Draft Artifacts
-**For behavioral changes:**
+Once the user agrees the design is settled, project `draft.md` into its durable homes. This
+is where the **fine routing** happens (each fact → its one home) and where the admission
+test + principles gate run. Artifacts are written **live in their real locations** on the
+branch — `git diff` is the staging area; there is no copy-into-the-change-folder.
 
-Before writing any `.feature` file, triage existing files. **The default is always extend. New files are the exception and require explicit justification.**
+First, **score the complexity level (1–4)** now that the design is settled, and write it to
+`manifest.md` frontmatter as `complexity: <1-4>`.
 
-**Step 1 — List existing feature files (required, not skippable)**
+Then project each kind of fact:
 
-Read `features/` recursively. Print a table before doing anything else:
+**Behaviors → `features/*.feature`.** For each behavioral fact in the design:
+
+*The feature-file admission test* — a scenario may be written **only if it passes all four gates**; if it fails any, it is a constraint or a decision, not a feature:
+1. **External actor** — a user, operator, or external system does the thing. Internal actor → constraint/decision.
+2. **Observable** — the actor sees the outcome without reading code or logs. "<200ms", "logs scrubbed of PII" → fails → constraint.
+3. **Domain language** — domain nouns, zero implementation detail. Names a library/log-level/table (`loguru`, `INFO`, `bcrypt`, `users` table) → fails → leaking implementation.
+4. **Survives reimplementation** — rewrite the internals from scratch; would the scenario still read the same? If it would change, it's pinned to implementation → not a feature.
+
+Common slop this catches (all → `constraints.md`): "PII is scrubbed from logs", "all endpoints require auth", "responses are gzipped", "errors logged with a trace id".
+
+*Extend vs. new — default is always extend; new files are the exception and require justification.* List existing feature files first (**required, not skippable** — do not write any scenario until this triage table is complete):
 
 ```
 Existing feature files:
   features/auth/login.feature         — "User Login"
-  features/auth/registration.feature  — "User Registration"
   features/billing/invoices.feature   — "Invoice Management"
-  ...
 ```
 
-If `features/` is empty or doesn't exist, skip to step 3.
-
-**Step 2 — Match each proposed scenario to an existing file**
-
-For each scenario you intend to draft, explicitly decide: extend or new? Show the decision:
+For each scenario, decide extend-or-new and show it:
 
 ```
-Scenario triage:
-  "Admin resets a user's password"  → extend features/auth/login.feature  (same actor domain: auth)
-  "User exports invoices as CSV"    → extend features/billing/invoices.feature  (same resource)
-  "User configures SSO provider"    → NEW  (no existing file owns SSO configuration)
+  "Admin resets a user's password"  → extend features/auth/login.feature (same actor domain: auth)
+  "User configures SSO provider"    → NEW (no existing file owns SSO configuration)
 ```
 
-Do not proceed to writing until this table is complete. If unsure about a match, default to extend.
+Signals to extend: same actor, same domain object, same entry point, same HTTP resource or screen. Signals genuinely new: new actor type with no existing file, entirely new domain object, or the existing Feature title would need "and" to cover both. If unsure, extend. A new file requires stating which files were considered and why none fit.
 
-**Step 3 — Execute (edit live on the branch)**
+Then write Gherkin (Feature title + user story; Background for shared preconditions; one scenario per behavior; Given/When/Then describing WHAT, never HOW). Apply security tags per `../references/security-compliance.md` (only when there's a security surface; compliance tags only when `project.compliance` is set). When design input grounded the scenarios (step 4): use brand-token **names** not hex values when `.grimoire/brand/tokens.json` applies; prefer existing component names when `.grimoire/docs/components.md` exists, and flag any net-new component ("new component required — confirm before plan stage").
 
-Artifacts are edited **directly in their real locations** on the feature branch. The branch is the isolation; `git diff` is the staging area. There is no copy into `.grimoire/changes/` and no promote step (see `../references/principles.md` — don't reinvent git).
+**Constraints → `.grimoire/docs/constraints.md`.** Every invariant that failed the admission test (it's a security control / NFR / observability / compliance rule, not an actor-observable behavior) becomes one row: **assertion · rationale · how-verified · links**. The assertion is a flat statement ("Log output never contains PII or secrets"), not Given/When/Then. `how-verified` names the test that proves it (a `unit-invariant` the plan stage will create) — never a Gherkin scenario. If it stems from a decision, link the MADR; don't restate it. Create the file from `templates/constraints.md` if absent.
 
-- **Extend:** add scenarios directly to the live `features/<same-relative-path>` file.
-- **New file (requires justification):** state which existing files were considered and why none fit. Then create `features/<capability>/<name>.feature` directly.
+**Decisions → `.grimoire/decisions/NNNN-*.md`.** Project each Decisions-ledger entry, applying the **novelty gate**: a MADR is for a decision with a real, project-specific trade-off between viable alternatives — not for industry-default tooling picks or ecosystem-forced conventions. Ask: *would a competent engineer on this stack make a different choice, and need our reasoning to understand ours?* If no, skip it. Obvious tooling/convention picks fold into the existing `Tooling and convention baseline` ADR (one line: choice → why), not a new sequential record. Genuine trade-offs get the next sequential number, status `proposed` (`grimoire-apply` flips to `accepted` at finalize), using `.grimoire/decisions/template.md`.
 
-Signals a scenario belongs in an existing file: same actor, same domain object, same entry point, same HTTP resource or screen.
-Signals a genuinely new file: new actor type with no existing file, entirely new domain object, or existing file's Feature title would need "and" to cover both.
-
-- Every scenario must have passed the **admission test** in step 1. If you catch yourself writing a step that names a library/log-level/table, stop — that fact belongs in `constraints.md`, not here.
-- Follow Gherkin best practices:
-  - Feature title + user story (As a / I want / So that)
-  - Background for shared preconditions
-  - One scenario per behavior
-  - Given/When/Then — describe WHAT, never HOW
-  - No implementation details in feature files
-
-**When design data was provided (step 4.0):**
-- If a Figma snapshot or `grimoire-design` output is available, propose Gherkin scenarios per (component × state) grounded in those artifacts. Walk the component list and the enumerated states; emit one Scenario per pair.
-- Present the proposed scenarios for user review before writing to `.feature` files — accept all / accept some / edit / reject any. Rejected scenarios are not written.
-- If `grimoire-design` already produced user-accepted scenarios under `.grimoire/changes/<change-id>/designs/scenarios.feature`, do NOT re-propose them; write the accepted ones live into `features/` (applying the admission test) and only fill gaps (e.g., new components not yet covered).
-
-**Brand-tokens grounding:**
-- When Figma variables map to tokens that also appear in `.grimoire/brand/tokens.json`, scenarios referencing visual properties must use token names, not hex values. Example: write `Then the submit button uses color.primary` not `Then the submit button is #0066ff`.
-- Hardcoded hex values in scenarios drift silently when tokens change. Token names stay correct across re-skins.
-
-**Component-library awareness:**
-- When `.grimoire/docs/components.md` exists, prefer references to existing components by name in scenarios (e.g., `Then a Button with variant="primary" is rendered` over `Then a blue button appears`).
-- Flag net-new components explicitly: emit "new component required — confirm before plan stage" alongside any scenario that introduces a component not listed in `components.md`. The plan stage will then decide whether to add it to the inventory or reuse an existing variant.
-
-**Security tags on scenarios:**
-Apply Gherkin tags per `../references/security-compliance.md` (section "Security Tags"). Tags drive stricter checks in plan, review, and verify stages. Apply compliance-specific tags only when `project.compliance` is configured. If no compliance frameworks and no security surface, don't add tags.
-
-**For constraints (security / NFR / observability / compliance):**
-
-Anything that failed the feature admission test because it's an invariant rather than an actor-observable behavior goes here — **not** into a `.feature`.
-
-- Append to the live `.grimoire/docs/constraints.md` (create it from `templates/constraints.md` if absent).
-- One row per constraint: **assertion · rationale · how-verified · links**. The assertion is a flat statement of what must always hold ("Log output never contains PII or secrets"), not a Given/When/Then.
-- `how-verified` names the test that proves it (a `unit-invariant` test the plan stage will create) — never a Gherkin scenario.
-- If the constraint stems from a decision, link the MADR; don't restate the decision (DRY).
-
-**For architecture decisions:**
-
-- **Novelty gate — record only novel decisions.** A MADR is for a decision with a real, project-specific trade-off between viable alternatives. It is NOT for industry-default tooling picks (the standard test runner, CLI parser, git wrapper, linter) or for conventions the ecosystem forces (ESM `.js` import suffix, where the framework expects files). If the honest "Considered Options" would be "the obvious default vs. things nobody would pick here", do not write an ADR. Before writing one, ask: *would a competent engineer on this stack make a different choice, and would they need our reasoning to understand ours?* If no, skip it.
-- **Obvious tooling/conventions go in the baseline record, not their own ADR.** When you do need to write down a default pick (e.g. a new dev dependency), add a row to the existing `Tooling and convention baseline` ADR (one line: choice → why) rather than minting a new sequential record. Reserve sequential ADRs for genuine trade-offs.
-- Write the MADR record directly into the live `.grimoire/decisions/` with the next sequential number (`NNNN-title.md`)
-- Use the template from `.grimoire/decisions/template.md` or the AGENTS.md format
-- Include considered options, decision drivers, and consequences
-- Draft status `proposed`; `grimoire-apply` flips it to `accepted` at finalize
-
-**For changes that touch data:**
-- Check `.grimoire/docs/data/schema.yml` for the current data schema (if it exists)
-- If the change adds, modifies, or removes data models, fields, indexes, or external API integrations, write a `data.yml` in `.grimoire/changes/<change-id>/` showing the proposed schema changes
-- Use the same YAML format as `schema.yml` but only include what's changing — new models, added/removed fields, new external API integrations
-- Mark changes clearly with `action:` on each entry:
+**Data changes → `.grimoire/changes/<change-id>/data.yml`.** If the change adds/modifies/removes data models, fields, indexes, or external API integrations, write `data.yml` (same YAML shape as `schema.yml`, only what's changing, `action:` on each entry):
 
 ```yaml
 # Proposed data changes for: add-user-profiles
-
 users:
   action: modify
   source: src/models/user.py
   fields:
-    avatar_url:                    # new field
-      action: add
-      type: varchar
-      nullable: true
-    legacy_name:                   # removing a field
-      action: remove
-
+    avatar_url: { action: add, type: varchar, nullable: true }
+    legacy_name: { action: remove }
 profiles:
-  action: add                      # entirely new model
+  action: add
   type: collection
   fields:
     user_id: { type: objectId, ref: users }
     bio: { type: string, max_length: 500 }
-    social_links:
-      type: array
-      items:
-        platform: { type: string }
-        url: { type: string }
-
 github_api:
-  action: add                      # new external API dependency
+  action: add
   type: external_api
   provider: GitHub
   schema_ref: https://docs.github.com/en/rest
@@ -263,60 +210,43 @@ github_api:
     get_user:
       method: GET
       path: /users/{username}
-      request:                       # document what you send
-        headers:
-          Authorization: "Bearer {token}"
-      response:                      # document what you expect back
+      request:
+        headers: { Authorization: "Bearer {token}" }
+      response:
         login: { type: string, required: true }
         avatar_url: { type: string, required: true }
         name: { type: string, nullable: true }
-      error_response:                # document known error shapes
+      error_response:
         message: { type: string }
         status: { type: integer }
 ```
 
-**Contract documentation is mandatory for external APIs.** Every endpoint entry must include:
-- **`request`**: headers, query params, or body fields your client sends
-- **`response`**: fields your client reads, with types and `required: true` for fields your code depends on
-- **`error_response`**: the error shape your client handles
+**Contract documentation is mandatory for external APIs.** Every endpoint must document `request` (what you send), `response` (fields you read, `required: true` for those your code depends on), and `error_response` (the error shape you handle). Downstream skills generate contract tests from this. If you don't know the exact shape, reference `schema_ref` and document the subset your client uses — that subset is the contract. No data impact → skip `data.yml` entirely.
 
-This is the contract. Downstream skills (plan, review, verify) use it to generate contract tests and detect breaking changes. If you don't know the exact shape, reference the `schema_ref` and document what your client actually uses — that subset is the contract.
+**Manifest (`manifest.md`).** Generate it from `draft.md` as the durable plan-input glue: `complexity` (just scored), Why + Non-goals, the artifact list (added/modified/removed features, decisions, constraints), and a **Prior Art** section summarizing step 3's research (what was found/evaluated, why adopt/build/hybrid; if building, what's borrowed). **Level 3–4** also carry **Assumptions** (what must be true; mark evidence vs. unvalidated; flag unvalidated ones on the critical path) and a **Pre-Mortem** (2–5 plausible failure modes 6 months out, with mitigations or "accepted"). These come straight from the `draft.md` Decided/Open and Cut sections.
 
-- If the change has no data impact, skip `data.yml` entirely — don't create an empty one
+**Do NOT delete `draft.md`.** Retain it read-only as the agreed reference through plan → … → apply. `grimoire-apply` removes it with the change folder at finalize.
 
-**For all changes:**
-- Write `manifest.md` listing all artifacts, what's added/modified/removed, and why
-- Include `complexity: <1-4>` in the manifest frontmatter (from step 2)
-- **Level 1-2**: Assumptions and Pre-Mortem sections are optional (include if relevant)
-- **Level 3-4**: Include an **Assumptions** section: list what must be true for this change to succeed. For each assumption, note whether there is evidence or it is unvalidated. Unvalidated assumptions on the critical path should be flagged to the user.
-- **Level 3-4**: Include a **Pre-Mortem** section: imagine this change has failed or caused a production incident 6 months from now — what went wrong? List 2-5 plausible failure modes with mitigations or "accepted" if the risk is acknowledged.
-- The manifest must include a **Prior Art** section summarizing the research from step 3: what was found, what was evaluated, and why the chosen direction (adopt, build, or hybrid) was selected. If the decision was to build, include what's being borrowed from existing implementations. This section is consumed by the plan and review stages — without it, reviewers can't validate the build-vs-buy decision.
+### 8. Validate (at projection)
 
-### 8. Collaborate
-- Present the draft to the user
-- Iterate based on feedback
-- Do NOT proceed to plan stage without user approval
-
-### 9. Validate
-- Verify `.feature` files have valid Gherkin syntax
-- Verify MADR records have valid YAML frontmatter (status, date)
-- Verify manifest is complete and accurate
-- Every Feature has a user story
-- Every Scenario has at least Given + When + Then
-- No implementation details leaked into features
-- **Re-run the admission test on every scenario you wrote** (step 1): external actor, observable, domain language, survives reimplementation. Any scenario that now fails is slop — move it to `constraints.md` or a MADR before proceeding.
-- **Principles gate** (`../references/principles.md`): no fact written to two homes (DRY), no second way to do an existing thing (one right way), no reinvented wheel (don't reinvent), no artifact created past the stated scope (KISS).
+- `.feature` files have valid Gherkin; every Feature has a user story; every Scenario has at least Given + When + Then.
+- MADR records have valid YAML frontmatter (status, date).
+- Manifest is complete and accurate; `complexity` is set.
+- **Re-run the admission test on every scenario you wrote**: external actor, observable, domain language, survives reimplementation. Any scenario that now fails is slop — move it to `constraints.md` or a MADR.
+- **Principles gate** (`../references/principles.md`): no fact written to two homes (DRY), no second way to do an existing thing (one right way), no reinvented wheel, no artifact created past the stated scope (KISS). Note: `draft.md` co-existing with the homes is **not** a DRY violation — it is the (soon-deleted) source the homes were projected from, not a parallel authority.
 
 ## Important
 - ONE change at a time. Don't combine unrelated changes.
-- **Features describe actor-observable behavior, not implementation, and not invariants.** If a scenario has no external actor, isn't observable, or names a library/log-level/table, it is not a feature — it's a constraint (→ `constraints.md`) or a decision (→ MADR). This is the #1 source of feature-file slop.
-- **One fact, one home** (`../references/principles.md`). A capability lives in one `.feature`; a control lives in one constraint row; a decision lives in one MADR. Never the same fact in two places.
-- Artifacts are edited **live on the branch** — never copied into `.grimoire/changes/`. git diff is the staging area.
-- The manifest is lightweight glue — don't over-document. Just enough to capture why.
-- Always check if a capability/feature already exists before creating a new one.
-- **Figma access token is read from `FIGMA_ACCESS_TOKEN` env var by the MCP server.** Never log the token, never write it to config, never include it in `manifest.md`, `consult.md`, `figma-snapshot.json`, or any other artifact. The MCP server handles authentication transparently — grimoire-draft never needs to see the token value.
+- **`draft.md` is the only surface you design on.** Features, constraints, MADRs, and the manifest are **generated from it** at projection — never authored by hand in parallel during design.
+- **Features describe actor-observable behavior, not implementation, and not invariants.** No external actor, not observable, or names a library/log-level/table → it's a constraint (→ `constraints.md`) or a decision (→ MADR). This is the #1 source of feature-file slop.
+- **One fact, one home** (`../references/principles.md`). A capability lives in one `.feature`; a control in one constraint row; a decision in one MADR. Never the same fact in two homes (at rest).
+- Decisions live in **one inline ledger** in `draft.md` while designing; they project to separate MADRs only at step 7. This is how coupled decisions stay legible during the thinking.
+- Artifacts (post-projection) are edited **live on the branch** — never copied into `.grimoire/changes/`. `git diff` is the staging area.
+- **Figma access token is read from `FIGMA_ACCESS_TOKEN` by the MCP server.** Never log it, never write it to config or any artifact (`manifest.md`, `consult.md`, `figma-snapshot.json`, `draft.md`). The MCP handles auth transparently.
 
 ## Done
-When the user approves the draft, the workflow is complete. Present the change directory path and suggest next steps:
+When the user approves the design and it has been projected, the workflow is complete.
+`draft.md` remains as reference until `grimoire-apply` clears it. Present the change
+directory path and suggest next steps:
 - `grimoire-plan` to generate implementation tasks
-- Or further iteration if the user wants changes
+- Or further iteration on `draft.md` if the user wants changes
