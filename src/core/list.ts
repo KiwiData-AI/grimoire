@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
-import matter from "gray-matter";
+import { matter } from "../utils/frontmatter.js";
 import { findProjectRoot } from "../utils/paths.js";
 import { fileExists } from "../utils/fs.js";
 import fg from "fast-glob";
@@ -29,7 +29,7 @@ async function buildChangeInfo(changePath: string, changeName: string): Promise<
   let branch: string | null = null;
   if (hasManifest) {
     const manifestContent = await readFile(join(changePath, "manifest.md"), "utf-8");
-    const { data: fm } = matter(manifestContent);
+    const fm = matter(manifestContent).data as { status?: string; branch?: string };
     if (fm.status) status = fm.status;
     if (fm.branch) branch = fm.branch;
   }

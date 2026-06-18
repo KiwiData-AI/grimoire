@@ -2,7 +2,7 @@ import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, relative, basename } from "node:path";
 import chalk from "chalk";
 import { parse as parseYaml } from "yaml";
-import matter from "gray-matter";
+import { matter } from "../utils/frontmatter.js";
 import { findProjectRoot, safePath } from "../utils/paths.js";
 import { loadConfig } from "../utils/config.js";
 import { findFiles } from "../utils/fs.js";
