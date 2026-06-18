@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
-import matter from "gray-matter";
+import { matter } from "../utils/frontmatter.js";
 import {
   GherkinClassicTokenMatcher,
   Parser,

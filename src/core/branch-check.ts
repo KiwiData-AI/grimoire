@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import matter from "gray-matter";
+import { matter } from "../utils/frontmatter.js";
 import { findProjectRoot } from "../utils/paths.js";
 import { fileExists } from "../utils/fs.js";
 import { readStdin } from "../utils/stdin.js";

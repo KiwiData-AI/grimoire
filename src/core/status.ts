@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import chalk from "chalk";
-import matter from "gray-matter";
+import { matter } from "../utils/frontmatter.js";
 import { findProjectRoot, resolveChangePath } from "../utils/paths.js";
 import fg from "fast-glob";
 
@@ -32,7 +32,7 @@ async function readManifestStatus(changePath: string, status: ChangeStatus): Pro
   try {
     const manifestContent = await readFile(join(changePath, "manifest.md"), "utf-8");
     status.artifacts.manifest = true;
-    const { data: fm } = matter(manifestContent);
+    const fm = matter(manifestContent).data as { status?: string; branch?: string };
     if (fm.status) status.status = fm.status;
     if (fm.branch) status.branch = fm.branch;
   } catch {

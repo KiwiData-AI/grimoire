@@ -1,6 +1,6 @@
 {
   "name": "@kiwidata/grimoire",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "description": "Gherkin + MADR spec-driven development for AI coding assistants",
   "type": "module",
   "bin": {
@@ -65,7 +65,6 @@
     "chalk": "^5.5.0",
     "commander": "^14.0.0",
     "fast-glob": "^3.3.0",
-    "gray-matter": "^4.0.3",
     "simple-git": "^3.33.0",
     "yaml": "^2.8.0"
   },
@@ -81,5 +80,10 @@
     "typescript": "^5.7.0",
     "vitepress": "^1.6.4",
     "vitest": "^3.0.0"
+  },
+  "overrides": {
+    "@eslint/eslintrc": {
+      "js-yaml": "4.2.0"
+    }
   }
 }
