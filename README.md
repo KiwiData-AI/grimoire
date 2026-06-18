@@ -1,4 +1,8 @@
-# Grimoire
+<p align="center">
+  <img src="logo.png" alt="Grimoire" width="200">
+</p>
+
+<h1 align="center">Grimoire</h1>
 
 **Spec-driven AI development framework.** Encodes decades of software engineering discipline — requirements, design review, TDD, change management, traceability — into AI coding workflows so they can't be skipped.
 
