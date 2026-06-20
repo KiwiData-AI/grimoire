@@ -154,12 +154,14 @@ Then project each kind of fact:
 **Behaviors → `features/*.feature`.** For each behavioral fact in the design:
 
 *The feature-file admission test* — a scenario may be written **only if it passes all four gates**; if it fails any, it is a constraint or a decision, not a feature:
-1. **External actor** — a user, operator, or external system does the thing. Internal actor → constraint/decision.
+1. **External actor, outside the system boundary** — an end user, an operator, or a *third-party* system integrating with you does the thing. "External" means outside *your* system, not outside one module: a sibling service, an internal queue consumer, or another module in the same repo calling this one is **internal**, even though it's a separate process. Internal actor → contract test or constraint/decision, never a `.feature`.
 2. **Observable** — the actor sees the outcome without reading code or logs. "<200ms", "logs scrubbed of PII" → fails → constraint.
 3. **Domain language** — domain nouns, zero implementation detail. Names a library/log-level/table (`loguru`, `INFO`, `bcrypt`, `users` table) → fails → leaking implementation.
 4. **Survives reimplementation** — rewrite the internals from scratch; would the scenario still read the same? If it would change, it's pinned to implementation → not a feature.
 
-Common slop this catches (all → `constraints.md`): "PII is scrubbed from logs", "all endpoints require auth", "responses are gzipped", "errors logged with a trace id".
+**Internal protocols and service-to-service contracts are NOT features.** A change to how two of your own components talk — an internal RPC/queue/event shape, a module API, a wire format between your services — is a *contract*, verified by a contract/integration test (`verify: unit-invariant` at plan stage), not by Gherkin. It fails gate 1: there is no external actor, only your own code on both ends. If a third-party integrates against the protocol it's external and may be a feature; two of your own services is internal. This is the second-biggest source of feature-file slop after invariants.
+
+Common slop this catches: invariants (→ `constraints.md`) — "PII is scrubbed from logs", "all endpoints require auth", "responses are gzipped", "errors logged with a trace id"; internal protocols (→ contract test) — "service A publishes an OrderPlaced event B consumes", "the worker accepts a job payload with these fields", "module X returns this struct to module Y".
 
 *Extend vs. new — default is always extend; new files are the exception and require justification.* List existing feature files first (**required, not skippable** — do not write any scenario until this triage table is complete):
 
@@ -238,7 +240,7 @@ github_api:
 ## Important
 - ONE change at a time. Don't combine unrelated changes.
 - **`draft.md` is the only surface you design on.** Features, constraints, MADRs, and the manifest are **generated from it** at projection — never authored by hand in parallel during design.
-- **Features describe actor-observable behavior, not implementation, and not invariants.** No external actor, not observable, or names a library/log-level/table → it's a constraint (→ `constraints.md`) or a decision (→ MADR). This is the #1 source of feature-file slop.
+- **Features describe actor-observable behavior, not implementation, and not invariants.** No external actor, not observable, or names a library/log-level/table → it's a constraint (→ `constraints.md`) or a decision (→ MADR). An internal protocol or service-to-service contract (your own components talking) is a contract test, not a `.feature` — "external" means outside your system, not outside one module. These two — invariants and internal protocols — are the top sources of feature-file slop.
 - **One fact, one home** (`../references/principles.md`). A capability lives in one `.feature`; a control in one constraint row; a decision in one MADR. Never the same fact in two homes (at rest).
 - Decisions live in **one inline ledger** in `draft.md` while designing; they project to separate MADRs only at step 7. This is how coupled decisions stay legible during the thinking.
 - Artifacts (post-projection) are edited **live on the branch** — never copied into `.grimoire/changes/`. `git diff` is the staging area.

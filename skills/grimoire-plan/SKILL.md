@@ -126,9 +126,10 @@ Create `.grimoire/changes/<change-id>/tasks.md`. **Every task produces both prod
 |-------------------|-----------|--------------|
 | a `.feature` scenario (actor-observable behavior) | `scenario` | step definitions + Gherkin |
 | a constraint in `constraints.md` (security/NFR/observability) | `unit-invariant` | unit/integration test asserting the invariant |
+| an internal protocol / service-to-service contract (internal RPC, queue/event shape, module API between your own components) | `unit-invariant` | contract/integration test asserting the wire shape both ends agree on |
 | an ADR consequence, refactor, or internal change with no spec | `characterization` | unit / characterization test |
 
-**Do not plan a `.feature` scenario task for a constraint or an internal change.** Constraints get `unit-invariant` unit tests; internal changes get `characterization` tests. Forcing Gherkin onto a non-behavioral concern is the antipattern that fills feature files with slop (one right way: behavior → scenario, everything else → unit test).
+**Do not plan a `.feature` scenario task for a constraint, an internal protocol, or an internal change.** Constraints and internal protocols get `unit-invariant` tests (a contract test for a protocol asserts the payload/event shape both ends agree on); other internal changes get `characterization` tests. Forcing Gherkin onto a non-behavioral concern is the antipattern that fills feature files with slop (one right way: external actor-observable behavior → scenario, everything else — invariants, internal protocols, refactors → unit/contract test). If a `.feature` in the change actually describes an internal protocol (slop that slipped past draft), flag it and route the task to `unit-invariant`, don't write step definitions for it.
 
 **THE PLAN'S SCOPE IS WHAT WAS APPROVED.** Tasks may only derive from:
 - `.feature` scenarios in this change → `verify: scenario`
@@ -233,6 +234,8 @@ Good task (specific enough to execute):
 
 **Mocking strategy for external services:**
 Follow the rules in `../references/testing-contracts.md`. Key points: mock at HTTP boundary (not client), fixtures must match `schema.yml`, include error fixtures. Each contract test task must specify: (1) which HTTP mocking library, (2) which fixture file, (3) what the fixture contains (from `schema.yml`).
+
+**Test data:** Do not add tasks that ask the user for sample data or example scenarios. Per `../references/testing-contracts.md` (Test Data Generation), every test task that needs data must name the generation source — the project's existing data factory / property-based tool (`factory_boy`, `@faker-js/faker`, `model_bakery`, `Hypothesis`, `fast-check`, etc., detected from `config.tools` / existing test imports), and which fields the scenario pins vs. lets the factory fill. AI-authored literal data is a last resort: only plan it when the user explicitly asked for generated data, or no factory exists and a specific crafted value is needed — and say which in the task. If the project has no data-factory tooling and the change clearly needs one, surface adopting it as a build-vs-buy line, don't smuggle the dependency into an implementation task.
 
 **From manifest Assumptions:**
 - Each unvalidated assumption on the critical path → a verification task (spike, proof-of-concept, or integration test that confirms the assumption holds)

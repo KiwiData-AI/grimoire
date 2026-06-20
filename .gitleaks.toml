@@ -1,0 +1,9 @@
+# Extend gitleaks defaults; allowlist documentation false positives.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Crypto/library names in skill prose flagged as high-entropy keys"
+regexes = [
+  '''bcrypt/argon2''',
+]
