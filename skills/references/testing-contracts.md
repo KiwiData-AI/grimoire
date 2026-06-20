@@ -18,6 +18,25 @@ Loaded by skills that involve writing tests, mocking external services, or verif
 - When the contract changes, the fixture must change — stale fixtures are false-positive tests
 - Include at least one error response fixture per external API (matching `error_response` in `schema.yml`)
 
+## Test Data Generation
+
+**Do not ask the user for test data, sample records, or example scenarios.** Scenarios are derived from the spec (`.feature` scenarios, constraints, contracts); the *data* that exercises them is generated. Asking the user to supply fixtures by hand front-loads the work onto them and produces brittle, hand-curated values. Generate it instead, in this order of preference:
+
+1. **Project's standard data factory / generator (default).** Check `config.tools` and existing test imports for the tool already in use and follow it:
+   - **Python**: `factory_boy`, `model_bakery`/`model-mommy`, `faker`, `Hypothesis` (property-based)
+   - **JS/TS**: `@faker-js/faker`, `fishery`, `test-data-bot`, `fast-check` (property-based)
+   - **Ruby**: `factory_bot`, `faker`
+   - **Go**: `gofakeit`, table-driven fixtures
+   - **Java/Kotlin**: `instancio`, `easy-random`, `jqwik` (property-based)
+
+   Build records through the factory, override only the fields the scenario actually pins, and let the tool fill the rest. For invariants ("never accepts a negative amount", "round-trips any valid payload"), prefer **property-based generation** (Hypothesis / fast-check / jqwik) over a handful of literals — it covers the input space the spec describes instead of one example.
+
+2. **Recorded / fixture responses** for external-API contracts — concrete instances of the `schema.yml` contract (see Fixture Management above). These are captured shapes, not invented ones.
+
+3. **AI-authored literal test data — last resort, only on explicit instruction.** Hand-writing literal records (the agent inventing `{name: "Acme Corp", amount: 4200, ...}`) is permitted **only when the user explicitly asks for generated test data**, or no factory tooling exists in the project *and* the case needs one specific crafted value (a known edge constant, a regression repro). When you fall back to this, say so — note in the task/test why a factory wasn't used. Never silently invent a dataset.
+
+No data-factory tool configured and the project has tests? Match whatever those tests already do. Proposing a *new* factory dependency is a plan-stage decision, not something to pull in mid-implementation.
+
 ## Contract Test Requirements
 
 Every external API integration needs contract tests that assert:
