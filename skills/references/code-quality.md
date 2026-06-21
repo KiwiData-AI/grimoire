@@ -67,7 +67,7 @@ Fail: a private function with three guard clauses before its one real line.
 
 Fail: any local named `data`, `result`, `temp`, `obj`, `item`, or `value` when a more specific name fits.
 
-### 6. No premature abstraction
+### 6. No premature abstraction (YAGNI)
 
 Three near-identical copies is acceptable. Extract on the fourth, or when the shared shape is stable and named. Wrong abstractions are harder to undo than duplication.
 

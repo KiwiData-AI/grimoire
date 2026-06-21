@@ -34,7 +34,7 @@ Each debt item in the register follows a structured format influenced by the Cod
 
 **Required fields:**
 - `id` — unique identifier (debt-NNN, monotonically increasing)
-- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `dead_code`, `test_debt`, `pattern_divergence`, `comment_noise`
+- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `reinvented_platform`, `dead_code`, `test_debt`, `pattern_divergence`, `comment_noise`
 - `severity` — `high`, `medium`, or `low`
 - `location` — file path (with optional `:line`), or `path ↔ path` for relationships
 - `title` — short human-readable summary
@@ -114,6 +114,7 @@ Run applicable scans from the categories in `../references/refactor-scan-categor
 - **Dependency staleness** — uses `config.tools.dep_audit` or package manager outdated commands
 - **Broken promises** — aged TODO/FIXME/HACK comments via `grep` + `git blame`
 - **Duplication** — textual clones via `config.tools.duplicates` or `grimoire health` (config-driven duplicates metric); plus semantic duplicate detection via `search_graph(semantic_query=[...])` to find re-implementations under different names (requires `codebase-memory-mcp`)
+- **Platform/stdlib reinvention** (YAGNI) — code or a dependency hand-rolling what the stdlib or runtime platform already ships (`moment`→`Intl`, a date-picker lib→`<input type="date">`, a hand-written deep-clone→`structuredClone`); the don't-reinvent-the-wheel principle (principles.md §3) as a scan. See `../references/refactor-scan-categories.md` §2L
 - **Dead code** — uses `config.tools.dead_code` or `codebase-memory-mcp` graph queries
 - **Test debt** — high complexity + low coverage
 - **Pattern divergence** — code that contradicts established codebase patterns; uses `codebase-memory-mcp` peer group analysis + hallucinated reference detection (skip if graph not indexed)
@@ -195,6 +196,7 @@ After the first batch, ask if the user wants to see more or start working on the
 - "This 34-method class has 5 distinct responsibilities — extracting them would make each class testable independently"
 - "This 28-field config type is used in 3 contexts — splitting it eliminates 22 optional fields and makes each usage self-documenting"
 - "Flattening this 4-level nested structure into 2 normalized types would eliminate the deep property chains throughout the codebase"
+- "This `EmailValidator` class (27 lines) is `\"@\" in email` — real validation is the confirmation mail" / "`moment` is imported for one format call — `Intl.DateTimeFormat`, 0 deps" (always name the concrete stdlib/native replacement and the lines or dependency it removes)
 
 ### 6. Create Grimoire Changes
 

@@ -252,3 +252,18 @@ Manual triage: open each hit and check whether a multi-line docstring follows. P
 - low = multi-line docstrings on private functions
 
 **Suggested action:** Delete restatement comments. Move task/PR references to commit history. Trim private function docstrings to one line or remove entirely.
+
+## 2L. Platform / Stdlib Reinvention (YAGNI)
+
+Code or a dependency doing a job the standard library or the runtime platform already ships — `principles.md` §3 (don't reinvent the wheel) as a scan. Distinct from duplication (§2g), which finds *internal* re-implementation; this finds reinvention of things that live *outside* the repo.
+
+**How to scan (qualitative — no single tool):**
+- **Hand-rolled stdlib:** scan for what the language already covers — date math, URL/query parsing, grouping/uniq, deep clone, debounce/throttle, deep-merge, retry, UUID, base64, hashing. Stack-specific homes: Python `functools`/`itertools`/`collections`/`datetime`; JS `Intl`, `URLSearchParams`, `structuredClone`, `Array`/`Object` methods.
+- **Native-platform reinvention:** a JS lib for what HTML/CSS/the browser does (`<input type="date">`, `<dialog>`, `Intl.DateTimeFormat`, `:has()`), app code for what a DB constraint/index enforces, a polyfill for a baseline-supported feature.
+- **Removable dependency:** cross-reference `package.json` / `pyproject.toml` for a dependency whose whole job now lives in the stdlib or platform — `moment` → `Intl`/`Temporal`, `lodash.clonedeep` → `structuredClone`, `left-pad` → `String.padStart`.
+
+**Flag when** the replacement is a stdlib call or native feature of equal-or-better correctness. **Name the function/feature and the line count (or dependency) it removes** — a finding the author can't act on is noise.
+
+**Severity:** high = a removable dependency, medium = a multi-line hand-rolled stdlib equivalent, low = a one-or-two-line shrink.
+
+**Suggested action:** replace with the named stdlib/native feature; note the dependency drop if any.

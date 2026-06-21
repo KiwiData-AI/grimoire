@@ -52,15 +52,16 @@ grimoire mechanism that duplicates it.
   tracking is a fractured landscape), don't force-adopt one *and* don't build a
   general-purpose clone. Keep any local mechanism narrow and purpose-scoped.
 
-## 4. Keep it simple (KISS)
+## 4. Keep it simple (KISS / YAGNI)
 
 The simplest thing that fully solves the *stated* problem wins.
 
 - Least code, fewest new files, smallest surface area. A few lines in an existing
   file beats a new module. A standard-library call beats a new dependency. Inline
   beats a one-line wrapper.
-- No premature abstraction. No `BaseX`/factory/strategy/config-object for a single
-  caller. No speculative generality "for a future second caller" that doesn't exist.
+- **YAGNI — no premature abstraction.** You aren't gonna need it. No `BaseX`/factory/
+  strategy/config-object for a single caller. No speculative generality "for a future
+  second caller" that doesn't exist. Speculative need → skip it, say so in one line.
 - Solve the problem in front of you, not the imagined one. Non-goals are real scope
   boundaries — do not plan or build past them.
 - **Tell:** an abstraction, indirection, or dependency whose only justification is a

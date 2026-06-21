@@ -12,9 +12,9 @@ These principles govern all grimoire work — drafting, planning, reviewing, and
 
 **Don't abstract early.** Three copies of similar code is fine. An abstraction should be extracted when a clear, stable pattern has emerged — not when you see the first hint of repetition. Wrong abstractions are harder to fix than duplicated code.
 
-**Solve the problem in front of you.** Do not add configurability, feature flags, extension points, plugin systems, or generic interfaces unless the task specifically calls for them. Build for the current requirement, not imagined future ones.
+**YAGNI — solve the problem in front of you.** You aren't gonna need it. Do not add configurability, feature flags, extension points, plugin systems, or generic interfaces unless the task specifically calls for them. Build for the current requirement, not imagined future ones — a speculative need is the signal to *skip it* and say so in one line, not to build it.
 
-**Use what exists.** Before writing anything, check what's already in the codebase. Use existing utilities, patterns, conventions, and libraries. Read `.grimoire/docs/` if area docs exist. A new dependency or utility needs a reason.
+**Use what exists — the laziness ladder.** Climb down to the least code that works, stopping at the first rung that holds: skip it (YAGNI) → standard library → native platform feature (`<input type="date">` over a picker lib, CSS over JS, a DB constraint over app code) → an already-installed dependency → one line → only then the minimum new code. Check what's already in the codebase first; use existing utilities, patterns, conventions, and libraries; read `.grimoire/docs/` if area docs exist. A new dependency or utility needs a reason — never add one for what the stdlib or platform already does.
 
 **Small surface area.** Fewer public functions, fewer parameters, fewer options. A function that does one thing with two parameters beats one that does three things with six parameters and a config object.
 
