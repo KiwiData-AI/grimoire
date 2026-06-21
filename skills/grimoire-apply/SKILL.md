@@ -329,16 +329,29 @@ When all tests are green. Features, decisions, and constraints were edited live 
 3. If the change has a `data.yml` (schema delta), apply its `add`/`modify`/`remove` entries to the live `.grimoire/docs/data/schema.yml` so the baseline schema stays current. `data.yml` is a migration-delta spec (ephemeral scaffolding carrying nullability/safety/ordering intent a raw diff wouldn't), not a copy of the schema — `schema.yml` is the live target; the delta is discarded with the change folder.
 4. Refresh the project overview: run `grimoire docs`. It regenerates `.grimoire/docs/OVERVIEW.md` (the human entry point) from the now-current features, constraints, decisions, and schema — superseded decisions drop out automatically. This is the existing `docs` command, not a new one.
 5. Reconcile `learnings.md`: for each entry under **Discovered facts**, write it into the home it names — an area doc (`.grimoire/docs/<area>.md`), a decision, a constraint, or `schema.yml`. Confirm the routing with the user (it's correctable) and drop stale ones. Failure-mode notes are discarded, not promoted. This is the one place facts learned during apply enter the durable record — `AGENTS.md` is never the destination.
-6. Remove the change directory `.grimoire/changes/<change-id>/`. Its `manifest.md` + `tasks.md` + `learnings.md` (+ any `data.yml`) and the `draft.md` design doc are ephemeral process scaffolding. `draft.md` was retained read-only through the pipeline as the agreed-design reference; this is its closing deletion. The durable record is the branch, the PR, and `git log` — linked by the `Change: <change-id>` trailer; git history still preserves `draft.md` if ever needed. **There is no archive tree** (don't reinvent git history).
+6. Remove the change directory `.grimoire/changes/<change-id>/`. Its `manifest.md` + `tasks.md` + `learnings.md` (+ any `data.yml`) and the `draft.md` design doc are ephemeral process scaffolding. `draft.md` was retained read-only through the pipeline as the agreed-design reference; this is its closing deletion.
+
+   **Guard — never delete uncommitted scaffolding.** `git log` only preserves what was committed. If `draft.md`/`tasks.md`/`manifest.md`/`learnings.md` were never committed (e.g. draft and plan ran without intermediate commits), deleting them now loses them permanently — there is no recovering an untracked file. Before removing the folder, verify it is in history:
+   ```
+   git ls-files --error-unmatch .grimoire/changes/<change-id>/draft.md
+   ```
+   If that errors (untracked), or `git status` shows uncommitted edits under the change folder, **commit the scaffolding first** (see step 8 — this becomes the first of two commits), then delete. If you cannot commit, STOP and tell the user rather than deleting.
+
+   The durable record is the branch, the PR, and `git log` — linked by the `Change: <change-id>` trailer; once committed, git history preserves `draft.md` if ever needed. **There is no archive tree** (don't reinvent git history).
 
 ### 8. Commit
 
-Finalize must be complete before committing — the commit captures the finished state (accepted decisions, cleared scaffolding), not mid-flight change artefacts.
+The commit captures the finished state — accepted decisions, live artifacts, cleared scaffolding — not mid-flight change artefacts.
 
-Stage the live artifacts and the scaffolding removal:
+**Order depends on whether the scaffolding is already in history (see step 6's guard):**
+
+- **Scaffolding already committed** (draft/plan committed earlier, the normal case): finalize fully — including the folder removal — then make one commit capturing the accepted state and the deletion.
+- **Scaffolding NOT yet committed** (this is the change's first commit): you cannot delete-then-commit, or the scaffolding is lost forever. Make **two commits**: (1) commit the implementation, live artifacts, and the still-present change folder so history preserves `draft.md`/`tasks.md`; (2) remove the folder and commit the deletion. Both carry the `Change: <change-id>` trailer.
+
+Stage the live artifacts (and, in the single-commit case, the scaffolding removal):
 ```
 git add features/ .grimoire/decisions/ .grimoire/docs/ src/ tests/
-git add -u  # picks up the removed change directory
+git add -u  # picks up the removed change directory (single-commit case)
 ```
 
 Then commit using `/grimoire:commit` (reads change context for the message) or write a manual message following `AGENTS.md` commit trailer conventions:
