@@ -75,31 +75,29 @@ Compose the PR body from grimoire artifacts:
 - Security-tagged scenarios verified: X/Y
 <if any security findings from review/verify exist, summarize the resolution>
 
+## Deployment impact
+<only include if the change has a downtime-incurring or backward-incompatible schema migration (per the Data Engineer persona, `../references/review-personas.md` §4.5)>
+- ⚠️ **Incurs downtime**: <which migration and why — e.g. "ALTER on `users` locks the table during the column rewrite">
+- ⚠️ **Breaking schema change**: <backward-incompatible — old app versions break mid-deploy>
+- Decision: <maintenance window accepted | split into expand→contract | rollout plan>
+
 Change: <change-id>
 ```
+
+**Deployment impact (when to include):** Scan `.grimoire/changes/<id>/data.yml` and the migration in the diff for a table-locking ALTER, a NOT NULL on a large table, a rename/retype, or any backward-incompatible schema change. If present, include the **Deployment impact** section and lead the PR summary with the `⚠️` line — this is the merge-time visibility the Data Engineer review requires; surfacing it only in review is not enough. No such migration → omit the section entirely.
 
 **PR title:** Derive from manifest heading, following the project's commit style:
 - conventional: `feat: add two-factor authentication`
 - angular: `feat(auth): add two-factor authentication`
 
 ### 4. Post-Implementation Review (Optional)
-If the user wants a review, run a quick automated pass on the actual diff:
+If the user wants a pre-merge review, **do NOT hand-roll a checklist** — apply the shared persona engine so self-review runs the *same rubrics as design review*: INVEST (PM), the YAGNI ladder + Rule of Three + Chesterton's Fence (Senior Engineer), STRIDE + LINDDUN + OWASP API Top 10 (Security), BVA/FIRST against the spec (QA), Expand–Contract + the deployment-impact flag (Data), then the Contrarian calibration pass.
 
-1. Get the diff: `git diff main...HEAD` (or the base branch)
-2. Read `.grimoire/config.yaml` for `project.compliance` and check feature files for security tags
-3. Feed the diff + PR description to the LLM with this prompt:
+1. Get the diff: `git diff <base>...HEAD`.
+2. Apply `../references/review-personas.md` to that diff — same engine `grimoire-precommit-review` uses (it IS this review, pre-push). Run the **Diff review** path: build the Project Briefing (§1), pick personas via the diff-review complexity table (§3), apply the materiality / steel-man / severity gates (§2/§2a/§2b), then the Contrarian pass (§4.8). If the branch is already pushed, defer to `grimoire-pr-review` instead — identical engine, fuller PR metadata.
+3. Present the engine's findings alongside the PR description. Blockers → fix before creating the PR (or open a draft). Carry any Data-persona downtime/breaking flag into the Deployment-impact section above.
 
-> Review this pull request for issues that the design review might have missed now that real code exists. Focus on:
-> - Implementation doesn't match the scenarios described
-> - Missing error handling for edge cases in the scenarios
-> - Dependencies added that weren't in the plan
-> - Files changed that aren't covered by the task list (scope creep)
-> - Test quality: are step definitions making real assertions?
->
-> **Security review** — scan changed files per `../references/security-compliance.md`: OWASP surface scan, security tag verification, compliance verification. Tag findings with OWASP/CWE.
-> Flag issues as **blocker** or **suggestion**. Be concise.
-
-4. Present findings alongside the PR description.
+One review engine, one set of rubrics — design and code alike. This skill no longer keeps a separate, lighter review prompt (DRY).
 
 ### 5. Create PR
 Offer to create the PR:
@@ -124,6 +122,7 @@ After PR creation:
 - The PR description must trace back to grimoire artifacts — this is what makes the audit trail work.
 - Include the `Change: <change-id>` line at the bottom so `grimoire trace` can find it.
 - Don't pad the description with boilerplate. Keep it factual: what changed, why, how to verify.
+- A downtime-incurring or backward-incompatible schema migration MUST carry a `⚠️` flag in the PR body (Deployment impact section) — never let it merge silently. Zero-downtime is not forced; *visibility* of the cost is.
 - The post-implementation review is optional and quick — it's not a replacement for the design review, just a sanity check on the actual code.
 - If tasks are incomplete, warn the user but don't block PR creation — they may want a draft PR.
 

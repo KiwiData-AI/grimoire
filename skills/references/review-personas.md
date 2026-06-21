@@ -158,6 +158,8 @@ Each persona below names what it evaluates. The calling skill points the persona
 
 Skip if the change is purely internal (no user-facing behavior).
 
+**Anchor — INVEST + outcome over output.** Judge the change as a well-formed unit of value, using the review-relevant slice of INVEST: **V**aluable (solves a real user problem — not gold-plating), **S**mall/scoped (one coherent outcome, not a grab-bag), **T**estable (acceptance is checkable from the artifact in front of you). Review the *outcome* the change targets, not output volume. INVEST is a lens on what's already specified — the PM persona adds no scope of its own; a "nice to have" it invents is gold-plating, the same failure it flags in others.
+
 Evaluate:
 - **Outcome**: Manifest's Why states the problem and how success is measured? Mechanism vs outcome ("add an endpoint" vs "users can reset passwords")?
 - **Coverage**: Do feature scenarios cover all user-facing behaviors? Missing edge cases, error states, alternate flows?
@@ -172,11 +174,12 @@ Treat accepted decisions as constraints — cite ADR ID before suggesting an ove
 
 Evaluate:
 - **Build vs Buy** *(design only)*: Was prior art research thorough? If a well-maintained library exists that the manifest doesn't mention, **blocker**.
-- **Simplicity**: Simplest design that solves the problem? Unnecessary abstraction, indirection, premature generalization, config-driven where direct call would do?
+- **Simplicity (YAGNI ladder)**: Walk `../references/principles.md` §4 in order — could it not exist (YAGNI), does the stdlib do it, does a native platform feature cover it, does an installed dep solve it, is it one line? Flag the first rung the code skipped: unnecessary abstraction, indirection, premature generalization, config-driven where a direct call would do. Abstract on the third real use, not the first (**Rule of Three**) — two copies is not yet a pattern. Every finding **names the concrete replacement** (`stdlib: 27-line validator → "@" in email, 1 line`), not just "this seems complex" — a finding the author can't act on is noise.
 - **Architecture**: Decisions sensible for this codebase? Will this paint us into a corner?
 - **Conventions** *(PR/pre-commit)*: Does new code match file layout, naming, and patterns already in the touched areas? Check `.grimoire/docs/<area>.md` if present.
-- **Reuse**: Existing utilities/functions that were re-implemented? `grep` for similar names; check area docs' reusable-code lists.
+- **Reuse / reinvention**: Existing utilities re-implemented (`grep` similar names; area-doc reusable lists), or stdlib / native-platform / installed-dep functionality hand-rolled (principles.md §3 — don't reinvent the wheel). Name what already does the job.
 - **Dead code** *(PR/pre-commit)*: Functions added but not called, imports unused, commented-out code, stubs with no implementation.
+- **Safe deletion / refactor (Chesterton's Fence)**: Before recommending code be deleted, inlined, or "simplified away," state *why it exists* — a guard, a workaround, a non-obvious caller. If you can't explain the fence, don't tear it down — ask. YAGNI removes the speculative, never the load-bearing-but-unobvious.
 - **Scope creep** *(PR/pre-commit)*: Files changed outside the scope implied by the change-id or manifest. Formatting-only changes to unrelated files = noise.
 - **Error handling**: Errors handled at boundaries? Internal code shouldn't be littered with defensive checks; external inputs must be validated.
 - **Tests**: New behaviors have tests? Tests make real assertions (not just `assert true` / mock everything)? Check `./testing-contracts.md` if framework matches.
@@ -205,12 +208,24 @@ For every new entry point, data flow, or trust boundary:
 
 Skip categories that don't apply.
 
+#### LINDDUN (privacy) — engage only when briefing data-sensitivity is pii/financial/phi, or the change touches personal data
+
+STRIDE covers security, not privacy. For flows that collect, store, or share personal data, scan the privacy threats STRIDE under-covers:
+
+- **Linking / Identifying**: can records be correlated to one person, or a dataset/log de-anonymize someone who shouldn't be identifiable?
+- **Data disclosure (minimization)**: is each collected field minimized, purpose-bound, and retention-limited? (GDPR data-minimization) — excess collection/retention is the finding.
+- **Detecting**: presence/membership inferable via side channels (timing, error-message diffs)?
+- **Non-compliance**: storage/retention violates `project.compliance` or an accepted ADR?
+
+Most reviews: only **Data disclosure** + **Linking/Identifying** apply — skip the rest unless the flow warrants. (Full LINDDUN: Linking, Identifying, Non-repudiation, Detecting, Disclosure, Unawareness, Non-compliance.)
+
 #### Code-level scan *(PR/pre-commit only)*
 
 - **Secrets**: Grep diff for hardcoded keys, tokens, passwords, cloud credentials, JWT secrets. Any hit = **blocker**.
 - **Injection**: Raw SQL with string concatenation, shell-exec with user input, `eval`/`exec`, unsafe deserialization. Tag OWASP + CWE.
 - **Input validation**: New endpoints without schema validation, file uploads without size/type limits, path params used directly in filesystem calls.
 - **Auth**: New routes/handlers missing auth decorators / middleware. Compare against neighbors in same file.
+- **API authorization (OWASP API Top 10 2023)**: new/changed endpoints — object-level authz (**BOLA**: can user A fetch user B's object by id?), property-level (**BOPLA**: mass-assignment / over-exposed response fields), SSRF on user-supplied URLs. The API-specific complement to the generic Top 10.
 - **Dependencies**: New packages — pinned to exact version (no `^`/`~`/`>=`/`*`), lockfile updated and committed with integrity hashes, name is real (typosquat risk), `dep_audit` output clean if committed. Flag packages with zero downloads, recent ownership transfer (~90 days), suspicious new maintainers, or post-install scripts. Unpinned dep or missing lockfile entry on a new package = **blocker** (see `./security-compliance.md` § Supply Chain Defense).
 - **PII**: New logging that could emit PII; new storage of personal data without encryption.
 - **Cross-service auth**: If `context.yml` lists related services, are service-to-service calls authenticated?
@@ -227,20 +242,21 @@ Every security finding gets OWASP 2021 + CWE tags. See CWE quick-reference in `.
 
 Skip if change is purely internal.
 
+**Mandate — review the *testing of the spec*, not the spec itself.** QA owns exactly one question: *is what the spec already defines adequately and honestly tested?* It does **not** own feature completeness or scope — the Product Manager owns coverage of user-facing behaviors, the Senior Engineer owns build correctness. QA never expands the requirement. A behavior, edge case, or failure mode the spec does not define is a **scope question routed to the PM**, never a QA finding. YAGNI: demand no test for behavior nobody asked for. This persona is the most prone to over-reach — if a finding would *add* required behavior, it is out of lane; drop it.
+
 **Coverage-gap routing (apply before recommending any new artifact).** A coverage gap does NOT default to "write a `.feature`." Route each gap to its one home using the feature-file admission test in `../grimoire-draft/SKILL.md` (§ jurisdiction table + the four admission gates):
 - A `.feature` scenario is warranted **only** for an actor-observable behavior that passes all four gates (external actor, observable outcome, domain language, survives reimplementation).
 - An invariant — observability/logging guarantee, perf budget, security control, compliance rule — is a **constraint**. Recommend it be recorded/verified in `.grimoire/docs/constraints.md`, never as a new `.feature`.
 - When a behavior gap belongs in features, the default is **extend an existing feature file** in the same domain — recommend a new file only if no existing file fits, and say which were considered. Don't propose a `.feature` per finding.
 - Test gaps for already-specified behavior are a *missing test*, not a missing feature — recommend the test, not a new spec.
 
-Evaluate:
-- **Test presence**: Every new user-facing behavior has a test? Every scenario from a linked feature file has step definitions? Missing test = recommend the test; only recommend a new/extended `.feature` if the behavior itself is unspecified *and* passes the admission test.
-- **Test quality**: Tests asserting outputs, or just that code "ran"? Over-mocked tests = red flag.
-- **Negative paths**: For each happy path, is there a failure-path test?
-- **Edge cases**: Empty states, concurrent users, interruptions, boundary values? A missing edge case is a missing test/scenario in the relevant existing feature — not grounds for a new feature file.
-- **Observability**: New feature — how will it be debugged in prod? Structured logs / metrics / error surfaces? Observability is a **constraint**: verify it's asserted in `constraints.md`; do not recommend a `.feature` for it.
-- **Regression risk** *(PR/pre-commit)*: Which existing tests cover the touched code? Were any tests removed or weakened?
-- **Accessibility**: New UI — keyboard nav, aria labels, contrast?
+Evaluate (every check anchored to behavior the spec / feature already defines):
+- **Test presence**: Does every behavior the spec defines have a test? Every scenario in a linked feature file have step definitions? Missing test for a *specified* behavior → recommend the test. A behavior with no spec is not a QA finding — route to PM.
+- **Test quality (FIRST + behavior-not-implementation)**: Tests assert real outputs, not that code "ran"? Tests **F**ast / **I**solated / **R**epeatable / **S**elf-validating / **T**imely? Over-mocked tests that verify the mock instead of the behavior, or tests coupled to implementation internals rather than observable behavior = QA's highest-value finding. This is the lane — spend the attention here.
+- **Negative paths**: Where the spec defines a failure behavior (an error, a rejection, a rollback), is it tested? Do **not** invent failure modes the spec is silent on.
+- **Edge cases (Boundary Value Analysis / Equivalence Partitioning)**: For input the spec gives a range or set, test the boundaries and one value per equivalence class — but only for ranges the spec, a scenario, or a `constraints.md` entry actually names. **BVA bounds "enough edge cases" to the spec's stated values; it does not license inventing scenarios.** An unspecified edge case ("what about concurrent users / interruptions?") is a scope question for the PM — drop it, don't file it as a test gap.
+- **Regression risk** *(PR/pre-commit)*: Which existing tests cover the touched code? Were any removed or weakened? A silently weakened assertion is a **blocker**.
+- **Out of lane — defer, don't duplicate**: Observability is a **constraint** (verify it's in `constraints.md`; never a `.feature`). Accessibility belongs to the Adversarial User personas (§4.7). Note in one line and defer — do not re-file their findings as QA blockers.
 
 ### 4.5 Data Engineer
 
@@ -251,11 +267,12 @@ Read:
 - `.grimoire/docs/data/schema.yml` — current baseline
 
 Evaluate:
-- **Migrations**: Safe on live DB? Adding NOT NULL without default on large table = **blocker**. Renames without two-step migration = **blocker**.
+- **Migrations — name the deployment consequence, don't mandate zero-downtime**: State plainly what the change costs to ship — does this ALTER **lock the table** (a downtime-incurring change)? Is it **backward-incompatible** (old app versions break mid-deploy)? Is it **irreversible**? Zero-downtime is *not* assumed — many projects accept a maintenance window. Surface the cost as a decision for the human ("this rename locks `users` and breaks rolling deploy — confirm a downtime window is acceptable, or split expand→contract to avoid it"), **not** an automatic blocker. **Expand–Contract / Parallel Change** (add new → backfill → switch reads → drop old) is the *option* offered when the project wants zero-downtime, never a requirement. **A downtime-incurring or backward-incompatible migration MUST be flagged in the PR / merge-request body** (a one-line `⚠️ incurs downtime` / `breaking schema change` note) so it's visible at merge — surfacing it only in the review is not enough.
 - **Indexes**: New foreign keys with no index? New query patterns against unindexed columns?
 - **Naming**: New fields follow existing schema conventions?
-- **Backwards compatibility**: Will schema change break existing API consumers, queries, or reports?
-- **Breaking contract**: `data.yml` vs `schema.yml` — removed/renamed/retyped response fields or new required request fields = **blocker** unless migration path documented.
+- **Data minimization (PII)**: New columns holding personal data — each field necessary, purpose-bound, retention-limited, encrypted at rest if sensitive? Excess PII storage = finding. Pairs with the Security persona's LINDDUN Data-disclosure check (§4.3).
+- **Backward / forward compatibility (named outcome, not forced)**: State *whether* the change is backward-compatible (old readers survive) and forward-compatible (old code + new schema holds during deploy). Report the outcome so breaking is a *conscious* choice, not a surprise — the project decides if it's acceptable; don't force compatibility. If broken, it rides the same PR / merge-request flag as a downtime change.
+- **Breaking contract**: `data.yml` vs `schema.yml` — removed/renamed/retyped response fields or new required request fields = **blocker** unless migration path documented. (This is the silent-break exception: breaking a *documented consumer contract* without noting it harms other people's code — distinct from a self-contained downtime choice above.)
 - **Transactions**: Multi-step writes wrapped in a transaction?
 - **External APIs** *(design)*: New API dependency — `schema_ref` pointing to a stable spec? Fallback if API unavailable?
 

@@ -410,14 +410,14 @@ describe("initProject", () => {
 
   describe("askPreferences — secret scan on serialized config (§4.2a)", () => {
     it("rejects when serialized config contains a literal *_TOKEN value", async () => {
-      const { scanForSecrets } = await import("./init.js");
+      const { scanForSecrets } = await import("./init-config.js");
       expect(() =>
         scanForSecrets("project:\n  custom: FIGMA_ACCESS_TOKEN: ghp_real_value\n")
       ).toThrow(/secret/i);
     });
 
     it("passes when *_TOKEN values use ${VAR} env-var references", async () => {
-      const { scanForSecrets } = await import("./init.js");
+      const { scanForSecrets } = await import("./init-config.js");
       expect(() =>
         scanForSecrets(
           "project:\n  env: FIGMA_ACCESS_TOKEN: ${FIGMA_ACCESS_TOKEN}\n"
@@ -426,7 +426,7 @@ describe("initProject", () => {
     });
 
     it("flags generic FOO_KEY assignment too (future-proof for new MCPs)", async () => {
-      const { scanForSecrets } = await import("./init.js");
+      const { scanForSecrets } = await import("./init-config.js");
       expect(() =>
         scanForSecrets("project:\n  custom:\n    NEW_API_SECRET: hunter2plaintextvalue\n")
       ).toThrow(/secret/i);

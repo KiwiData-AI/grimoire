@@ -1,14 +1,14 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
-import { simpleGit } from "simple-git";
 import fg from "fast-glob";
 import { loadConfig, type GrimoireConfig, type ToolConfig } from "../utils/config.js";
 import { findProjectRoot } from "../utils/paths.js";
-import { spawnWithStdin } from "../utils/spawn.js";
 import { analyzeTestQuality, TEST_FILE_GLOBS, TEST_FILE_IGNORE } from "./test-quality.js";
 import { checkDocStyle } from "./doc-style.js";
 import { loadAcceptedRiskIds, partitionAdvisories } from "./risk-register.js";
+import { runComplexityStep } from "./check-complexity.js";
+import { runLlmStep, getBuiltinLlmFallback } from "./check-llm.js";
 
 // Steps whose scanner prints CVE/GHSA ids, so the risk-acceptance register can
 // suppress them. No-op for tools that don't key failures by advisory id.
@@ -24,7 +24,7 @@ export interface CheckOptions {
   json: boolean;
 }
 
-interface StepResult {
+export interface StepResult {
   step: string;
   status: "pass" | "fail" | "skip" | "error";
   duration: number;
@@ -205,122 +205,6 @@ async function runShellStep(
   }
 }
 
-async function resolveChangedFiles(root: string): Promise<{ files: string[]; diff: string }> {
-  try {
-    const git = simpleGit(root);
-    const nameOnly = await git.diff(["--name-only", "HEAD"]);
-    const files = nameOnly.trim().split("\n").filter(Boolean);
-    if (files.length > 0) {
-      const diff = await git.diff(["HEAD", "--", ...files]);
-      return { files, diff };
-    }
-    const stagedNames = await git.diff(["--name-only", "--cached"]);
-    const stagedFiles = stagedNames.trim().split("\n").filter(Boolean);
-    const diff = await git.diff(["--cached", "--", ...stagedFiles]);
-    return { files: stagedFiles, diff };
-  } catch {
-    return { files: [], diff: "" };
-  }
-}
-
-const MAX_DIFF_CHARS = 40_000;
-
-function buildLlmPrompt(prompt: string, files: string[], diff: string): string {
-  // Strip newlines and backticks from each filename to prevent prompt injection.
-  const safeFiles = files.map((f) => `\`${f.replace(/[\n\r`]/g, "")}\``).filter((f) => f.length > 2);
-  const fileList = safeFiles.length > 0 ? `\n\nFiles changed:\n${safeFiles.join("\n")}` : "";
-  const safeDiff = diff.replace(/`{3,}/g, "```");
-  const diffSection = safeDiff
-    ? `\n\nDiff:\n\`\`\`diff\n${safeDiff.slice(0, MAX_DIFF_CHARS)}\n\`\`\``
-    : "";
-  return `${prompt}${fileList}${diffSection}\n\nOnly flag issues directly observable in the diff above. Do not infer issues from filenames or speculate about code not shown.\n\nRespond with PASS or FAIL as the very first word on the very first line (no markdown, no asterisks, no extra words on that line). Then explain any issues on subsequent lines.`;
-}
-
-function parseLlmVerdict(output: string): boolean {
-  const firstLine = output.trim().split("\n").map((l) => l.trim()).find(Boolean)?.toUpperCase() ?? "";
-  return /\bPASS\b/.test(firstLine) && !/\bFAIL\b/.test(firstLine);
-}
-
-async function runLlmStep(
-  step: string,
-  prompt: string,
-  llmCommand: string,
-  root: string,
-  changedOnly: boolean
-): Promise<StepResult> {
-  const start = Date.now();
-
-  try {
-    await execFileAsync("which", [llmCommand]);
-  } catch {
-    return { step, status: "skip", duration: Date.now() - start, output: "", reason: `${llmCommand} not found` };
-  }
-
-  const { files, diff } = changedOnly ? await resolveChangedFiles(root) : { files: [], diff: "" };
-
-  if (changedOnly && files.length === 0) {
-    return { step, status: "pass", duration: Date.now() - start, output: "No changed files to review." };
-  }
-
-  try {
-    const output = await spawnWithStdin(llmCommand, ["--print"], buildLlmPrompt(prompt, files, diff), root);
-    return { step, status: parseLlmVerdict(output) ? "pass" : "fail", duration: Date.now() - start, output };
-  } catch (err) {
-    return {
-      step,
-      status: "error",
-      duration: Date.now() - start,
-      output: err instanceof Error ? err.message : String(err),
-      reason: "LLM command failed",
-    };
-  }
-}
-
-const BUILTIN_LLM_FALLBACKS: Record<string, ToolConfig> = {
-  security: {
-    name: "llm",
-    prompt: `Review these changed files for security vulnerabilities. For each finding:
-1. Describe the vulnerability
-2. Tag it with the relevant OWASP Top 10 category (e.g., A01:2021-Broken Access Control) and CWE ID (e.g., CWE-89)
-3. Rate severity: critical / high / medium / low
-
-Check specifically for:
-- SQL injection (CWE-89) — string concatenation in queries instead of parameterized queries
-- XSS (CWE-79) — unescaped user input in HTML/template output
-- Broken authentication (CWE-287) — custom token generation, weak session management, missing auth checks
-- Insecure cryptography (CWE-327) — MD5/SHA1 for passwords, custom crypto, weak random
-- SSRF (CWE-918) — user-controlled URLs in server-side requests
-- Path traversal (CWE-22) — user input in file paths without sanitization
-- Insecure deserialization (CWE-502) — pickle.loads, yaml.load without SafeLoader, eval()
-- Missing access control (CWE-862) — endpoints without authorization checks
-- CSRF (CWE-352) — state-changing endpoints without CSRF tokens
-- Hardcoded secrets (CWE-798) — API keys, passwords, tokens in source code`,
-  },
-  dep_audit: {
-    name: "llm",
-    prompt: `Review these changed files for newly added dependencies or imports. For each finding:
-1. Verify the package name is real and correctly spelled — flag potential typosquatting (e.g., 'reqeusts' instead of 'requests', 'lodash-utils' instead of 'lodash')
-2. Flag packages you cannot verify as real published packages
-3. Flag packages with known security advisories if you are aware of them
-4. Tag supply chain risks with CWE-1357 (Reliance on Insufficiently Trustworthy Component)`,
-  },
-  secrets: {
-    name: "llm",
-    prompt: `Review these changed files for hardcoded secrets, API keys, passwords, tokens, private keys, or credentials.
-Tag findings with CWE-798 (Use of Hard-coded Credentials) or CWE-312 (Cleartext Storage of Sensitive Information).
-Flag any string that looks like a secret value rather than a placeholder or environment variable reference.
-Check for: API keys, database connection strings, JWT secrets, private keys, OAuth client secrets, webhook URLs with tokens.`,
-  },
-  best_practices: {
-    name: "llm",
-    prompt: "Review these changed files for best practices violations",
-  },
-};
-
-function getBuiltinLlmFallback(step: string): ToolConfig | undefined {
-  return BUILTIN_LLM_FALLBACKS[step];
-}
-
 const MAX_FAIL_LINES = 30;
 
 function printFailOutput(output: string): void {
@@ -433,81 +317,3 @@ async function runDocStyleStep(root: string, config: GrimoireConfig): Promise<St
     };
   }
 }
-
-async function tryRadon(root: string): Promise<{ output: string; hasHighComplexity: boolean } | null> {
-  try {
-    await execFileAsync("which", ["radon"]);
-    const { stdout, stderr } = await execFileAsync("sh", [
-      "-c",
-      "radon cc . -a -nc --exclude 'node_modules,.venv,dist,migrations' 2>&1 || true",
-    ], { cwd: root, timeout: 60_000 });
-    const output = (stdout + stderr).trim();
-    const hasHighComplexity = /\b[C-F]\s+\(\d+\)/.test(output) || /\b[C-F]\b/.test(output);
-    return { output, hasHighComplexity };
-  } catch {
-    return null;
-  }
-}
-
-async function tryEslintComplexity(root: string): Promise<{ output: string; hasWarnings: boolean } | null> {
-  try {
-    await execFileAsync("which", ["npx"]);
-    const { stdout, stderr } = await execFileAsync("sh", [
-      "-c",
-      "npx eslint --rule 'complexity: [warn, 10]' --ext .ts,.tsx,.js,.jsx src/ 2>&1 || true",
-    ], { cwd: root, timeout: 60_000 });
-    const output = (stdout + stderr).trim();
-    // Match ESLint complexity rule output ("  complexity" at end of warning line).
-    // Avoids false positives from parsing errors or unrelated warnings.
-    const hasWarnings = / complexity$/m.test(output);
-    return { output, hasWarnings };
-  } catch {
-    return null;
-  }
-}
-
-async function checkPythonComplexity(root: string, start: number): Promise<StepResult | null> {
-  const radon = await tryRadon(root);
-  if (!radon) return null;
-  return {
-    step: "complexity",
-    status: radon.hasHighComplexity ? "fail" : "pass",
-    duration: Date.now() - start,
-    output: radon.output || "No high-complexity functions found.",
-  };
-}
-
-async function checkJsComplexity(root: string, start: number): Promise<StepResult | null> {
-  const eslint = await tryEslintComplexity(root);
-  if (!eslint) return null;
-  return {
-    step: "complexity",
-    status: eslint.hasWarnings ? "fail" : "pass",
-    duration: Date.now() - start,
-    output: eslint.output || "No high-complexity functions found.",
-  };
-}
-
-async function runComplexityStep(root: string, config: GrimoireConfig): Promise<StepResult> {
-  const start = Date.now();
-  const lang = config.project.language;
-
-  if (!lang || lang === "python") {
-    const result = await checkPythonComplexity(root, start);
-    if (result) return result;
-  }
-
-  if (!lang || ["typescript", "javascript"].includes(lang ?? "")) {
-    const result = await checkJsComplexity(root, start);
-    if (result) return result;
-  }
-
-  return {
-    step: "complexity",
-    status: "skip",
-    duration: Date.now() - start,
-    output: "",
-    reason: "no complexity tool found (install radon for Python or eslint for JS/TS)",
-  };
-}
-
