@@ -21,7 +21,7 @@ Implement tasks from a planned grimoire change using **test-first discipline at 
 
 Do NOT write a `.feature` scenario for a `unit-invariant` or `characterization` task — forcing Gherkin where a unit test is correct is the antipattern that fills feature files with slop. One right way: behavior → scenario, everything else → unit test.
 
-**Artifacts are edited live on the feature branch.** Features, decisions, constraints, and schema are real files in `features/`, `.grimoire/decisions/`, `.grimoire/docs/`. There is no copy-into-change-folder and no promote step — `git diff` is the staging area. The change folder holds only ephemeral process scaffolding (`manifest.md`, `tasks.md`).
+**Artifacts are edited live on the feature branch.** Features, decisions, constraints, and schema are real files in `features/`, `.grimoire/decisions/`, `.grimoire/docs/`. There is no copy-into-change-folder and no promote step — `git diff` is the staging area. The change folder holds only ephemeral process scaffolding (`manifest.md`, `tasks.md`, and the apply-maintained `learnings.md`).
 
 ## CRITICAL: Two Rules That Must Not Be Broken
 
@@ -84,16 +84,26 @@ If the user doesn't specify, default to review mode.
 
 **Both modes:** Update `tasks.md` in real time as work progresses. Mark tasks `- [x]` the moment they pass. If a task is split, reordered, or new tasks are discovered during implementation, update `tasks.md` immediately so it always reflects the current state. The task list is the source of truth for progress — if the session is interrupted, the next agent should be able to read `tasks.md` and know exactly where to resume.
 
+### Working Memory: `learnings.md`
+
+Apply keeps one ephemeral file, `.grimoire/changes/<change-id>/learnings.md` (create it from `templates/learnings.md` the first time you need it). It is the loop's memory between attempts and sessions, and it is **removed at finalize** with the rest of the change folder — nothing in it reaches the repo. Two sections, two lifecycles:
+
+- **Failure-mode notes** — transient. After a failed attempt, append one line: what you tried and why it failed. Before any retry, read this section so you don't repeat a dead end. Prune a task's notes the moment it goes green. Never promote them.
+- **Discovered facts** — durable facts about the project learned while implementing (a build flag, a convention, an undocumented contract). Stage them here with their destination home; at finalize they are reconciled into that one home and cleared. Do **not** write them into `AGENTS.md`.
+
+Subagents and fresh sessions read and append to this file the same way they use `tasks.md` — it is shared state on disk, not context-window memory.
+
 ### Stuck Detection & Recovery
 
 **You MUST track failed attempts per task.** If a test won't go green, count your attempts:
 
+- **Before any attempt past the first:** read the task's **failure-mode notes** in `learnings.md`. Do not repeat an approach already recorded there as failed.
 - **Attempt 1:** Try the straightforward implementation from the task description.
-- **Attempt 2:** If attempt 1 failed, re-read the error carefully. Try a *different* approach — not the same code with minor tweaks. State what you're doing differently and why.
-- **Attempt 3 (final):** If attempt 2 failed, try one more *fundamentally different* approach. If the same error recurs, the problem is likely not in your implementation.
+- **Attempt 2:** If attempt 1 failed, append a failure-mode note (`<task-id> · tried … · failed: …`), re-read the error carefully, then try a *different* approach — not the same code with minor tweaks. State what you're doing differently and why.
+- **Attempt 3 (final):** If attempt 2 failed, append the second dead end as a failure-mode note, then try one more *fundamentally different* approach. If the same error recurs, the problem is likely not in your implementation.
 
 **After 3 failed attempts on a single task, STOP.** Do not continue. Instead:
-1. Add a comment to `tasks.md` under the task: `<!-- BLOCKED: <summary of what was tried and what failed> -->`
+1. Add a comment to `tasks.md` under the task: `<!-- BLOCKED: <summary> -->` (the full trail is already in the failure-mode notes)
 2. Present to the user:
    - What the task requires
    - What you tried (all 3 approaches, briefly)
@@ -115,9 +125,28 @@ If the user doesn't specify, default to review mode.
 
 **Never silently retry the same approach.** If your implementation produced error X and you're about to write code that will produce error X again, stop and think about why. If you can't identify what would change the outcome, stop and ask.
 
+### Circuit Breaker & Cross-Section Thrash (Autonomous Mode)
+
+The per-task 3-attempt cap bounds a single task; it cannot see the *run* cycling. Autonomous mode adds a loop-level breaker the parent orchestrator checks **between sections**. Caps live under `llm.coding.limits` in `.grimoire/config.yaml`:
+
+| Cap | Default | Kind |
+|-----|---------|------|
+| `max_sections_without_checkpoint` | 5 | followable — halt and checkpoint with the user |
+| `consecutive_blocked` | 2 | followable — two BLOCKED sections in a row → halt |
+| `max_cost_usd` | null (opt-in) | **soft** — self-reported; not harness-enforced in v1 |
+| `max_wallclock_min` | null (opt-in) | **soft** — self-reported; not harness-enforced in v1 |
+
+**Cross-section thrash detection:** halt the whole run — don't just retry locally — when the last two sections both ended BLOCKED, **or** when a section's failure-mode error class repeats the prior section's (read the failure-mode notes in `learnings.md` to compare). A failed attempt always leaves a note, so the thrash signal accumulates across sections; the breaker is the last resort once that signal shows the loop is stuck, not the first line of defense.
+
+**On any trip:** stop, state the trip reason and a one-line diagnosis (what cycled, what was tried), and hand to the user. Do not continue past a tripped breaker.
+
+> **Enforcement honesty:** the section and BLOCKED caps are orchestrator behavior the agent follows; the cost and wall-clock caps are *soft* — the agent self-reports against them and they are not enforced by the harness in v1. A hard, code-enforced breaker is a deferred follow-up.
+
 ### Session Management — MANDATORY Fresh Context Per Section
 
 **Do NOT implement all tasks in a single conversation context.** Context accumulates across tasks and degrades output quality — the LLM starts hallucinating based on stale file contents it read 5 tasks ago. This is not a suggestion. Fresh context per task section is required.
+
+**Size one task to one context.** The goal is not statelessness for its own sake — a task should be small enough that one coherent context carries it start to finish (stateful *within* a task), and context is reset *between* tasks. If a single task overflows its context mid-flight, that is a **smell that the task is too big** — split the spec, don't paper over it with a stateless restart loop. Fresh-context-per-section gives you the "reset between" half for free; keeping tasks small gives you the "continuity within" half.
 
 Each task section in `tasks.md` has a `<!-- context: ... -->` block listing the exact files needed. This is the loading list for that section's fresh context.
 
@@ -131,6 +160,12 @@ The parent agent is the **orchestrator only** — it does NOT implement tasks it
    You are implementing grimoire tasks. Read `.grimoire/changes/<change-id>/tasks.md`,
    find section <N>, and implement all unchecked tasks in that section.
    Follow the red-green BDD cycle for each task. Mark tasks [x] when done.
+
+   Use `.grimoire/changes/<change-id>/learnings.md` as working memory: read a
+   task's failure-mode notes before retrying it and don't repeat a recorded dead
+   end; append a failure-mode note after any failed attempt; prune them when the
+   task goes green; append durable project facts to Discovered facts with their
+   home (never to AGENTS.md). Never weaken or delete a test to force green.
 
    Before writing any production code, read `../references/code-quality.md`,
    `../references/testing-contracts.md`, and `../references/pattern-guard.md`.
@@ -255,10 +290,13 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
    - Assertions check behavior, not just types or existence — "response status is 302 and redirect URL is /dashboard/" not "response is not None"
    - If you wrote a test that would pass against a null/trivial implementation, strengthen it
 10. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix code, re-run tests, re-check. Do not mark `[x]` while a check fails.
-11. Mark complete: `- [ ]` → `- [x]`
-12. Move to next task
+11. **Reconcile working memory:** prune this task's failure-mode notes from `learnings.md` — it's green, they've served their purpose. If you learned a durable project fact while implementing (a build flag, a convention, an undocumented contract, an architectural constraint), append it to the **Discovered facts** section with its destination home — don't write it into `AGENTS.md` and don't leave it only in context.
+12. Mark complete: `- [ ]` → `- [x]`
+13. Move to next task
 
 **This is strict red-green BDD.** A test that has never been red has never proven it can catch a failure. The red step is NOT a formality — it is the proof that the test works. If you skip it or the test passes immediately, you have a false positive that provides zero safety.
+
+**Never game the gate (reward-hack guard).** When a test won't pass, fix the production code — never weaken or delete the test to force green. Deleting a test, loosening an assertion to match wrong output, narrowing what it checks, or skipping/`xfail`-ing it to get a green run is **stop-and-flag**, not a valid completion. The gate is the convergence signal; gaming it produces plausible-wrong code faster. If a test genuinely encodes the wrong expectation, that is a spec problem — STOP and go back to draft, don't quietly edit the test to pass.
 
 **Step definition rules:**
 - Organize by domain concept, not by feature file
@@ -290,7 +328,8 @@ When all tests are green. Features, decisions, and constraints were edited live 
 2. Constraints (`.grimoire/docs/constraints.md`) were edited in place — nothing to move.
 3. If the change has a `data.yml` (schema delta), apply its `add`/`modify`/`remove` entries to the live `.grimoire/docs/data/schema.yml` so the baseline schema stays current. `data.yml` is a migration-delta spec (ephemeral scaffolding carrying nullability/safety/ordering intent a raw diff wouldn't), not a copy of the schema — `schema.yml` is the live target; the delta is discarded with the change folder.
 4. Refresh the project overview: run `grimoire docs`. It regenerates `.grimoire/docs/OVERVIEW.md` (the human entry point) from the now-current features, constraints, decisions, and schema — superseded decisions drop out automatically. This is the existing `docs` command, not a new one.
-5. Remove the change directory `.grimoire/changes/<change-id>/`. Its `manifest.md` + `tasks.md` (+ any `data.yml`) and the `draft.md` design doc are ephemeral process scaffolding. `draft.md` was retained read-only through the pipeline as the agreed-design reference; this is its closing deletion. The durable record is the branch, the PR, and `git log` — linked by the `Change: <change-id>` trailer; git history still preserves `draft.md` if ever needed. **There is no archive tree** (don't reinvent git history).
+5. Reconcile `learnings.md`: for each entry under **Discovered facts**, write it into the home it names — an area doc (`.grimoire/docs/<area>.md`), a decision, a constraint, or `schema.yml`. Confirm the routing with the user (it's correctable) and drop stale ones. Failure-mode notes are discarded, not promoted. This is the one place facts learned during apply enter the durable record — `AGENTS.md` is never the destination.
+6. Remove the change directory `.grimoire/changes/<change-id>/`. Its `manifest.md` + `tasks.md` + `learnings.md` (+ any `data.yml`) and the `draft.md` design doc are ephemeral process scaffolding. `draft.md` was retained read-only through the pipeline as the agreed-design reference; this is its closing deletion. The durable record is the branch, the PR, and `git log` — linked by the `Change: <change-id>` trailer; git history still preserves `draft.md` if ever needed. **There is no archive tree** (don't reinvent git history).
 
 ### 8. Commit
 
