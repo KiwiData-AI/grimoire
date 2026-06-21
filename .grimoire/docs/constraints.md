@@ -16,6 +16,8 @@
 | Subprocesses are invoked with an explicit argv, never a shell string | No `shell: true`; git/gh/linter args are passed as array elements so external/file input cannot inject shell syntax | `src/utils/spawn.test.ts` (args passed positionally); `execFile` usage in `check.ts`, `pr.ts`, `branch-check.ts` | — |
 | Diffs and filenames sent to an LLM CLI are fenced/sanitized | Untrusted repo content piped to a configured LLM must not break out of its prompt context (prompt-injection hardening in `buildLlmPrompt`) | TODO: unit-invariant test for `buildLlmPrompt` fencing (`src/core/check.ts`) | — |
 | `.grimoire/config.yaml` is trusted code | `grimoire check`/`health` execute config-defined shell commands by design — same trust model as npm scripts / Makefiles; documented as a user-facing warning, not sandboxed | README "Security" note in the Pre-Commit Pipeline section | — |
+| Autonomous apply halts at a configured ceiling (sections-without-checkpoint, cost, wall-clock, consecutive-BLOCKED) before exhausting the token budget | Prevents loop death-spirals — unbounded retry and cost blowup — in autonomous mode | TODO: unit-invariant once the breaker is enforced in code; v1 is instruction-only in `grimoire-apply` | 0035 |
+| During apply, a test is never weakened or deleted to make the red-green gate pass | The gate is the convergence signal; gaming it (reward-hacking) defeats verification | TODO: unit-invariant / guard check once enforced; v1 is instruction-only in `grimoire-apply` | 0035 |
 
 <!--
 Add one row per constraint. Guidance:

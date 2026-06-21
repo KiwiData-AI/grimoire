@@ -61,6 +61,10 @@ After any failure, state what you observe before proposing a fix. One sentence: 
 
 This applies especially to test failures. "The test failed" is not a diagnosis. "The test expected `302` but got `200` because the redirect middleware isn't registered in the test client" is.
 
+### Loop-level breaker (autonomous apply)
+
+The attempt budget above is per-problem. Autonomous `grimoire-apply` adds a run-level circuit breaker and cross-section thrash detection on top of it — see `grimoire-apply` SKILL.md. Don't duplicate the per-problem rules there; the breaker is the loop-scale backstop, this protocol is the per-problem one.
+
 ## When to Use Grimoire
 
 Use grimoire when the user's request involves:
@@ -178,7 +182,7 @@ If a task seems wrong or impossible during apply:
 
 ## Directory Structure
 
-Features, decisions, constraints, and schema are edited **live on the feature branch** — `git diff` is the staging area. A change folder holds only the ephemeral coordination artifacts (manifest + tasks) and is removed at finalize; the PR diff and git history are the record. There is no proposed-copy tree and no archive tree.
+Features, decisions, constraints, and schema are edited **live on the feature branch** — `git diff` is the staging area. A change folder holds only the ephemeral coordination artifacts (manifest, tasks, and the apply-maintained learnings file) and is removed at finalize; the PR diff and git history are the record. There is no proposed-copy tree and no archive tree.
 
 ```
 project-root/
@@ -193,7 +197,8 @@ project-root/
 │   └── changes/              # ephemeral per-change coordination — removed at finalize
 │       └── <change-id>/
 │           ├── manifest.md
-│           └── tasks.md
+│           ├── tasks.md
+│           └── learnings.md  # apply working memory: failure-mode notes + discovered facts
 ```
 
 ## Conventions
