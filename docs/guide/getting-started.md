@@ -31,7 +31,9 @@ grimoire init
 
 This generates `AGENTS.md` instructions and installs skills for the AI agents
 you select. See [`grimoire init`](/reference/cli#grimoire-init) for the full
-flag list.
+flag list, [Setup & best practices](/guide/setup) for per-language guidance
+(TypeScript, Python), and [Agent compatibility](/guide/compatibility) for what
+each AI tool supports.
 
 ## Day-to-day commands
 

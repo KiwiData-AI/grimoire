@@ -22,6 +22,8 @@ export default defineConfig({
           text: "Guide",
           items: [
             { text: "Getting started", link: "/guide/getting-started" },
+            { text: "Setup & best practices", link: "/guide/setup" },
+            { text: "Agent compatibility", link: "/guide/compatibility" },
           ],
         },
       ],
