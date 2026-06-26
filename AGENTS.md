@@ -248,7 +248,15 @@ This is what makes `grimoire trace` work. Without it, the commit is invisible to
 ### Decision Numbering
 - Sequential, zero-padded: `0001-`, `0002-`, etc.
 - Never reuse numbers
-- Superseded decisions keep their number, status updated to `superseded by NNNN`
+
+### Decision Lifecycle
+Status moves `proposed → accepted → (deprecated | superseded by NNNN)`:
+- `proposed` — drafted, not yet adopted.
+- `accepted` — in force; treated as a constraint by every stage.
+- `deprecated` — no longer recommended, with no direct replacement (the need went away).
+- `superseded by NNNN` — replaced by a newer decision.
+
+Supersession is **two-way and explicit**: the superseding ADR back-links the one it replaces (in Context or Decision Drivers), and the superseded ADR keeps its number with status set to `superseded by NNNN`. This is the only home for the link — don't restate it elsewhere.
 
 ### Step Definitions
 Organize by **domain concept**, NOT by feature file. Check the project's existing test setup and match its BDD framework conventions. See the active skill's testing reference for ecosystem-specific patterns.

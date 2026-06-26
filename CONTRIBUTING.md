@@ -71,6 +71,14 @@ Every command follows the same flow:
 | Add/change config | Interfaces in `src/utils/config.ts` + handle in `loadConfig()` |
 | Understand the project | `features/` (behavioral specs), `.grimoire/docs/` (intent-focused area docs), or the codebase-memory-mcp graph (live structure) |
 
+### Skill authoring
+
+Skills are pure markdown (ADR-0010). Two conventions keep them lean and the surface focused:
+
+**Where a capability belongs.** Before adding a skill, MCP connector, or CLI command, apply the capability-surface rule (ADR-0036): deterministic always-on → an AGENTS.md rule; on-demand workflow → a skill; one-shot deterministic → a CLI command; MCP only when universal *and* stateful. Pick the smallest surface that holds. This is what keeps grimoire a focused dev tool, not an agent OS.
+
+**Progressive disclosure.** Keep `SKILL.md` lean — it's the always-loaded instruction set. Heavy rubrics, catalogs, and persona prompts live in `skills/references/*.md`, loaded on demand by the skill that needs them. Soft thresholds (review-time, not CI gates): a `SKILL.md` past ~400 lines, or a frontmatter `description` past ~30 words, is a signal to move detail into a reference.
+
 ## Development
 
 ```bash

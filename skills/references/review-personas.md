@@ -116,6 +116,31 @@ Severity inflation patterns to avoid:
 - "Untested edge case" when no scenario in the briefing covers it → not a blocker.
 - "Missing observability" on a level 1-2 change → suggestion, never blocker.
 
+## 2c. Pre-Report Gate *(diff-review personas: Senior Engineer code-level, Security code-level scan, Code Style)*
+
+The materiality gate (§2) asks "does this matter to *this* project". The Pre-Report Gate asks the prior question: "is this *even a real issue*". Both apply; this one runs first on code-level findings. Before writing any finding, answer four questions:
+
+1. **Exact line** — can you cite the precise `file:line` the finding lives at?
+2. **Concrete failure mode** — can you state input → state → bad outcome? Not "could be unsafe" — the actual trigger and consequence.
+3. **Context read** — have you read the callers, imports, and tests around the line, not just the hunk? Trace the type and the caller before claiming a flaw.
+4. **Severity defensible** — would the §2b severity survive the Contrarian?
+
+Any "no / unsure" → downgrade or drop. A **blocker** additionally requires the offending snippet, the failure scenario, and **why existing guards don't already catch it** (neighbor code, framework default, narrowing on the prior line). If you can't write that, it is not a blocker.
+
+## 2d. Common False Positives — skip these
+
+Recurring LLM mis-flags. Each has a disqualifying condition — check it before filing. The fix is always *trace it*, not *pattern-match the syntax*.
+
+- **"Possible null deref"** when the preceding line narrows the type (`if (!x) return`, early-return, `?.` already guarding) → trace the type flow; drop.
+- **"N+1 query"** on a fixed-cardinality loop (known small constant) or a DataLoader / batched path → not N+1; drop.
+- **"Missing await"** on an intentionally detached call (`void promise`, fire-and-forget with a comment, a queued job) → check for `void` / comment first; drop.
+- **"Unhandled promise rejection"** on a promise that is `.catch`-chained or `await`ed in a `try` → trace the chain; drop.
+- **"Math.random() is insecure"** in a non-crypto context (jitter, sampling, test data, cache-bust) → security theater; drop. Flag only on tokens/keys/IDs.
+- **"Missing input validation"** when a traced caller already validates at the boundary → trace one caller; internal code may trust it (errors-at-the-boundary). Drop or route as a boundary note.
+- **"Magic number / no constant"**, **"add a comment"**, **"could be more generic"** with no project anchor → style preference; drop (or §4.6 suggestion at most).
+
+Closing test for any code-level finding: **would a senior engineer on this team actually change this in review?** If no, skip.
+
 ---
 
 ## 3. Complexity Gating
@@ -170,12 +195,13 @@ Evaluate:
 
 ### 4.2 Senior Engineer
 
-Treat accepted decisions as constraints — cite ADR ID before suggesting an override.
+Treat accepted decisions as constraints — cite ADR ID before suggesting an override. On PR/pre-commit, run the Pre-Report Gate (§2c) and check §2d before filing any code-level finding.
 
 Evaluate:
 - **Build vs Buy** *(design only)*: Was prior art research thorough? If a well-maintained library exists that the manifest doesn't mention, **blocker**.
 - **Simplicity (YAGNI ladder)**: Walk `../references/principles.md` §4 in order — could it not exist (YAGNI), does the stdlib do it, does a native platform feature cover it, does an installed dep solve it, is it one line? Flag the first rung the code skipped: unnecessary abstraction, indirection, premature generalization, config-driven where a direct call would do. Abstract on the third real use, not the first (**Rule of Three**) — two copies is not yet a pattern. Every finding **names the concrete replacement** (`stdlib: 27-line validator → "@" in email, 1 line`), not just "this seems complex" — a finding the author can't act on is noise.
 - **Architecture**: Decisions sensible for this codebase? Will this paint us into a corner?
+- **Unrecorded decision**: Does the change make an architectural or technology choice — new dependency, pattern, module boundary, NFR target — with no ADR recorded? An architectural decision without a decision record → finding; route to an ADR via `grimoire-draft`, and check it satisfies the capability-surface rule (ADR-0036). Apply the novelty gate (`grimoire-audit` §3) — don't flag default tooling picks.
 - **Conventions** *(PR/pre-commit)*: Does new code match file layout, naming, and patterns already in the touched areas? Check `.grimoire/docs/<area>.md` if present.
 - **Reuse / reinvention**: Existing utilities re-implemented (`grep` similar names; area-doc reusable lists), or stdlib / native-platform / installed-dep functionality hand-rolled (principles.md §3 — don't reinvent the wheel). Name what already does the job.
 - **Dead code** *(PR/pre-commit)*: Functions added but not called, imports unused, commented-out code, stubs with no implementation.
@@ -220,6 +246,8 @@ STRIDE covers security, not privacy. For flows that collect, store, or share per
 Most reviews: only **Data disclosure** + **Linking/Identifying** apply — skip the rest unless the flow warrants. (Full LINDDUN: Linking, Identifying, Non-repudiation, Detecting, Disclosure, Unawareness, Non-compliance.)
 
 #### Code-level scan *(PR/pre-commit only)*
+
+Run the Pre-Report Gate (§2c) and check §2d before filing — security findings draw the most reflexive false positives (theoretical injection on validated input, `Math.random()` outside crypto).
 
 - **Secrets**: Grep diff for hardcoded keys, tokens, passwords, cloud credentials, JWT secrets. Any hit = **blocker**.
 - **Injection**: Raw SQL with string concatenation, shell-exec with user input, `eval`/`exec`, unsafe deserialization. Tag OWASP + CWE.
@@ -288,7 +316,7 @@ Verify the diff matches the project's code-style and comment standards. This is 
 4. Lint/format config in repo root: `.editorconfig`, `eslint.config.*`, `.prettierrc*`, `pyproject.toml` (ruff/black), `.rubocop.yml`, `rustfmt.toml`, `.golangci.yml`, etc.
 5. **Neighboring files** in the touched directories — derive convention from what already exists when no config exists
 
-If none of the above pin a rule, **don't invent one**. Style preferences without a project anchor are dropped.
+If none of the above pin a rule, **don't invent one**. Style preferences without a project anchor are dropped. The Pre-Report Gate (§2c) and §2d apply here too — most style nits without a config anchor are §2d false positives.
 
 #### Evaluate
 

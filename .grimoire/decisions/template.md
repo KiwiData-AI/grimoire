@@ -1,8 +1,15 @@
 ---
-status: proposed
+status: proposed # proposed | accepted | deprecated | superseded by NNNN
 date: YYYY-MM-DD
 decision-makers: []
 ---
+
+<!--
+Lifecycle: proposed → accepted → (deprecated | superseded by NNNN).
+A superseding ADR must back-link the ADR it replaces; the superseded ADR's status names the
+replacement (e.g. `superseded by 0042`). Keep the number; never reuse it. See AGENTS.md "Decision Numbering".
+-->
+
 
 # <Short Title: Problem and Solution>
 

@@ -118,8 +118,26 @@ For each step definition:
    - **[warning]** `test_auth.py:58` — step "Then user should exist" only asserts `is not None` — check the actual user properties
    ```
 
+**Regression coverage:** When verifying a bug fix, confirm the fix ships with a regression test **named after the bug** (see `grimoire-bug`). A bug fix with no test that goes red-without-the-fix and pins the defect → WARNING — the bug can silently return.
+
 If `grimoire test-quality` CLI command is available, suggest running it for a comprehensive analysis.
 To run tests directly: use `config.tools.bdd_test` for BDD and `config.tools.unit_test` for unit tests.
+
+### 3.E Behavioral Verification *(optional — user-facing changes only)*
+
+Sections 3.B–3.D verify statically (code exists, asserts, follows decisions) and run the configured suites. They do **not** drive the running app. When the change is user-facing and the app can be run, add a behavioral pass; otherwise skip and say so. This mode adds **no mandatory dependency** — if there's no way to drive the app, mark it INCONCLUSIVE and rely on 3.A–3.D.
+
+**Read-only by default.** Read-only navigation/inspection needs no opt-in. Any state-changing action requires explicit user opt-in **and** a non-production target (local/staging URL, seeded creds). Never run mutations against production.
+
+**Verdict.** Every behavioral pass ends in exactly one:
+- **SHIP** — behavior matches the spec; no material issues.
+- **SHIP WITH FIXES** — works, with the non-blocking issues listed.
+- **DO NOT SHIP** — a scenario's promised outcome does not hold.
+- **INCONCLUSIVE** — could not verify (no baseline, app wouldn't run, tooling absent).
+
+**No baseline ⇒ INCONCLUSIVE, never a silent PASS.** Same rule as §3.C2: without a reference state you cannot claim behavior is correct. Report INCONCLUSIVE and fall back to static verification — do not dress up "I couldn't check" as a pass.
+
+**Click-path final-state check.** For each touchpoint the change affects, build a side-effect map — `action → {state it sets, state it resets}` — then trace the sequence and ask: *is the FINAL state what the label/spec promises?* This catches the silent-undo class (action B resets what action A just set) that static reading and single-assert tests miss.
 
 ### 4. Security Compliance Verification
 
@@ -222,6 +240,7 @@ Produce a structured report:
 - Scenarios verified: X
 - Decisions verified: X
 - Security checks: X passed, X failed
+- Behavioral verdict: <SHIP | SHIP WITH FIXES | DO NOT SHIP | INCONCLUSIVE | n/a (static only)>
 - Issues found: X critical, X warnings, X suggestions
 
 ## Critical Issues

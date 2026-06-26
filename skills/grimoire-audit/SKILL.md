@@ -107,6 +107,9 @@ For confirmed items, create a grimoire change:
 Group related items into single changes — don't create one change per discovery.
 
 ### 6. Dead Feature Detection
+
+**Detection is deterministic.** Every dead/stale finding cites exact `file:line` (or ADR id) evidence from a reproducible check — codebase-memory-mcp graph queries (`search_graph` / `get_architecture`) per [0029]/[0030], with `grep` / `git blame` only where the graph has no answer (e.g. `@skip` age). The same commit yields the same findings. The LLM summarizes and interviews; it does not score the codebase by impression.
+
 Check for documented features and decisions that may no longer be accurate:
 
 **Dead features** — feature files that describe behavior the code no longer implements:
@@ -137,7 +140,15 @@ After the interview, summarize:
 - How many decisions are documented vs. undocumented
 - How many decisions are stale
 - How many conventions files drifted vs. up-to-date
-- Suggest which areas to address first (highest risk / most complex / most frequently changed)
+
+Then emit a **Top Actions** list — most-risk first, each with the exact path and the single next move. The ranking comes from the deterministic checks (§6), not impression, so the same commit yields the same list:
+
+```markdown
+## Top Actions
+1. `features/billing/invoice.feature` — dead (InvoiceView deleted ~3mo ago); create a removal change.
+2. `.grimoire/decisions/0007-search-backend.md` — stale (library no longer in deps); deprecate or update.
+3. `.grimoire/docs/conventions/api.md` — drifted (views moved to `src/api/handlers/`); refresh.
+```
 
 ## Important
 - This is a COLLABORATIVE process, not a dump. Interview, don't lecture.
