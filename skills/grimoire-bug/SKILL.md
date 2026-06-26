@@ -55,6 +55,8 @@ Before touching any production code:
 2. Run it — **it MUST FAIL**, reproducing the bug
 3. If it passes, your test doesn't actually reproduce the bug. Fix the test until it fails for the right reason.
 
+**Name it after the bug.** This repro test stays as the permanent regression test — name it so the bug is obvious (`test_password_reset_special_chars`; scenario "Password reset with plus-sign email"). One bug → one named regression test. This is how the same bug doesn't come back: a future change that reintroduces it goes red on a test that names the defect.
+
 This is non-negotiable. A bug fix without a reproduction test is a guess that might work. A failing test is proof you understand the problem.
 
 ### 4. Document the Bug
@@ -193,6 +195,7 @@ Report to the user:
 
 ## Important
 - **Reproduce before you fix.** No exceptions. If you can't reproduce it, you don't understand it, and your fix is a guess.
+- **The test is the source of truth, not your self-review.** When the same agent writes a fix and then reviews it, the same wrong assumption rides into both steps — "looks correct" is not evidence. The red→green of the named regression test (and the configured suites) is the proof. Don't declare a bug fixed on a code re-read; declare it fixed when the mechanical gate flips and stays green.
 - **Small fixes only.** If the bug fix requires significant architectural changes, it's not a bug fix — route to `grimoire-draft` for a proper change.
 - **Don't over-document.** The test is the documentation. A one-line comment in the test explaining the bug is enough. Don't create tracking files, bug reports, or manifests for a bug fix.
 - **The feature file is truth.** If a scenario describes behavior the user now says is wrong, that's a spec change, not a bug. Handle it through `grimoire-draft`.
