@@ -6,6 +6,8 @@ decision-makers: [Fred]
 
 # Living `draft.md` as the single design surface, projected into homes after agreement
 
+> **Amended 2026-06-28** (change `consolidate-skill-guidance`, see [0037](0037-named-methodology-shared-references.md)): **projection moved from the end of `grimoire-draft` to the first step of `grimoire-plan`.** Draft now designs only; plan projects, then plans. The "Projection happens in `grimoire-draft`" framing below is superseded by this amendment — the locus is plan, the timing (after the design is agreed) is unchanged. Everything else here (the living `draft.md` surface, one-home-per-fact at rest, complexity-as-output) stands. Also renumbered from a duplicate `0034`.
+
 ## Context and Problem Statement
 
 `grimoire-draft` (post-[0031](0031-artifact-model-redesign-one-home-per-fact.md)) routes
@@ -69,10 +71,11 @@ Concrete changes shipped together:
   collapse into one loop: propose into the ledger → question into *Open* → user reacts →
   resolve in place (`RESOLVED:`). Requirements surface, get questioned, and resolve inside
   the doc.
-- **Projection happens in `grimoire-draft`, after agreement.** The fine fact-to-home routing
-  (admission test + jurisdiction) and the principles gate run here, generating
-  features/constraints/MADRs/`data.yml`/manifest live in their real locations. The coarse
-  routing (is this a grimoire change at all?) stays up front.
+- **Projection happens at the start of `grimoire-plan`, after the design is agreed** (amended;
+  originally `grimoire-draft`). The fine fact-to-home routing (admission test + jurisdiction)
+  and the principles gate run there, generating features/constraints/MADRs/`data.yml`/manifest
+  live in their real locations. The coarse routing (is this a grimoire change at all?) stays up
+  front in draft.
 - **Complexity is an output.** Up front there is only a binary triviality gate (typo/config
   → skip `draft.md`). The 1–4 level is scored at projection and written to the manifest.
 - **Refactors mandate a current-state map.** For `kind: refactor`, the design starts by
@@ -98,8 +101,9 @@ Concrete changes shipped together:
   projection and apply). Mitigated: `draft.md` is read-only reference, not a second editable
   source; the principles gate explicitly exempts it.
 - Bad: contributors learn a new artifact (`draft.md`) and the projection step.
-- Bad: `grimoire-draft` carries more responsibility (it now also projects); `grimoire-apply`
-  gains one closing deletion.
+- Bad: `grimoire-plan` carries more responsibility (it opens with projection); `grimoire-apply`
+  gains one closing deletion. (Amended: projection was originally draft's — relocated to plan so
+  draft's single job is design.)
 
 ### Quality Attributes
 

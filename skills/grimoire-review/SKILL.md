@@ -177,9 +177,11 @@ Recommendation: Fix blockers, then proceed to apply.
 ## Important
 - This is a design review, not a code review. Focus on the specifications and plan, not hypothetical implementation details.
 - Be direct. Don't pad findings with praise or soften blockers. The goal is to catch problems before code is written, when they're cheap to fix.
+- **Ground every finding — ladder it.** Use the interview techniques in `../references/elicitation-personas.md` pointed at the design: ladder a decision *up* to the goal it serves (or expose it as Tunnel Vision), ladder a finding *down* to the concrete behavior that breaks, 5-Whys it to root cause. Also check each decision walks the spine in context (`../references/design-spine.md`) — names its layer, validates the prior. A laddered finding earns its severity; a bare verdict doesn't.
 - A blocker means "if we code this as-is, we'll have to come back and redo work." A suggestion means "this would improve the design but isn't blocking."
 - Keep each persona's review focused and short. Three bullet points that matter are better than ten that don't.
 - If the change is trivial (e.g., rename a field, fix a typo in a feature), say so and don't manufacture issues.
+- **Don't self-exempt by feel.** "It looks fine" / "I reviewed as I wrote it" are the *Skipping review* rationalization in `../references/red-flags.md`. Trivial-exempt is the skill's call, not a vibe.
 - All persona evaluation criteria, the materiality gate, the briefing structure, and the complexity-depth table live in `../references/review-personas.md`. Don't duplicate them here — read that file when running a persona.
 
 ## Done

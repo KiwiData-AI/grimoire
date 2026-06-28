@@ -1,6 +1,6 @@
 ---
 name: grimoire-plan
-description: Derive implementation tasks from approved Gherkin features and MADR decisions. Use when features are approved and ready for task breakdown.
+description: Project an agreed draft.md into its homes (features, constraints, decisions, manifest), then derive implementation tasks from them. Use after the design is approved in grimoire-draft.
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
@@ -9,7 +9,7 @@ metadata:
 
 # grimoire-plan
 
-Derive implementation tasks from approved Gherkin features and MADR decisions. The output must be detailed enough that any LLM can execute the tasks without further planning.
+Plan opens by **projecting** the agreed `draft.md` into its durable homes (features, constraints, decisions, `data.yml`, manifest), then derives implementation tasks from them. The output must be detailed enough that any LLM can execute the tasks without further planning.
 
 ## Triggers
 - User has approved a grimoire draft and wants to plan implementation
@@ -22,9 +22,7 @@ Derive implementation tasks from approved Gherkin features and MADR decisions. T
 - User wants to review the design → `grimoire-review` (after plan, before apply)
 
 ## Prerequisites
-- A change exists in `.grimoire/changes/<change-id>/` with:
-  - `manifest.md` (approved)
-  - At least one `.feature` file or decision record
+- A change exists in `.grimoire/changes/<change-id>/` with an agreed `draft.md` — the user has approved the design in `grimoire-draft`. Plan's first step **projects** that design into its homes (features, constraints, MADRs, `data.yml`, manifest); those do not need to exist yet.
 
 ## Workflow
 
@@ -56,14 +54,104 @@ The plan implements what's approved. It does not expand scope to hit a checklist
 
 These are gates, not aspirations — a task that adds a duplicate home or a reinvented wheel is rejected, not refined.
 
-### 1. Select Change
-- List active changes in `.grimoire/changes/`
-- If multiple, ask user which one to plan
-- If only one, confirm it
+### 1. Project the Design from draft.md
+
+**Select the change.** List active changes in `.grimoire/changes/`; if multiple, ask which to plan; if one, confirm it. Read its `draft.md` — the agreed design is the source of truth for this step. (If a change arrives already projected and has no `draft.md` — e.g. from `grimoire-refactor`, which authors its own register and artifacts — there is nothing to project: skip to step 2.)
+
+**Project `draft.md` into its durable homes.** This is where the **fine routing** happens (each fact → its one home) and where the admission test + principles gate run. Artifacts are written **live in their real locations** on the branch — `git diff` is the staging area; there is no copy-into-the-change-folder. (Projection used to close `grimoire-draft`; it now opens plan, co-located with the planning that consumes these homes.)
+
+First, **score the complexity level (1–4)** now that the design is settled, and write it to `manifest.md` frontmatter as `complexity: <1-4>` (use the level table in `grimoire-draft` step 2 as the rubric). Then project each kind of fact:
+
+**Behaviors → `features/*.feature`.** For each behavioral fact in the design:
+
+*The feature-file admission test* — a scenario may be written **only if it passes all four gates**; if it fails any, it is a constraint or a decision, not a feature:
+1. **External actor, outside the system boundary** — an end user, an operator, or a *third-party* system integrating with you does the thing. "External" means outside *your* system, not outside one module: a sibling service, an internal queue consumer, or another module in the same repo calling this one is **internal**, even though it's a separate process. Internal actor → contract test or constraint/decision, never a `.feature`.
+2. **Observable** — the actor sees the outcome without reading code or logs. "<200ms", "logs scrubbed of PII" → fails → constraint.
+3. **Domain language** — domain nouns, zero implementation detail. Names a library/log-level/table (`loguru`, `INFO`, `bcrypt`, `users` table) → fails → leaking implementation.
+4. **Survives reimplementation** — rewrite the internals from scratch; would the scenario still read the same? If it would change, it's pinned to implementation → not a feature.
+
+**Internal protocols and service-to-service contracts are NOT features.** A change to how two of your own components talk — an internal RPC/queue/event shape, a module API, a wire format between your services — is a *contract*, verified by a contract/integration test (`verify: unit-invariant`), not by Gherkin. It fails gate 1: there is no external actor, only your own code on both ends. If a third-party integrates against the protocol it's external and may be a feature; two of your own services is internal. This is the second-biggest source of feature-file slop after invariants.
+
+Common slop this catches: invariants (→ `constraints.md`) — "PII is scrubbed from logs", "all endpoints require auth", "responses are gzipped", "errors logged with a trace id"; internal protocols (→ contract test) — "service A publishes an OrderPlaced event B consumes", "the worker accepts a job payload with these fields", "module X returns this struct to module Y".
+
+*Extend vs. new — default is always extend; new files are the exception and require justification.* List existing feature files first (**required, not skippable** — do not write any scenario until this triage table is complete):
+
+```
+Existing feature files:
+  features/auth/login.feature         — "User Login"
+  features/billing/invoices.feature   — "Invoice Management"
+```
+
+For each scenario, decide extend-or-new and show it:
+
+```
+  "Admin resets a user's password"  → extend features/auth/login.feature (same actor domain: auth)
+  "User configures SSO provider"    → NEW (no existing file owns SSO configuration)
+```
+
+Signals to extend: same actor, same domain object, same entry point, same HTTP resource or screen. Signals genuinely new: new actor type with no existing file, entirely new domain object, or the existing Feature title would need "and" to cover both. If unsure, extend. A new file requires stating which files were considered and why none fit.
+
+Then write Gherkin (Feature title + user story; Background for shared preconditions; one scenario per behavior; Given/When/Then describing WHAT, never HOW). Apply security tags per `../references/security-compliance.md` (only when there's a security surface; compliance tags only when `project.compliance` is set). When design input grounded the scenarios (the change's `designs/` folder): use brand-token **names** not hex values when `.grimoire/brand/tokens.json` applies; prefer existing component names when `.grimoire/docs/components.md` exists, and flag any net-new component ("new component required — confirm before generating tasks").
+
+**Constraints → `.grimoire/docs/constraints.md`.** Every invariant that failed the admission test (it's a security control / NFR / observability / compliance rule, not an actor-observable behavior) becomes one row: **assertion · rationale · how-verified · links**. The assertion is a flat statement ("Log output never contains PII or secrets"), not Given/When/Then. `how-verified` names the test that proves it (a `unit-invariant` this plan creates) — never a Gherkin scenario. If it stems from a decision, link the MADR; don't restate it. Create the file from `templates/constraints.md` if absent.
+
+**Decisions → `.grimoire/decisions/NNNN-*.md`.** Project each Decisions-ledger entry (a Y-statement in `draft.md`), applying the **novelty gate**: a MADR is for a decision with a real, project-specific trade-off between viable alternatives — not for industry-default tooling picks or ecosystem-forced conventions. Ask: *would a competent engineer on this stack make a different choice, and need our reasoning to understand ours?* If no, skip it. Obvious tooling/convention picks fold into the existing `Tooling and convention baseline` ADR (one line: choice → why), not a new sequential record. Genuine trade-offs get the next sequential number, status `proposed` (`grimoire-apply` flips to `accepted` at finalize), using `.grimoire/decisions/template.md` — the Y-statement's context clause becomes the ADR's *Context and Problem Statement*.
+
+**Data changes → `.grimoire/changes/<change-id>/data.yml`.** If the change adds/modifies/removes data models, fields, indexes, or external API integrations, write `data.yml` (same YAML shape as `schema.yml`, only what's changing, `action:` on each entry):
+
+```yaml
+# Proposed data changes for: add-user-profiles
+users:
+  action: modify
+  source: src/models/user.py
+  fields:
+    avatar_url: { action: add, type: varchar, nullable: true }
+    legacy_name: { action: remove }
+profiles:
+  action: add
+  type: collection
+  fields:
+    user_id: { type: objectId, ref: users }
+    bio: { type: string, max_length: 500 }
+github_api:
+  action: add
+  type: external_api
+  provider: GitHub
+  schema_ref: https://docs.github.com/en/rest
+  client: src/integrations/github.py
+  endpoints:
+    get_user:
+      method: GET
+      path: /users/{username}
+      request:
+        headers: { Authorization: "Bearer {token}" }
+      response:
+        login: { type: string, required: true }
+        avatar_url: { type: string, required: true }
+        name: { type: string, nullable: true }
+      error_response:
+        message: { type: string }
+        status: { type: integer }
+```
+
+**Contract documentation is mandatory for external APIs.** Every endpoint must document `request` (what you send), `response` (fields you read, `required: true` for those your code depends on), and `error_response` (the error shape you handle). The task-generation step below turns this into contract tests. If you don't know the exact shape, reference `schema_ref` and document the subset your client uses — that subset is the contract. No data impact → skip `data.yml` entirely.
+
+**Manifest (`manifest.md`).** Generate it from `draft.md` as the durable plan glue: `complexity` (just scored), Why + Non-goals, the artifact list (added/modified/removed features, decisions, constraints), and a **Prior Art** section summarizing the build-vs-buy research captured in `draft.md` (what was found/evaluated, why adopt/build/hybrid; if building, what's borrowed). **Level 3–4** also carry **Assumptions** (what must be true; mark evidence vs. unvalidated; flag unvalidated ones on the critical path) and a **Pre-Mortem** (2–5 plausible failure modes 6 months out, with mitigations or "accepted"). These come straight from the `draft.md` Decided/Open and Cut sections.
+
+**Do NOT delete `draft.md`.** Retain it read-only as the agreed reference through the rest of plan → apply. `grimoire-apply` removes it with the change folder at finalize.
+
+**Validate the projection** before moving on:
+- `.feature` files have valid Gherkin; every Feature has a user story; every Scenario has at least Given + When + Then.
+- MADR records have valid YAML frontmatter (status, date).
+- Manifest is complete and accurate; `complexity` is set.
+- **Re-run the admission test on every scenario you wrote**: external actor, observable, domain language, survives reimplementation. Any scenario that now fails is slop — move it to `constraints.md` or a MADR.
+- **Principles gate** (`../references/principles.md`): no fact written to two homes (DRY), no second way to do an existing thing (one right way), no reinvented wheel, no artifact created past the stated scope (KISS). `draft.md` co-existing with the homes is **not** a DRY violation — it is the (soon-deleted) source the homes were projected from.
+
+The homes now exist; the rest of plan reads and breaks them into tasks.
 
 ### 2. Read All Artifacts
 
-Read the change's artifacts following `../references/artifact-map.md` — it defines what each file is, the grimoire-docs-first / graph-for-structure discipline, and the staleness gate. Plan-specific reading on top of that:
+Read the change's artifacts following `../references/artifact-map.md` — it defines what each file is, the grimoire-docs-first / graph-for-structure discipline, the **reading-altitude** rule (read contracts and signatures, not internal source or unit tests), and the staleness gate. Plan-specific reading on top of that:
 
 - `.grimoire/docs/constraints.md` — any constraints (security/NFR/observability) this change touches. These produce `unit-invariant` tasks, not scenarios.
 - The current baseline (`features/`, `.grimoire/decisions/`) via `git diff main` — exactly what this change adds vs. what already existed.
@@ -119,6 +207,8 @@ Level 1-2 changes with minor gaps may proceed; level 3-4 with multiple gaps shou
 
 ### 4. Generate Tasks
 Create `.grimoire/changes/<change-id>/tasks.md`. **Every task produces both production code AND a test — but the test level matches the artifact the task derives from.** Tasks are structured as pairs: the failing test first, then the production code.
+
+**Order tasks by the technical spine** (`../references/design-spine.md`): dependencies → data/schema → API/contract → business logic → UI by component → verification, **test-first within each layer**. This is the same order the change was designed on, so the plan's shape mirrors the design and stays predictable across changes.
 
 **Tag every implementation task with a `verify:` level** — this tells `grimoire-apply` which test vehicle to use. Match the artifact:
 
@@ -341,7 +431,7 @@ Before presenting to the user, verify the plan:
 - [ ] Every test task describes what to assert (no "write a test")
 - [ ] Every implementation task describes what to create/modify (no "add the code")
 - [ ] The verification section has the exact commands to run
-- [ ] Tasks are ordered: shared steps → test → production code → verification
+- [ ] Tasks follow the technical-spine order (`../references/design-spine.md`): dependencies → data/schema → API/contract → logic → UI → verification, test-first within each layer
 - [ ] No task requires the LLM to make architectural decisions — those should already be in the ADR
 - [ ] **Principles gate** (`../references/principles.md`): no task introduces a duplicate home for an existing fact (DRY), a second way to do an existing thing (one right way), a reinvented wheel where a tool/library/proven pattern exists (don't reinvent), or an abstraction/dependency justified only by a hypothetical (KISS). Any that does has a stated reason.
 
@@ -367,10 +457,10 @@ Check `.grimoire/config.yaml` for the configured agents:
 - If the user has configured separate thinking/coding agents, note this in the tasks.md header so the apply stage knows which agent to use
 
 ## Important
-- **Specificity is the whole point.** A vague plan is worse than no plan — it gives false confidence and the LLM will re-plan anyway. Every task must be executable without thinking.
+- **Specificity is the whole point.** A vague plan is worse than no plan — it gives false confidence and the LLM will re-plan anyway. Every task must be executable without thinking. "Implement the feature" is not a task — it's the *Skipping the plan / vague tasks* rationalization in `../references/red-flags.md`.
 - Tasks should be small and specific — one logical unit of work each
 - Every task traces back to a scenario or decision
-- Order matters: dependencies first, verification last
+- Order matters: tasks follow the technical-spine order (`../references/design-spine.md`); verification last
 - Don't generate tasks for things that already work (check the baseline)
 - Read the actual codebase before writing tasks. Reference real file paths, real patterns, real conventions. Don't guess.
 

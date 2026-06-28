@@ -384,6 +384,7 @@ Present a brief summary:
 ## Important
 - **Tests are not optional.** Every task produces both production code and passing step definitions. No exceptions.
 - **Red-green is mandatory, not aspirational.** A test must fail before it passes. If it doesn't fail, it's not a real test. Fix it before moving on.
+- **Code-before-test is the most common bypass.** "I'll add the test after" / "let me see it work first" are the *Code before the test* rationalization in `../references/red-flags.md`. If you wrote code before the test, delete the code and start from red.
 - **A test that always passes is worse than no test.** It gives false confidence. If you can't make a step definition fail, you don't understand what it's testing.
 - The feature file is the spec. If a test fails, fix the code, not the feature.
 - If implementation reveals that a scenario is wrong or missing, STOP and go back to draft. Don't silently change features.

@@ -181,9 +181,9 @@ Do not invent content for empty sections. If the designer skipped "Proposed user
 ### 6. Handoff
 Tell the user what runs next and what those skills will do with `consult.md`:
 
-- **`grimoire-design`** on the same `change-id` will read `consult.md` first, propagate assumptions and givens into prompts for variant generation (e.g., "exclude patterns that violate givens"), and copy the lists into `manifest.md` when the designer accepts a direction.
-- **`grimoire-draft`** on the same `change-id` will read `consult.md` and copy "Inferred assumptions" + "Inferred givens" into `manifest.md` (Assumptions section, plus a new Givens section) at level 3-4 complexity.
-- **Open questions** travel into `manifest.md` as unvalidated assumptions for the designer/PM to resolve before plan.
+- **`grimoire-design`** on the same `change-id` will read `consult.md` first and propagate assumptions and givens into prompts for variant generation (e.g., "exclude patterns that violate givens"); the lists carry into the design and are projected into `manifest.md` by `grimoire-plan`.
+- **`grimoire-draft`** on the same `change-id` will read `consult.md` and carry "Inferred assumptions" + "Inferred givens" into the `draft.md` design (assumptions → Decided/Open; givens → Decisions-ledger context). `grimoire-plan` then projects these into the manifest's Assumptions section at level 3-4 complexity.
+- **Open questions** stay in `consult.md` as designer follow-up items — they are not copied forward.
 
 Do not invoke the next skill automatically. Confirm with the user, then suggest the next command.
 

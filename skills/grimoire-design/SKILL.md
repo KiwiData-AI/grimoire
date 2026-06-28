@@ -61,6 +61,8 @@ Render the chosen template for the user to fill in. Write the result to `problem
 ### 3. User Flow & Success Metrics
 Ask for a **friction-log narrative** as the default minimum-viable level — a short prose description of the current user journey and where it hurts. Offer (but never force) two upgrades: Mermaid journey diagram, then service blueprint.
 
+Walk the flow on the **UX-workflow spine** (`../references/design-spine.md`): pick a direction — **backward** from the goal ("what must be true for the user to reach here?") when the goal is clear but the path isn't, or **forward** from what the user already knows when documenting an existing happy path — then validate by walking the other way; gaps where the two don't meet are missing or assumed steps. Reconstruct the *real* sequence with laddering / the Mom Test (`../references/elicitation-personas.md`), not an imagined one. Keep the simplicity bias: a surfaced step is a candidate, and a step that serves no part of the stated goal is cut, not designed.
+
 Separately — not bundled — ask "What are the user's current pain points?" Accept a bulleted list, free text, or "none known". Capture pain points in `problem.md` under a dedicated `## Pain Points` section. Variants generated in step 6 must each state which pain points they address (or explicitly mark "deferred").
 
 Ask for at least one measurable success metric (e.g., "reduce support tickets about lockouts by 50%"). If the user cannot articulate one, note `no success metric — design effectiveness will be hard to evaluate` as an assumption in `problem.md`.
@@ -73,7 +75,7 @@ If `.grimoire/docs/components.md` is absent AND the project has UI code, ask the
 - MUI / Chakra / Mantine / Radix imports in `package.json`
 - `*.stories.{ts,tsx,jsx,js}` (Storybook stories)
 
-Write findings to `.grimoire/docs/components.md` listing detected components with file paths and known variants. Skip the scan entirely if no UI signals are present (greenfield or non-UI surface). Subsequent variants prefer existing components over net-new designs and flag net-new explicitly.
+Read at **interface altitude** — detect components from these manifests, imports, and stories, not by reading component source bodies (`../references/artifact-map.md` → Reading altitude). Write findings to `.grimoire/docs/components.md` listing detected components with file paths and known variants. Skip the scan entirely if no UI signals are present (greenfield or non-UI surface). Subsequent variants prefer existing components over net-new designs and flag net-new explicitly.
 
 ### 5. Brand Grounding
 Read `.grimoire/brand/tokens.json` and `.grimoire/brand/voice.md` if they exist. Use the format documented in `../references/brand-tokens-format.md`. Required groups: `color.*`, `font.family.*`, `font.size.*`, `spacing.*`.
@@ -128,7 +130,7 @@ For HTML output, write a single `.grimoire/changes/<change-id>/designs/preview.h
 Skip preview rendering when output is Figma (the Figma file IS the preview) or ASCII (the markdown table IS the preview).
 
 ### 9. Derive Gherkin
-Propose draft scenarios as a **design artifact** at `.grimoire/changes/<change-id>/designs/scenarios.feature` (a proposal, not the live baseline). One Scenario per (component × state), Given / When / Then grounded in the design. `grimoire-draft` writes the user-approved scenarios live into `features/` — design does not edit the live baseline directly. Every proposed scenario must still pass draft's feature admission test (external actor, observable, domain language).
+Propose draft scenarios as a **design artifact** at `.grimoire/changes/<change-id>/designs/scenarios.feature` (a proposal, not the live baseline). One Scenario per (component × state), Given / When / Then grounded in the design. These are a proposal: `grimoire-draft` carries them into the design, and `grimoire-plan` projects the user-approved scenarios live into `features/` — design does not edit the live baseline directly. Every proposed scenario must still pass the feature admission test (external actor, observable, domain language).
 
 Apply surface-conditional adversarial scenarios per `../references/adversarial-personas.md`:
 
@@ -143,7 +145,7 @@ Present the proposed scenarios for review: "Review proposed scenarios — accept
 ### 10. Handoff
 When the user accepts proposed scenarios, the change folder is populated. Suggest the next step:
 
-> Run `grimoire-draft` to refine the manifest and ADRs, or `grimoire-plan` to break into tasks.
+> Run `grimoire-draft` to refine the behavioral design, then `grimoire-plan` to project it (features/constraints/ADRs/manifest) and break into tasks.
 
 Skill is done.
 
@@ -256,4 +258,4 @@ Do not error — absence is a valid state for projects that haven't onboarded br
 - **Brand drift findings are suggestions, not blockers.** Lint mode proposes token replacements; it does not auto-rewrite code. The user decides whether to apply.
 
 ## Done
-When the user accepts proposed Gherkin scenarios and the change folder contains `problem.md`, `designs/`, and `features/`, the workflow is complete. Suggest `grimoire-draft` (manifest + ADRs) or `grimoire-plan` (task breakdown) next.
+When the user accepts proposed Gherkin scenarios and the change folder contains `problem.md` and `designs/`, the workflow is complete. Suggest `grimoire-draft` (refine the behavioral design) next, then `grimoire-plan` (project to features/ADRs/manifest + task breakdown).

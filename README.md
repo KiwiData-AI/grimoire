@@ -77,8 +77,8 @@ Then talk to your AI assistant:
 ```
 You: "Users should be able to log in with 2FA"
 
-→ /grimoire:draft    Creates login.feature with Given/When/Then scenarios
-→ /grimoire:plan     Generates tasks: write the test, then production code
+→ /grimoire:draft    Designs the change on one living draft.md (Given/When/Then take shape here)
+→ /grimoire:plan     Projects the design into login.feature + decisions, then generates tasks
 → /grimoire:review   (optional) Product, security, engineering + principles review
 → /grimoire:apply    Implements test-first (BDD for behavior, unit for invariants)
 → /grimoire:verify   Confirms all scenarios pass, no regressions
@@ -115,11 +115,11 @@ Grimoire routes your request to its one correct home (an admission test keeps ea
 - **"The login page is broken"** → `/grimoire:bug` (reproduce first, then fix)
 - **"A tester found a problem"** → `/grimoire:bug-report` → `/grimoire:bug-triage` → routed fix
 
-A `.feature` is allowed only if it has an external actor, is observable without reading code/logs, uses domain language, and survives a reimplementation. Security controls, NFRs, and observability guarantees are invariants → they live in the constraints register. Produces `.feature` files (with security tags like `@security`, `@auth`, `@pii`, `@pci-dss` when applicable), constraint entries, decision records, `data.yml` for schema changes, and a manifest tracking the change.
+A `.feature` is allowed only if it has an external actor, is observable without reading code/logs, uses domain language, and survives a reimplementation. Security controls, NFRs, and observability guarantees are invariants → they live in the constraints register. You design all this on one living `draft.md`; it is **projected** into its homes — `.feature` files (with security tags like `@security`, `@auth`, `@pii`, `@pci-dss` when applicable), constraint entries, decision records, `data.yml` for schema changes, and a manifest — at the **start of Plan**, so Draft's one job is to design the change.
 
-### 2. Plan — Generate concrete tasks
+### 2. Plan — Project the design, then generate concrete tasks
 
-Every scenario becomes a pair: write the step definition (test), then write the production code. Tasks reference exact file paths, exact assertions, and real patterns from area docs. Data changes (models, migrations) are ordered before feature code.
+Plan opens by **projecting** the agreed `draft.md` into its homes (features, constraints, decisions, `data.yml`, manifest), running the admission test and principles gate as it goes. Then every scenario becomes a pair: write the step definition (test), then write the production code. Tasks reference exact file paths, exact assertions, and real patterns from area docs, ordered along the technical spine (dependencies → data → API → logic → UI → verification).
 
 The plan skill reads area docs for conventions and boundaries, and queries the code graph for reusable utilities and exact symbols — so the AI plans with real codebase knowledge, not guesses. Each task is tagged with its verification level: `scenario` (behavior), `unit-invariant` (a constraint), or `characterization` (internal/refactor).
 
@@ -176,7 +176,7 @@ Grimoire treats design as a first-class spec input, not an afterthought.
 - **Brand capture at init** — `grimoire init` offers to capture colors, type, spacing, and voice into `.grimoire/brand/` (DTCG tokens). Skip-able; can be added later via `grimoire-design --capture-brand`.
 - **Consult (optional)** — `/grimoire:design-consult` runs a pre-design Q&A. Security and data personas interview the designer about the proposed change *before* any artifacts exist, surfacing assumptions and constraints early. No findings, no blockers — just questions whose answers will shape the design.
 - **Design** — `/grimoire:design` walks: problem statement → user flow & pain points → variants (Figma MCP, static HTML, or ASCII) → required component states (default/loading/empty/error) → proposed Gherkin scenarios for each (component × state).
-- **Handoff** — accepted scenarios feed `/grimoire:draft` (manifest + ADRs), then `/grimoire:plan` (tasks), then `/grimoire:review` — **mandatory at complexity 4** with surface-conditional adversarial personas (keyboard, screen-reader, contrast on web; touch + gesture on mobile; keyboard-only on TUI).
+- **Handoff** — accepted scenarios feed `/grimoire:draft` (design), then `/grimoire:plan` (projects manifest + ADRs, then tasks), then `/grimoire:review` — **mandatory at complexity 4** with surface-conditional adversarial personas (keyboard, screen-reader, contrast on web; touch + gesture on mobile; keyboard-only on TUI).
 - **Revision** — `/grimoire:design --revise` re-enters an existing design without restarting. Shows current variants and Gherkin, asks what to change, regenerates only the affected artifacts. Previously-accepted scenarios are not overwritten without confirmation.
 
 Brand-drift lint (`grimoire-design --lint`) cross-references hardcoded colors / px / fonts against `.grimoire/brand/tokens.json` and suggests token replacements. Wired into precommit-review when tokens exist.
@@ -194,19 +194,14 @@ Full grimoire cycle end-to-end — adding two-factor authentication to an existi
 You: "Users should verify their identity with a TOTP code after entering their password"
 ```
 
-The AI runs `/grimoire:draft` and produces:
+The AI runs `/grimoire:draft` and designs the change on one living `draft.md` — the decision ledger (Y-statements), behavioral sketches, and an open/decided ledger — iterating with you until the design is agreed:
 
 ```
 .grimoire/changes/add-2fa-login/
-├── manifest.md              # Why, what's changing, scope
-├── features/
-│   └── auth/
-│       └── login.feature    # Updated with 2FA scenarios
-└── decisions/
-    └── 0003-totp-library.md # Chose pyotp over django-otp
+└── draft.md   # the agreed design; scenarios take shape here before projection
 ```
 
-**login.feature:**
+The scenarios that emerge (projected into `login.feature` at the start of Plan):
 ```gherkin
 Feature: Login with two-factor authentication
   As a user
@@ -235,11 +230,11 @@ Feature: Login with two-factor authentication
     And I should remain on the verification page
 ```
 
-You review and approve. Manifest status: `draft` → `approved`.
+You review and approve the **design**. Nothing is written to `features/` or `decisions/` yet — projection happens next, in Plan.
 
 ### Plan
 
-The AI runs `/grimoire:plan`, reads the approved features + area docs + data schema, and generates `tasks.md`:
+The AI runs `/grimoire:plan`, which **first projects** the agreed `draft.md` into its homes — `manifest.md`, `features/auth/login.feature` (the scenarios above), and `decisions/0003-totp-library.md` — running the admission test as it routes each fact. It then reads those homes + area docs + the code graph and generates `tasks.md`, ordered along the technical spine:
 
 ```markdown
 # Tasks: add-2fa-login

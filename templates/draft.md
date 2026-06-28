@@ -60,9 +60,14 @@ kind: greenfield | refactor
   and cross-references (D7 cites D3) freely — this is how coupled decisions stay legible
   in one place. At projection, each NOVEL decision becomes a MADR (novelty gate applies —
   obvious tooling picks fold into the baseline ADR, they don't mint a record).
+
+  Phrase each row as a Y-statement (see the design-spine reference): the Decision cell states
+  "in the context of <spine layer / use-case>, facing <force>, chose <option> over
+  <alternatives>, accepting <downside>"; the Why cell is the "because". The context clause
+  ties the decision to the layer it serves so it's judged in situation, not in a vacuum.
 -->
 
-| #  | Decision | Why |
+| #  | Decision (Y-statement: context · option over alternatives · accepting downside) | Why (because…) |
 |----|----------|-----|
 | D1 |          |     |
 
