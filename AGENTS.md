@@ -103,22 +103,22 @@ User has a request
 ├─ "I want to add / change / remove functionality"
 │  │
 │  ├─ Adding new behavior?
-│  │  → /grimoire:draft → write new .feature file
+│  │  → /grimoire:draft → design the new behavior (plan projects the .feature)
 │  │
 │  ├─ Changing existing behavior?
-│  │  → /grimoire:draft → modify existing .feature file
+│  │  → /grimoire:draft → design the change (plan projects it into the .feature)
 │  │
 │  ├─ Removing a feature?
 │  │  → /grimoire:remove → tracked removal with impact assessment
 │  │
 │  └─ Does it also involve a technology/architecture choice?
-│     → Draft BOTH: .feature file + MADR decision record in the same change
+│     → Draft BOTH the behavior and the decision in one change
 │
 ├─ "We should use X instead of Y" / "How should we architect this?"
-│  → /grimoire:draft → MADR decision record (not a feature)
+│  → /grimoire:draft → design the decision (plan projects a MADR, not a feature)
 │
 ├─ "We need to handle X concurrent users / meet Y compliance"
-│  → /grimoire:draft → MADR decision record (non-functional requirement)
+│  → /grimoire:draft → design the requirement (plan projects a MADR / constraint)
 │
 ├─ "What do we have? What's documented?"
 │  → /grimoire:audit → discover undocumented features and decisions
@@ -156,9 +156,11 @@ The end-to-end flow for adding or modifying behavior is six stages, each owned b
 
 **Draft** (`/grimoire:draft`) → **Plan** (`/grimoire:plan`) → **Review** (`/grimoire:review`, optional) → **Apply** (`/grimoire:apply`) → **Verify** (`/grimoire:verify`) → **PR** (`grimoire pr`).
 
+Draft's single job is to design the change on `draft.md`. **Projection** — turning that agreed design into features, constraints, MADRs, `data.yml`, and the manifest — is the **first step of Plan**, not the end of Draft.
+
 Each skill's SKILL.md is the authoritative home for that stage's mechanics; the README "Workflow" section is the narrative walkthrough. Do not re-derive stage steps here — invoke the skill. The operational invariants that bind every stage:
 
-- **Manifest status tracks progress:** `approved` after draft, `implementing` during apply, `accepted` at PR.
+- **Manifest status tracks progress:** the manifest is created at plan's projection step; `approved` once the design is agreed and projected, `implementing` during apply, `accepted` at PR.
 - **Live on the branch.** Features, decisions, constraints, and schema are edited directly on the feature branch — no copy-into-change-folder, no promote step.
 - **No archive step.** The PR diff *is* the change; git history plus the `Change: <id>` commit trailer are the record. PR finalize just flips decision status to `accepted` and removes the ephemeral change folder.
 - **The user drives the pace.** Review mode (default) approves every file change before writing; autonomous mode works the full task list, stopping only on blockers.
@@ -204,9 +206,9 @@ project-root/
 ## Conventions
 
 ### Manifest Status Lifecycle
-Every manifest has a `status` field in YAML frontmatter:
-- `draft` — being written, not yet reviewed
-- `approved` — reviewed by user, ready for planning/implementation
+Every manifest has a `status` field in YAML frontmatter (the manifest is created at plan's projection step, from the already-agreed design):
+- `draft` — just projected from the agreed `draft.md`
+- `approved` — design agreed and projected, ready for implementation
 - `implementing` — tasks are being worked on
 
 Update the status as the change progresses. The CLI reads this to report change state. There is no `complete`/archive state — finalize removes the ephemeral change folder once the PR is opened; git history is the record.

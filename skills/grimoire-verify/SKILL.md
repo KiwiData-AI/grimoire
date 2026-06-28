@@ -274,6 +274,7 @@ Based on the report:
 
 ## Important
 - Verify is read-only. Do NOT fix issues — only report them. The user decides what to do.
+- **"Should pass" is not evidence.** Declaring done without running is the *Declaring done without verifying* rationalization in `../references/red-flags.md`. Observe state, don't predict it.
 - Be specific: reference file paths and line numbers for every issue.
 - A scenario without a step definition is always CRITICAL — the spec is not tested.
 - A step definition with no assertions is always CRITICAL — it's a false positive.

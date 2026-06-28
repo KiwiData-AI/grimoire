@@ -8,7 +8,7 @@ Loaded by skills that read a change's specs before acting (`grimoire-plan`, `gri
 
 Per-change (under `.grimoire/changes/<change-id>/`):
 
-- **`draft.md`** — the living design doc the change was designed on (diagram/sketch, decision ledger, pseudo-code, Decided/Open ledger). The single source the other artifacts were **projected** from at the end of `grimoire-draft`. Ephemeral: retained read-only as the agreed-design reference through the pipeline, deleted when `grimoire-apply` clears the change folder. Read it for the *intent and rationale* behind the projected artifacts; the features/constraints/decisions remain the authoritative homes.
+- **`draft.md`** — the living design doc the change was designed on (diagram/sketch, decision ledger of Y-statements, pseudo-code, Decided/Open ledger). The single source the other artifacts are **projected** from at the start of `grimoire-plan`. Ephemeral: retained read-only as the agreed-design reference through the pipeline, deleted when `grimoire-apply` clears the change folder. Read it for the *intent and rationale* behind the projected artifacts; the features/constraints/decisions remain the authoritative homes.
 - **`manifest.md`** — change summary, complexity level, and the Why. Level 3-4 also carry Assumptions, Pre-Mortem, and **Prior Art** (the build-vs-buy rationale). Generated from `draft.md` at projection.
 - **`features/*.feature`** — behavioral specifications. Edited live in `features/` on the branch.
 - **decision records** — architectural choices for this change, edited live in `.grimoire/decisions/`, including Cost of Ownership sections.
@@ -32,6 +32,18 @@ Project-wide (under `.grimoire/`):
 **Graph for live structure.** Area docs give intent and placement; they do not carry exact symbols. For function names, file paths, line numbers, reusable utilities, and call graphs, query the graph — `search_graph` / `get_code_snippet` / `get_architecture`. Combine the two: area doc says *where new code goes*, the graph says *what's already there to reuse*.
 
 **Do NOT read the entire codebase for "context."** Area docs + data schema + the graph already give you specific paths and assertions. Reading dozens of source files wastes context and does not produce better output. Read specific source only to verify a detail the docs can't answer (exact signature, exact import path, existing step-definition setup).
+
+---
+
+## Reading altitude — design reads contracts, debugging reads internals
+
+When you read code during **design** (`grimoire-draft`, `grimoire-design`, `grimoire-plan`), read at the **published-interface altitude** — what a caller needs to integrate, not how the callee works inside:
+
+- **Third-party library or service** — its public API, types, and docs. Not its source, and not its tests. The contract is what you design against; the internals are the maintainer's concern.
+- **Your own system** — the touched area's exported symbols, API endpoints, and data schema, plus the relevant feature files and `constraints.md`. Not the whole backend's source, and not its unit tests.
+- **Prefer the graph for structure without bodies.** `search_graph` / `get_architecture` give signatures, callers, and call edges — the *shape* of the interface — without spending context on implementation bodies. That is the altitude design needs.
+
+**Reading full source bodies and unit tests is a *debugging* activity** — justified when a behavior is wrong and you need root cause (`grimoire-bug`), not when you need to know how an interface is used. In design the question is "what is the contract?", and the contract lives in signatures, schemas, and specs — not in line-by-line implementation. Exhaustively reading internals at design time burns context and rarely improves the design. This is the rule above, sharpened: even when you *do* read source, read the seam, not the guts.
 
 ---
 
