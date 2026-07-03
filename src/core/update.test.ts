@@ -136,6 +136,36 @@ describe("updateProject", () => {
     expect(String(agentsWrite![1])).toContain("# Other");
   });
 
+  it("does not duplicate END marker when the source AGENTS.md carries its own markers", async () => {
+    // Regression: grimoire's own AGENTS.md is a managed file (it carries a
+    // caveman block between markers). Shipped verbatim as source content, those
+    // embedded markers nested and left an orphaned END tag on every update.
+    mockFileExists.mockResolvedValue(true);
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      if (p.endsWith("AGENTS.md")) {
+        // Source (package) AGENTS.md — itself a managed file.
+        if (!p.includes(TEST_PROJECT_ROOT)) {
+          return "# Grimoire\n<!-- GRIMOIRE:START -->\n## Caveman Mode\n<!-- GRIMOIRE:END -->\n" as any;
+        }
+        // Project AGENTS.md — already updated once.
+        return "# Project\n<!-- GRIMOIRE:START -->\nold\n<!-- GRIMOIRE:END -->\n" as any;
+      }
+      return "# New Agent Instructions" as any;
+    });
+
+    await updateProject(TEST_PROJECT_ROOT, { ...ALL_SKIPPED, skipAgents: false });
+
+    const agentsWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("AGENTS.md")
+    );
+    expect(agentsWrite).toBeDefined();
+    const written = String(agentsWrite![1]);
+    expect(written.match(/GRIMOIRE:END/g)?.length).toBe(1);
+    expect(written.match(/GRIMOIRE:START/g)?.length).toBe(1);
+  });
+
   it("skips in-place AGENTS.md write when root === packageRoot and caveman is none", async () => {
     setupBasicFs();
     // When the test runs from inside the grimoire repo, `updateProject(".")`
@@ -385,6 +415,90 @@ describe("updateProject", () => {
     );
     expect(configWrite).toBeDefined();
     expect(String(configWrite![1])).toContain("comment_lint: block");
+  });
+
+  it("adds the pydoclint doc_style tool on update for python + supported style", async () => {
+    mockFileExists.mockImplementation(async (path: string) => {
+      if (path.endsWith(".grimoire")) return true;
+      if (path.endsWith("config.yaml")) return true;
+      return false;
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("config.yaml")) {
+        return "version: 2\nproject:\n  commit_style: conventional\n  comment_lint: block\n  language: python\n  comment_style: sphinx\nchecks:\n  - lint\n" as any;
+      }
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      return "# content" as any;
+    });
+
+    await updateProject(".", { ...ALL_SKIPPED, skipConfig: false });
+
+    const configWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("config.yaml")
+    );
+    expect(configWrite).toBeDefined();
+    expect(String(configWrite![1])).toContain("pydoclint --style=sphinx");
+    expect(String(configWrite![1])).toContain("doc_style");
+  });
+
+  it("injects the project comment style directive into AGENTS.md", async () => {
+    mockFileExists.mockImplementation(async (path: string) => {
+      if (path.endsWith(".grimoire")) return true;
+      if (path.endsWith("config.yaml")) return true;
+      return false;
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("config.yaml")) {
+        return "version: 2\nproject:\n  comment_style: sphinx\n" as any;
+      }
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      if (p.endsWith("AGENTS.md")) return "# Grimoire Agent Instructions" as any;
+      return "" as any;
+    });
+
+    await updateProject(TEST_PROJECT_ROOT, { ...ALL_SKIPPED, skipAgents: false });
+
+    const agentsWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("AGENTS.md")
+    );
+    expect(agentsWrite).toBeDefined();
+    expect(String(agentsWrite![1])).toContain("## Project Comment Style");
+    expect(String(agentsWrite![1])).toContain("**sphinx**");
+  });
+
+  it("creates CLAUDE.md with an @AGENTS.md import", async () => {
+    setupBasicFs();
+    await updateProject(TEST_PROJECT_ROOT, { ...ALL_SKIPPED, skipAgents: false });
+
+    const claudeWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("CLAUDE.md")
+    );
+    expect(claudeWrite).toBeDefined();
+    expect(String(claudeWrite![1])).toContain("@AGENTS.md");
+  });
+
+  it("leaves CLAUDE.md alone when the import is already present", async () => {
+    mockFileExists.mockImplementation(async (path: string) => {
+      if (path.endsWith(".grimoire")) return true;
+      if (path.endsWith("CLAUDE.md")) return true;
+      return false;
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      if (p.endsWith("CLAUDE.md")) return "# My project\n\n@AGENTS.md\n" as any;
+      if (p.endsWith("AGENTS.md")) return "# Grimoire Agent Instructions" as any;
+      return "" as any;
+    });
+
+    await updateProject(TEST_PROJECT_ROOT, { ...ALL_SKIPPED, skipAgents: false });
+
+    const claudeWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("CLAUDE.md")
+    );
+    expect(claudeWrite).toBeUndefined();
   });
 
   it("skips config migration when skipConfig is true", async () => {

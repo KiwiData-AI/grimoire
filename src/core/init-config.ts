@@ -28,6 +28,7 @@ export function buildMinimalConfig(): GrimoireConfig {
     checks: [
       "lint",
       "format",
+      "doc_style",
       "duplicates",
       "complexity",
       "dead_code",
@@ -94,10 +95,24 @@ export function applyLlmFallbacks(config: GrimoireConfig, byCategory: Map<string
   if (!byCategory.has("dead_code")) {
     config.tools.dead_code = { name: "llm", prompt: "Review these changed files for dead code: unused functions, unreachable branches, unused imports, unused variables, and exports that are never imported elsewhere. Only flag code that is clearly dead, not code that might be used dynamically." };
   }
-  config.tools.best_practices = { name: "llm", prompt: "Review these changed files for best practices violations" };
+  config.tools.best_practices = { name: "llm", prompt: "Review these changed files for best practices violations. Flag comments that restate the adjacent code or an identifier's name, comments above well-named variables, and identifier names longer than about four words." };
   if (!config.tools.duplicates) {
     config.tools.duplicates = { name: "jscpd", command: "npx jscpd --reporters console" };
   }
+}
+
+const PYDOCLINT_STYLES = new Set(["sphinx", "google", "numpy"]);
+
+/** The pydoclint doc_style tool for a python project, or null when it doesn't apply. */
+export function pydoclintTool(language?: string, style?: string): ToolConfig | null {
+  if (language !== "python" || !style || !PYDOCLINT_STYLES.has(style)) return null;
+  return { name: "pydoclint", check_command: `pydoclint --style=${style} .` };
+}
+
+export function applyDocStyleTool(config: GrimoireConfig): void {
+  if (config.tools.doc_style) return;
+  const tool = pydoclintTool(config.project.language, config.project.comment_style);
+  if (tool) config.tools.doc_style = tool;
 }
 
 export function surfaceFromDetection(

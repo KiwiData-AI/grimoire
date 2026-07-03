@@ -28,8 +28,10 @@ AI agents repeatedly write verbose, redundant comments despite instructions in s
 Chosen option: "PreToolUse hook, deterministic, changed-portion-only, deny-with-override", because it enforces at the tool boundary (binds main agent and subagents alike) and denies the call *before* the write — so no half-written file is left behind, unlike PostToolUse (option 3), which fires after the write and can only feed text back. It converges deterministically (delete the comment → pass) and reuses the existing `doc-style.ts` rules. Option 1 is what already failed. Option 4 violates the Anti-Loop Protocol and the "no LLM in a blocking hook" rule. Option 5 risks destroying wanted comments and is hard to do safely.
 
 Scope is deliberately two checks that no linter covers:
-- **verbose_comments** — multi-line standalone comment blocks and external-artifact references (reuses `VOLATILE_RE` and the 2-line prose threshold from `doc-style.ts`)
+- **external_refs** — external-artifact references (reuses `VOLATILE_RE` from `doc-style.ts`)
 - **placeholder_stubs** — truncated/half-done markers (`// ... existing code`, `not implemented`, ellipsis-only bodies)
+
+*(Amended 2026-07-03: the original scope also blocked multi-line comment runs (`verbose_comments`). That rule produced false positives on legitimate rationale blocks and judged style, not correctness — removed from the hook. Comment brevity is now advisory policy in AGENTS.md ("Comments" section) and caught at review by the `best_practices` check; see 0039 for the docstring-format side.)*
 
 Debug leftovers and commented-out code are **out of scope** — eslint (`no-console`, `no-debugger`) and ruff (`T20`, `ERA001`) already catch them at the commit gate. We do not reimplement linters.
 
