@@ -67,6 +67,19 @@ function buildManagedBlock(content: string): string {
 }
 
 
+// Grimoire's own AGENTS.md is itself a managed file (it carries a caveman
+// block between markers). When that file is shipped as the *source* content
+// for a downstream project, the embedded markers must be removed first —
+// otherwise the block gets wrapped again, nesting markers and leaving an
+// orphaned END tag on every subsequent update.
+function stripManagedBlock(content: string): string {
+  const block = new RegExp(
+    `\\n*${escapeRegex(GRIMOIRE_START_MARKER)}[\\s\\S]*${escapeRegex(GRIMOIRE_END_MARKER)}\\n*`
+  );
+  return content.replace(block, "\n");
+}
+
+
 async function upsertManagedBlock(
   filePath: string,
   managedBlock: string,
@@ -77,9 +90,11 @@ async function upsertManagedBlock(
     const existing = await readFile(filePath, "utf-8");
 
     if (existing.includes(GRIMOIRE_START_MARKER)) {
+      // Greedy match (no `?`) spans from the first START to the *last* END so
+      // a file already corrupted with duplicate END tags self-heals on update.
       const updated = existing.replace(
         new RegExp(
-          `${escapeRegex(GRIMOIRE_START_MARKER)}[\\s\\S]*?${escapeRegex(GRIMOIRE_END_MARKER)}`
+          `${escapeRegex(GRIMOIRE_START_MARKER)}[\\s\\S]*${escapeRegex(GRIMOIRE_END_MARKER)}`
         ),
         managedBlock
       );
@@ -134,23 +149,44 @@ export function buildCavemanDirective(level: CavemanLevel): string {
 }
 
 
+const DOC_FORMAT_HINTS: Record<string, string> = {
+  sphinx: "`:param x:` / `:returns:`",
+  google: "`Args:` / `Returns:` sections",
+  numpy: "`Parameters` / `Returns` sections",
+  jsdoc: "`@param` / `@returns` tags",
+  tsdoc: "`@param name` (no `{type}` braces)",
+};
+
+export function buildCommentStyleDirective(style?: string): string {
+  if (!style) return "";
+  const hint = DOC_FORMAT_HINTS[style];
+  return [
+    "## Project Comment Style",
+    "",
+    `Docstrings in this project use **${style}**${hint ? ` — ${hint}` : ""}. The \`doc_style\` commit gate enforces it.`,
+    "",
+    "",
+  ].join("\n");
+}
+
+
 export async function upsertAgentsFile(
   root: string,
   packageRoot: string,
   verb: "created" | "updated",
-  caveman: CavemanLevel = "none"
+  caveman: CavemanLevel = "none",
+  commentStyle?: string
 ): Promise<void> {
   const agentsPath = join(root, "AGENTS.md");
   if (resolve(root) === resolve(packageRoot)) {
-    await upsertInPlaceAgentsFile(agentsPath, verb, caveman);
+    await upsertInPlaceAgentsFile(agentsPath, verb, caveman, commentStyle);
     return;
   }
-  const grimoireAgents = await readFile(
-    join(packageRoot, "AGENTS.md"),
-    "utf-8"
+  const grimoireAgents = stripManagedBlock(
+    await readFile(join(packageRoot, "AGENTS.md"), "utf-8")
   );
-  const cavemanBlock = buildCavemanDirective(caveman);
-  const content = cavemanBlock ? cavemanBlock + grimoireAgents : grimoireAgents;
+  const directives = buildCavemanDirective(caveman) + buildCommentStyleDirective(commentStyle);
+  const content = directives ? directives + grimoireAgents : grimoireAgents;
   const managedBlock = buildManagedBlock(content);
   await upsertManagedBlock(agentsPath, managedBlock, verb, "AGENTS.md");
 }
@@ -158,9 +194,10 @@ export async function upsertAgentsFile(
 async function upsertInPlaceAgentsFile(
   agentsPath: string,
   verb: "created" | "updated",
-  caveman: CavemanLevel
+  caveman: CavemanLevel,
+  commentStyle?: string
 ): Promise<void> {
-  const cavemanBlock = buildCavemanDirective(caveman);
+  const cavemanBlock = buildCavemanDirective(caveman) + buildCommentStyleDirective(commentStyle);
   if (cavemanBlock) {
     const managedBlock = buildManagedBlock(cavemanBlock);
     await upsertManagedBlock(agentsPath, managedBlock, verb, "AGENTS.md");
@@ -183,6 +220,23 @@ async function upsertInPlaceAgentsFile(
   );
   await writeFile(agentsPath, stripped);
   console.log(`  ${chalk.blue(verb)} AGENTS.md (in-place — stripped stale managed block)`);
+}
+
+
+// Claude Code reads CLAUDE.md, not AGENTS.md; an @AGENTS.md import makes the
+// grimoire instructions load in every session for both file conventions.
+export async function ensureClaudeAgentsImport(root: string): Promise<void> {
+  const claudePath = join(root, "CLAUDE.md");
+  const importLine = "@AGENTS.md";
+  if (await fileExists(claudePath)) {
+    const existing = await readFile(claudePath, "utf-8");
+    if (existing.includes(importLine)) return;
+    await writeFile(claudePath, existing.trimEnd() + "\n\n" + importLine + "\n");
+    console.log(`  ${chalk.blue("updated")} CLAUDE.md (@AGENTS.md import)`);
+    return;
+  }
+  await writeFile(claudePath, importLine + "\n");
+  console.log(`  ${chalk.green("created")} CLAUDE.md (@AGENTS.md import)`);
 }
 
 
@@ -231,7 +285,9 @@ export async function generateAgentFiles(
 ): Promise<void> {
   if (agents.length === 0) return;
 
-  const grimoireAgents = await readFile(join(packageRoot, "AGENTS.md"), "utf-8");
+  const grimoireAgents = stripManagedBlock(
+    await readFile(join(packageRoot, "AGENTS.md"), "utf-8")
+  );
   const managedBlock = buildManagedBlock(grimoireAgents);
 
   for (const agent of agents) {

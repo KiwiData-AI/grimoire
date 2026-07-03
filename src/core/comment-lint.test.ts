@@ -4,30 +4,15 @@ import { lintComments, isSourceFile, addedLineNumbers } from "./comment-lint.js"
 const rules = (text: string, file = "a.ts"): string[] =>
   lintComments(text, file).map((i) => i.rule);
 
-describe("lintComments — verbose blocks", () => {
-  it("flags a line-comment run longer than the terse limit", () => {
+describe("lintComments — multi-line comment runs", () => {
+  it("does not flag a long line-comment run (verbosity is policy, not lint)", () => {
     const text = ["// first line of explanation", "// second line", "// third line", "const x = 1;"].join("\n");
-    expect(rules(text)).toContain("verbose_comment");
-  });
-
-  it("allows a two-line comment", () => {
-    const text = ["// terse note", "// one more", "const x = 1;"].join("\n");
-    expect(rules(text)).not.toContain("verbose_comment");
-  });
-
-  it("does not flag a multi-line JSDoc block (owned by doc_style)", () => {
-    const text = ["/**", " * Summary.", " * @param x the thing", " * @returns y", " */", "function f(x) {}"].join("\n");
-    expect(rules(text)).not.toContain("verbose_comment");
-  });
-
-  it("flags a Python comment run", () => {
-    const text = ["# explain one", "# explain two", "# explain three", "x = 1"].join("\n");
-    expect(rules(text, "a.py")).toContain("verbose_comment");
+    expect(rules(text)).toEqual([]);
   });
 
   it("does not treat a TS private field as a comment", () => {
     const text = ["#count = 0;", "#total = 0;", "#name = '';"].join("\n");
-    expect(rules(text, "a.ts")).not.toContain("verbose_comment");
+    expect(rules(text, "a.ts")).toEqual([]);
   });
 });
 
@@ -66,24 +51,12 @@ describe("lintComments — placeholder stubs", () => {
 });
 
 describe("lintComments — override pragma", () => {
-  it("suppresses a verbose block when the pragma is present", () => {
-    const text = ["// grimoire-lint-ok long rationale follows", "// line two", "// line three", "const x = 1;"].join("\n");
-    expect(rules(text)).not.toContain("verbose_comment");
-  });
-
   it("suppresses an external ref on a pragma line", () => {
     expect(rules("// see login.feature grimoire-lint-ok")).not.toContain("external_ref");
   });
 });
 
 describe("lintComments — line numbers", () => {
-  it("reports the run's first line for a verbose block", () => {
-    const text = ["const a = 1;", "// one", "// two", "// three", "const b = 2;"].join("\n");
-    const verbose = lintComments(text, "a.ts").filter((i) => i.rule === "verbose_comment");
-    expect(verbose).toHaveLength(1);
-    expect(verbose[0].line).toBe(2);
-  });
-
   it("reports the exact line of an inline issue", () => {
     const text = ["const a = 1;", "const b = 2;", "// see login.feature"].join("\n");
     const ref = lintComments(text, "a.ts").find((i) => i.rule === "external_ref");

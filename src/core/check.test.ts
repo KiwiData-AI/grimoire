@@ -353,6 +353,19 @@ describe("runCheck", () => {
     expect(result.passed).toBe(1);
   });
 
+  it("uses configured doc_style tool over built-in", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      project: { ...baseConfig.project, comment_style: "sphinx" },
+      tools: { doc_style: { name: "pydoclint", check_command: "pydoclint --style=sphinx ." } },
+      checks: ["doc_style"],
+    } as any);
+
+    const result = await runCheck({ continueOnFail: false, changed: false, json: true });
+    expect(result.passed).toBe(1);
+    expect(mockCheckDocStyle).not.toHaveBeenCalled();
+  });
+
   it("fails doc_style when critical issues found", async () => {
     mockLoadConfig.mockResolvedValue({
       ...baseConfig,

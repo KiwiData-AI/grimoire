@@ -24,6 +24,17 @@ These principles govern all grimoire work — drafting, planning, reviewing, and
 
 **Verify before using.** Before importing a module, calling a function, or adding a dependency — confirm it exists. Query the codebase graph (codebase-memory-mcp: `search_graph`, `get_code_snippet`) for reusable code, exact symbols, and file paths — structure is read live, never from a frozen doc. Read `.grimoire/docs/<area>.md` for an area's purpose, boundaries, and conventions, and the data schema for real model fields and API endpoints. If you haven't read the file you're importing from, read it first. Never guess at package names, function signatures, or API paths.
 
+## Comments
+
+The default is **no comment**. Apply the laziness ladder to comments too: delete it (the code already says it) → rename or restructure until the code says it → only then write a comment, and only for what code cannot express (a constraint, an invariant, a non-obvious why). Max 2 lines.
+
+- Never comment a variable whose name says what it is. A comment explaining a variable is a rename signal, not a comment site.
+- Keep names short — 1–3 words. If a name needs a comment to decode, simplify the code instead.
+- Never restate the adjacent code, and never narrate the change you are making — that story belongs in the commit message.
+- No references to external artifacts (tickets, ADR ids, feature files, PRs). Comments must be self-contained; the write-time hook blocks these.
+- No placeholder stubs (`... rest of code`, `not implemented`). Finish the edit; the write-time hook blocks these.
+- Docstrings follow the project's `comment_style` in `.grimoire/config.yaml` — sphinx: `:param x:` / `:returns:`; google: `Args:` / `Returns:`; numpy: `Parameters` sections. The `doc_style` commit gate enforces it.
+
 ## Anti-Loop Protocol
 
 Applies everywhere: writing code, running tests, fixing checks, editing files. These rules exist because loops are expensive — each iteration burns context and time, and the later iterations are usually worse than just stopping.

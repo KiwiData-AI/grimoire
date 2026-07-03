@@ -8,6 +8,7 @@ import {
   bestByCategory,
   applyProjectDetections,
   applyLlmFallbacks,
+  applyDocStyleTool,
   surfaceFromDetection,
   PROMPT_SURFACES,
   type EssentialPrefill,
@@ -87,6 +88,7 @@ export async function buildDetectedConfig(
 
   applyProjectDetections(config, byCategory);
   applyLlmFallbacks(config, byCategory);
+  applyDocStyleTool(config);
 
   return { config: await askEssentialPreferences(config, root, prefillWithSurface), detection: byCategory.get("language") ?? null };
 }

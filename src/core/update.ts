@@ -7,6 +7,7 @@ import { fileExists } from "../utils/fs.js";
 import { loadConfig, CURRENT_CONFIG_VERSION } from "../utils/config.js";
 import {
   upsertAgentsFile,
+  ensureClaudeAgentsImport,
   installSkillFiles,
   installTemplates,
   ensureDirectories,
@@ -15,6 +16,7 @@ import {
   SKILL_NAMES,
 } from "./shared-setup.js";
 import { setupHooks } from "./hooks.js";
+import { pydoclintTool } from "./init-config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = join(__dirname, "..", "..");
@@ -45,6 +47,7 @@ export async function updateProject(
   if (!options.skipConfig) {
     await migrateConfig(root);
     await ensureCommentLint(root);
+    await ensureDocStyleTool(root);
   }
 
   await ensureDirectories(root);
@@ -94,7 +97,8 @@ async function resolveTargetAgents(
 async function updateAgentsFile(root: string): Promise<void> {
   const config = await loadConfig(root);
   const caveman = config.project.caveman ?? "none";
-  await upsertAgentsFile(root, PACKAGE_ROOT, "updated", caveman);
+  await upsertAgentsFile(root, PACKAGE_ROOT, "updated", caveman, config.project.comment_style);
+  await ensureClaudeAgentsImport(root);
 }
 
 async function updateSkills(root: string, agents: string[]): Promise<void> {
@@ -158,6 +162,39 @@ async function ensureCommentLint(root: string): Promise<void> {
   project.comment_lint = "block";
   await writeFile(configPath, yamlStringify(raw));
   console.log(`  ${chalk.blue("enabled")} comment linting (project.comment_lint: block)`);
+}
+
+async function ensureDocStyleTool(root: string): Promise<void> {
+  const configPath = join(root, ".grimoire", "config.yaml");
+  if (!(await fileExists(configPath))) return;
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = (yamlParse(await readFile(configPath, "utf-8")) as Record<string, unknown>) ?? {};
+  } catch {
+    return;
+  }
+
+  const before = yamlStringify(raw);
+  const toolAdded = applyDocStyleMigration(raw);
+  const after = yamlStringify(raw);
+  if (after === before) return;
+
+  await writeFile(configPath, after);
+  const suffix = toolAdded ? " — pydoclint gate configured; install: pip install pydoclint" : "";
+  console.log(`  ${chalk.blue("enabled")} doc_style check${suffix}`);
+}
+
+function applyDocStyleMigration(raw: Record<string, unknown>): boolean {
+  ensureChecks(raw, ["doc_style"]);
+  const project = (raw.project ?? {}) as Record<string, unknown>;
+  const tools = (raw.tools ?? {}) as Record<string, unknown>;
+  if (tools.doc_style !== undefined) return false;
+  const tool = pydoclintTool(project.language as string | undefined, project.comment_style as string | undefined);
+  if (!tool) return false;
+  tools.doc_style = tool;
+  raw.tools = tools;
+  return true;
 }
 
 interface Migration {

@@ -9,6 +9,7 @@ import { setupHooks } from "./hooks.js";
 import { fileExists } from "../utils/fs.js";
 import {
   upsertAgentsFile,
+  ensureClaudeAgentsImport,
   installSkillFiles,
   SKILL_NAMES,
   GRIMOIRE_DIRS,
@@ -38,6 +39,9 @@ interface InitOptions {
 
 interface ConfigSetupResult {
   cavemanLevel: CavemanLevel;
+  commentStyle?: string;
+  packageManager?: string;
+  pydoclintConfigured: boolean;
   configAgents: string[];
   integrationFlags: { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined };
   figmaMcpConfigured: boolean;
@@ -83,6 +87,9 @@ async function createGrimoireConfig(
 
   return {
     cavemanLevel: config.project.caveman ?? "lite",
+    commentStyle: config.project.comment_style,
+    packageManager: config.project.package_manager,
+    pydoclintConfigured: config.tools.doc_style?.name === "pydoclint",
     configAgents: config.project.agents ?? [],
     integrationFlags,
     figmaMcpConfigured: config.project.design_tool?.mcp?.name === "figma-dev-mode",
@@ -99,6 +106,9 @@ async function loadExistingConfig(
   const existing = await loadConfig(root);
   return {
     cavemanLevel: existing.project.caveman ?? "none",
+    commentStyle: existing.project.comment_style,
+    packageManager: existing.project.package_manager,
+    pydoclintConfigured: existing.tools.doc_style?.name === "pydoclint",
     configAgents: existing.project.agents ?? [],
     integrationFlags: {
       codebaseMemoryMcp: initialFlags.codebaseMemoryMcp ?? existing.project.integrations?.codebase_memory_mcp,
@@ -160,7 +170,7 @@ async function setupAgents(root: string, options: InitOptions, setup: ConfigSetu
     }
   }
 
-  if (!options.skipAgents) await setupAgentsFile(root, setup.cavemanLevel);
+  if (!options.skipAgents) await setupAgentsFile(root, setup.cavemanLevel, setup.commentStyle);
   if (!options.skipSkills) await installSkills(root, skillAgents.length > 0 ? skillAgents : ["claude"]);
   if (instructionAgents.length > 0) await generateAgentFiles(root, PACKAGE_ROOT, instructionAgents, "created");
   if (!options.skipAgents) await setupHooks(root);
@@ -184,15 +194,28 @@ export async function initProject(
   await setupAgents(root, options, setup);
 
   printNextSteps(!!setup.projectDetection?.name, options.full);
-  printIntegrationInstructions({ ...setup.integrationFlags, figmaMcp: setup.figmaMcpConfigured });
+  printIntegrationInstructions({
+    ...setup.integrationFlags,
+    figmaMcp: setup.figmaMcpConfigured,
+    pydoclint: setup.pydoclintConfigured,
+    packageManager: setup.packageManager,
+  });
 }
+
+const PYDOCLINT_INSTALL: Record<string, string> = {
+  uv: "uv add --dev pydoclint",
+  poetry: "poetry add --group dev pydoclint",
+  pip: "pip install pydoclint",
+};
 
 function printIntegrationInstructions(flags: {
   codebaseMemoryMcp?: boolean;
   cavemanPlugin?: boolean;
   figmaMcp?: boolean;
+  pydoclint?: boolean;
+  packageManager?: string;
 }): void {
-  if (!flags.codebaseMemoryMcp && !flags.cavemanPlugin && !flags.figmaMcp)
+  if (!flags.codebaseMemoryMcp && !flags.cavemanPlugin && !flags.figmaMcp && !flags.pydoclint)
     return;
 
   console.log(chalk.bold("Recommended integrations to install:\n"));
@@ -225,6 +248,8 @@ function printIntegrationInstructions(flags: {
     );
   }
 
+  if (flags.pydoclint) printPydoclintInstructions(flags.packageManager);
+
   if (flags.figmaMcp) {
     console.log(
       `  ${chalk.cyan("Figma Dev Mode MCP")} — read Figma frames, variables, and components from the AI agent`
@@ -240,11 +265,24 @@ function printIntegrationInstructions(flags: {
   }
 }
 
+function printPydoclintInstructions(packageManager?: string): void {
+  const install = PYDOCLINT_INSTALL[packageManager ?? ""] ?? PYDOCLINT_INSTALL.pip;
+  console.log(
+    `  ${chalk.cyan("pydoclint")} — enforces the configured docstring style at the doc_style commit gate`
+  );
+  console.log(`      ${chalk.dim(install)}`);
+  console.log(
+    `    ${chalk.dim("For a codebase with existing drift: pydoclint --generate-baseline 1 . then commit the baseline file.")}\n`
+  );
+}
+
 async function setupAgentsFile(
   root: string,
-  caveman: CavemanLevel
+  caveman: CavemanLevel,
+  commentStyle?: string
 ): Promise<void> {
-  await upsertAgentsFile(root, PACKAGE_ROOT, "created", caveman);
+  await upsertAgentsFile(root, PACKAGE_ROOT, "created", caveman, commentStyle);
+  await ensureClaudeAgentsImport(root);
 }
 
 async function installSkills(root: string, agents: string[]): Promise<void> {

@@ -9,15 +9,11 @@ export type { CommentLintMode };
 
 export interface CommentLintIssue {
   line: number;
-  rule: "verbose_comment" | "external_ref" | "placeholder_stub";
+  rule: "external_ref" | "placeholder_stub";
   message: string;
 }
 
 const PRAGMA = "grimoire-lint-ok";
-
-// A run of line comments longer than this reads as an essay. Matches the
-// 2-line prose budget the doc_style check applies to docstrings.
-const MAX_COMMENT_RUN = 2;
 
 // Line-comment token by language. Block doc comments (/** */, """) are owned by
 // the doc_style check, so they are deliberately not treated as line comments here.
@@ -51,45 +47,9 @@ function commentOf(line: string, token: "#" | "//"): string | null {
   return i !== -1 ? line.slice(i) : null;
 }
 
-function isLineComment(line: string, token: "#" | "//"): boolean {
-  const t = line.trim();
-  return token === "#" ? t.startsWith("#") && !t.startsWith("#!") : t.startsWith("//");
-}
-
 function isEllipsisOnly(line: string, token: "#" | "//"): boolean {
   const t = line.trim();
   return t === "..." || t === `${token} ...` || t === `${token}...`;
-}
-
-// A run of consecutive line comments longer than the terse limit reads as an essay.
-function findVerboseRuns(lines: string[], token: "#" | "//"): CommentLintIssue[] {
-  const issues: CommentLintIssue[] = [];
-  let start = -1;
-  let len = 0;
-  let pragma = false;
-  const flush = (): void => {
-    if (len > MAX_COMMENT_RUN && !pragma) {
-      issues.push({
-        line: start + 1,
-        rule: "verbose_comment",
-        message: `Comment block spans ${len} lines — keep it to ${MAX_COMMENT_RUN}; drop lines that restate the code or move rationale to a decision record.`,
-      });
-    }
-    start = -1;
-    len = 0;
-    pragma = false;
-  };
-  for (let i = 0; i < lines.length; i++) {
-    if (!isLineComment(lines[i], token)) {
-      flush();
-      continue;
-    }
-    if (len === 0) start = i;
-    len++;
-    if (lines[i].includes(PRAGMA)) pragma = true;
-  }
-  flush();
-  return issues;
 }
 
 function inlineIssue(line: string, index: number, token: "#" | "//"): CommentLintIssue | null {
@@ -117,7 +77,7 @@ function inlineIssue(line: string, index: number, token: "#" | "//"): CommentLin
 export function lintComments(text: string, filePath: string): CommentLintIssue[] {
   const token = lineToken(filePath);
   const lines = text.split("\n");
-  const issues = findVerboseRuns(lines, token);
+  const issues: CommentLintIssue[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].includes(PRAGMA)) continue;
     const issue = inlineIssue(lines[i], i, token);

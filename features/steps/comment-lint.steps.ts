@@ -13,7 +13,8 @@ function writeHook(world: LintWorld, toolName: string, input: Record<string, unk
   world.run(["lint-comments", "--hook"], payload);
 }
 
-const VERBOSE = ["// first line of rationale", "// second line", "// third line", "const x = 1;"].join("\n");
+const MULTI_LINE = ["// first line of rationale", "// second line", "// third line", "const x = 1;"].join("\n");
+const REF_COMMENT = "// see login.feature for the spec";
 
 Given("a grimoire project with comment linting set to block", function (this: LintWorld) {
   this.initProject();
@@ -28,16 +29,16 @@ Given("comment linting is off", function (this: LintWorld) {
   setMode(this, "off");
 });
 
-Given("the file already contains a verbose comment", function (this: LintWorld) {
-  this.write("src/widget.ts", `${VERBOSE}\nconst y = 2;\n`);
+Given("the file already contains a comment naming a feature file", function (this: LintWorld) {
+  this.write("src/widget.ts", `${REF_COMMENT}\nconst y = 2;\n`);
 });
 
-When("an agent writes a multi-line comment block longer than the terse limit", function (this: LintWorld) {
-  writeHook(this, "Edit", { file_path: "src/widget.ts", new_string: VERBOSE });
+When("an agent writes a multi-line comment block", function (this: LintWorld) {
+  writeHook(this, "Edit", { file_path: "src/widget.ts", new_string: MULTI_LINE });
 });
 
 When("an agent writes a comment naming a feature file or decision id", function (this: LintWorld) {
-  writeHook(this, "Edit", { file_path: "src/widget.ts", new_string: "// see login.feature for the spec\nconst x = 1;" });
+  writeHook(this, "Edit", { file_path: "src/widget.ts", new_string: `${REF_COMMENT}\nconst x = 1;` });
 });
 
 When("an agent writes a truncated marker such as {string}", function (this: LintWorld, marker: string) {
@@ -49,20 +50,15 @@ When("an agent edits an unrelated line in that file", function (this: LintWorld)
 });
 
 When("an agent rewrites the whole file keeping that comment and adding a clean line", function (this: LintWorld) {
-  writeHook(this, "Write", { file_path: "src/widget.ts", content: `${VERBOSE}\nconst y = 2;\nconst z = 9;\n` });
+  writeHook(this, "Write", { file_path: "src/widget.ts", content: `${REF_COMMENT}\nconst y = 2;\nconst z = 9;\n` });
 });
 
-When("an agent inserts a verbose comment block via a multi-edit", function (this: LintWorld) {
-  writeHook(this, "MultiEdit", { file_path: "src/widget.ts", edits: [{ new_string: VERBOSE }] });
+When("an agent inserts a comment naming a feature file via a multi-edit", function (this: LintWorld) {
+  writeHook(this, "MultiEdit", { file_path: "src/widget.ts", edits: [{ new_string: REF_COMMENT }] });
 });
 
-When("an agent writes a long comment marked with the override pragma", function (this: LintWorld) {
-  const text = ["// grimoire-lint-ok rationale follows", "// second line", "// third line", "const x = 1;"].join("\n");
-  writeHook(this, "Edit", { file_path: "src/widget.ts", new_string: text });
-});
-
-When("an agent writes a verbose comment", function (this: LintWorld) {
-  writeHook(this, "Edit", { file_path: "src/widget.ts", new_string: VERBOSE });
+When("an agent writes an external-artifact comment marked with the override pragma", function (this: LintWorld) {
+  writeHook(this, "Edit", { file_path: "src/widget.ts", new_string: `${REF_COMMENT} grimoire-lint-ok\nconst x = 1;` });
 });
 
 Then("the write is rejected", function (this: LintWorld) {
@@ -74,7 +70,7 @@ Then("the write is accepted", function (this: LintWorld) {
 });
 
 Then("the agent is shown the offending line", function (this: LintWorld) {
-  assert.match(this.result.stderr, /(verbose_comment|external_ref|placeholder_stub)/, `expected a named rule finding, got:\n${this.out}`);
+  assert.match(this.result.stderr, /(external_ref|placeholder_stub)/, `expected a named rule finding, got:\n${this.out}`);
   assert.match(this.result.stderr, /(L\d+|inserted line \d+)/, `expected an offending line reference, got:\n${this.out}`);
 });
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildCavemanDirective, SKILL_NAMES } from "./shared-setup.js";
+import { buildCavemanDirective, buildCommentStyleDirective, SKILL_NAMES } from "./shared-setup.js";
+import { pydoclintTool, applyDocStyleTool, buildMinimalConfig } from "./init-config.js";
 
 describe("buildCavemanDirective", () => {
   it("returns empty string for none", () => {
@@ -39,6 +40,63 @@ describe("buildCavemanDirective", () => {
   it("includes attribution comment", () => {
     const result = buildCavemanDirective("full");
     expect(result).toContain("github.com/JuliusBrussee/caveman");
+  });
+});
+
+describe("buildCommentStyleDirective", () => {
+  it("returns empty string when no style configured", () => {
+    expect(buildCommentStyleDirective(undefined)).toBe("");
+    expect(buildCommentStyleDirective("")).toBe("");
+  });
+
+  it("names the style and its format for sphinx", () => {
+    const result = buildCommentStyleDirective("sphinx");
+    expect(result).toContain("## Project Comment Style");
+    expect(result).toContain("**sphinx**");
+    expect(result).toContain(":param x:");
+  });
+
+  it("still names an unknown style without a format hint", () => {
+    const result = buildCommentStyleDirective("pep257");
+    expect(result).toContain("**pep257**");
+  });
+});
+
+describe("pydoclintTool", () => {
+  it("returns the tool for python with a supported style", () => {
+    expect(pydoclintTool("python", "sphinx")).toEqual({
+      name: "pydoclint",
+      check_command: "pydoclint --style=sphinx .",
+    });
+  });
+
+  it("returns null for non-python languages", () => {
+    expect(pydoclintTool("typescript", "sphinx")).toBeNull();
+  });
+
+  it("returns null for styles pydoclint does not support", () => {
+    expect(pydoclintTool("python", "pep257")).toBeNull();
+    expect(pydoclintTool("python", undefined)).toBeNull();
+  });
+});
+
+describe("applyDocStyleTool", () => {
+  it("sets the pydoclint tool for a python project", () => {
+    const config = buildMinimalConfig();
+    config.project.language = "python";
+    config.project.comment_style = "google";
+    applyDocStyleTool(config);
+    expect(config.tools.doc_style?.name).toBe("pydoclint");
+    expect(config.tools.doc_style?.check_command).toBe("pydoclint --style=google .");
+  });
+
+  it("does not overwrite an existing doc_style tool", () => {
+    const config = buildMinimalConfig();
+    config.project.language = "python";
+    config.project.comment_style = "google";
+    config.tools.doc_style = { name: "custom", check_command: "my-linter" };
+    applyDocStyleTool(config);
+    expect(config.tools.doc_style.name).toBe("custom");
   });
 });
 

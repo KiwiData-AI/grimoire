@@ -99,7 +99,7 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
   return { results, passed, failed: failedCount, skipped, errored };
 }
 
-function isBuiltinComplexity(tool: ToolConfig | undefined): boolean {
+function isBuiltinStep(tool: ToolConfig | undefined): boolean {
   return !tool?.command && !tool?.check_command && tool?.name !== "llm";
 }
 
@@ -126,8 +126,10 @@ async function runStep(
   options: CheckOptions,
 ): Promise<StepResult> {
   if (step === "test_quality") return runTestQualityStep(root);
-  if (step === "doc_style") return runDocStyleStep(root, config);
-  if (step === "complexity" && isBuiltinComplexity(config.tools[step])) {
+  if (step === "doc_style" && isBuiltinStep(config.tools[step])) {
+    return runDocStyleStep(root, config);
+  }
+  if (step === "complexity" && isBuiltinStep(config.tools[step])) {
     return runComplexityStep(root, config);
   }
   const result = await runToolStep(step, root, config, options);
