@@ -26,11 +26,12 @@ These principles govern all grimoire work — drafting, planning, reviewing, and
 
 ## Comments
 
-The default is **no comment**. Apply the laziness ladder to comments too: delete it (the code already says it) → rename or restructure until the code says it → only then write a comment, and only for what code cannot express (a constraint, an invariant, a non-obvious why). Max 2 lines.
+The default is **no comment**. Apply the laziness ladder to comments too: delete it (the code already says it) → rename or restructure until the code says it → only then write a comment, and only for what code cannot express (a hidden constraint, a subtle invariant, a workaround, behavior that would surprise a reader). Max 2 lines. The test: if removing the comment wouldn't confuse a future reader, don't write it.
 
 - Never comment a variable whose name says what it is. A comment explaining a variable is a rename signal, not a comment site.
 - Keep names short — 1–3 words. If a name needs a comment to decode, simplify the code instead.
 - Never restate the adjacent code, and never narrate the change you are making — that story belongs in the commit message.
+- Never reference the current task, fix, or callers ("used by X", "added for the Y flow") — those belong in the PR description and rot as the codebase evolves.
 - No references to external artifacts (tickets, ADR ids, feature files, PRs). Comments must be self-contained; the write-time hook blocks these.
 - No placeholder stubs (`... rest of code`, `not implemented`). Finish the edit; the write-time hook blocks these.
 - Docstrings follow the project's `comment_style` in `.grimoire/config.yaml` — sphinx: `:param x:` / `:returns:`; google: `Args:` / `Returns:`; numpy: `Parameters` sections. The `doc_style` commit gate enforces it.
