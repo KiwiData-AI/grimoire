@@ -1,0 +1,33 @@
+{
+  "name": "ste",
+  "description": "Brevity with clarity — ASD-STE100-based response style. Cuts filler, hedging, and AI rhetorical scaffolding while keeping articles, complete sentences, and consistent naming. Fork of caveman by Julius Brussee (MIT).",
+  "version": "0.1.0",
+  "author": "Kiwi Data",
+  "license": "MIT",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/ste-activate.js\"",
+            "timeout": 5,
+            "statusMessage": "Loading ste mode..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/ste-mode-tracker.js\"",
+            "timeout": 5,
+            "statusMessage": "Tracking ste mode..."
+          }
+        ]
+      }
+    ]
+  }
+}
