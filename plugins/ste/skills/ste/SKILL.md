@@ -32,6 +32,9 @@ These rules apply at level ste. Level caveman relaxes them per the Intensity tab
 - Active voice. Simple tenses.
 - Call each thing by the same full name every time. Never invent labels ("D1",
   "option B", "Layer 2") that need earlier context to decode.
+- Reference a decision, ADR, or ticket by identifier plus subject: "ADR-0039
+  (delegate doc style to pydoclint)", never a bare "ADR-0039" or "D-12". After the
+  first mention, the subject alone is enough.
 - Maximum 3 nouns in a row.
 - Instructions: imperative mood, one action per list item, in execution order.
 - A warning is its own sentence and comes before the action it protects.
@@ -39,18 +42,38 @@ These rules apply at level ste. Level caveman relaxes them per the Intensity tab
 
 ## Banned scaffolding — AI-isms
 
-These phrases add emphasis, not information. Delete the frame; state the fact.
+These patterns add emphasis or drama, not information. Delete the frame; state the fact.
 
-- Contrast frames: "it's not X, it's Y", "not just X but Y", "X isn't the problem — Y is".
-- Fake candor: "honestly", "frankly", "to be honest", "real talk".
+- Contrast frames: "it's not X, it's Y", "not just X but Y", "X isn't the problem — Y is",
+  "not because X but because Y", "the answer/question isn't X, it's Y",
+  "stops being X and starts being Y".
+- Negative listing: "It wasn't X. It wasn't Y. It was Z." — say Z.
+- Throat-clearing openers: "here's the thing/why/what", "the truth is",
+  "let me be clear", "it turns out", "the uncomfortable truth", "can we talk about".
+- Fake candor: "honestly", "frankly", "to be honest", "real talk", "I'll be honest",
+  "I promise".
+- Emphasis crutches: "full stop", "period.", "let that sink in", "make no mistake",
+  "this matters because".
 - Weight markers: "load-bearing", "the key insight", "the thing to hold on to",
-  "crucially", "importantly", "notably", "it's worth noting".
-- Narrative hooks: "here's the kicker", "here's the thing", "plot twist", "spoiler",
-  "smoking gun", "the culprit".
-- Hype adjectives: "elegant", "robust", "seamless", "powerful", "game-changer",
-  "deep dive", "delve".
-- Padding transitions: rhetorical questions as segues, "at its core", "fundamentally",
-  "in other words", "put simply".
+  "crucially", "importantly", "notably", "it's worth noting" — if it is worth
+  noting, note it.
+- Narrative hooks: "here's the kicker", "plot twist", "spoiler", "hint:",
+  "smoking gun", "the culprit", "a feature, not a bug".
+- Dramatic fragmentation: "[Noun]. That's it. That's the [thing]." Staccato
+  one-word reveals.
+- Rhetorical setups: questions you immediately answer, "what if...?", "think
+  about it:", "here's what I mean:".
+- Hype and business jargon: "elegant", "robust", "seamless", "powerful",
+  "game-changer", "deep dive", "delve", "unpack", "navigate", "landscape",
+  "lean into", "double down", "circle back", "moving forward".
+- Padding transitions: "at its core", "at the end of the day", "when it comes to",
+  "the reality is", "in today's X", "fundamentally", "in other words", "put simply".
+- False agency: "the data tells us", "the decision emerged", "the culture shifts" —
+  name who did what. Same for passive dodges: "mistakes were made".
+- Vague declaratives: "the implications are significant", "the stakes are high" —
+  state the implication instead.
+- Lazy extremes as authority: "every", "always", "never", "nobody" — unless
+  literally true.
 - Unrequested analogies: "think of it as...".
 - Empty closers: "hope this helps", "let me know if you need anything else".
 
