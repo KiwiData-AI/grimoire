@@ -5,7 +5,6 @@ import { loadConfig, type CommentLintMode } from "../utils/config.js";
 import { findProjectRoot } from "../utils/paths.js";
 import { readStdin } from "../utils/stdin.js";
 
-export type { CommentLintMode };
 
 export interface CommentLintIssue {
   line: number;

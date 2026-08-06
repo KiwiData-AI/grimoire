@@ -1,0 +1,18 @@
+{
+  "name": "grimoire",
+  "owner": {
+    "name": "Kiwi Data"
+  },
+  "plugins": [
+    {
+      "name": "grimoire",
+      "source": "./",
+      "description": "BDD-powered AI coding assistant — Gherkin specs, MADR decisions, and red-green development for AI agents"
+    },
+    {
+      "name": "ste",
+      "source": "./plugins/ste",
+      "description": "Brevity with clarity — ASD-STE100-based response style. Fork of caveman."
+    }
+  ]
+}
