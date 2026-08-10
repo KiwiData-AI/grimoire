@@ -232,6 +232,35 @@ tools:
     expect(config.tools.best_practices?.prompt).toBe("Review for best practices");
   });
 
+  it("maps legacy caveman keys onto ste before migration runs", async () => {
+    const yaml = `
+version: 2
+project:
+  caveman: lite
+  integrations:
+    caveman_plugin: true
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.ste).toBe("ste");
+    expect(config.project.integrations?.ste_plugin).toBe(true);
+  });
+
+  it("drops ste values outside the enum", async () => {
+    const yaml = `
+version: 3
+project:
+  ste: lite
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.ste).toBeUndefined();
+  });
+
   it("parses project.integrations booleans", async () => {
     const yaml = `
 version: 2

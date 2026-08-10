@@ -72,6 +72,35 @@ describe("setupHooks", () => {
     );
   });
 
+  it("replaces a stale grimoire check entry instead of stacking a second one", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [
+          { matcher: "*.py", command: "black --check ." },
+          { matcher: "*", command: "grimoire check --changed --json" },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(2);
+    expect(written.hooks.PreCommit[0].command).toBe("black --check .");
+    expect(written.hooks.PreCommit[1].command).toBe(
+      "grimoire check --changed --json --skip best_practices",
+    );
+  });
+
   it("skips git hooks when .git doesn't exist", async () => {
     setExists(); // nothing exists
     await setupHooks("/root");

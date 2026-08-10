@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { detectTools, type Detection } from "./detect.js";
-import type { GrimoireConfig, SteLevel, ProjectSurface } from "../utils/config.js";
+import { STE_LEVELS, type GrimoireConfig, type SteLevel, type ProjectSurface } from "../utils/config.js";
 import { detectAgentFiles } from "./shared-setup.js";
 import { runSections } from "./configure.js";
 import {
@@ -180,7 +180,7 @@ async function askEssentialPreferences(
       "    Install codebase-memory-mcp (call graphs, code intelligence)? (Y/n) "
     );
     integrations.codebase_memory_mcp =
-      cbmAnswer.trim().toLowerCase() !== "n";
+      !/^no?$/i.test(cbmAnswer.trim());
   } else {
     integrations.codebase_memory_mcp = prefill.codebaseMemoryMcp;
   }
@@ -190,7 +190,7 @@ async function askEssentialPreferences(
       "    Install ste response-style plugin (Claude Code marketplace)? (Y/n) "
     );
     integrations.ste_plugin =
-      stePluginAnswer.trim().toLowerCase() !== "n";
+      !/^no?$/i.test(stePluginAnswer.trim());
   } else {
     integrations.ste_plugin = prefill.stePlugin;
   }
@@ -205,9 +205,8 @@ async function askEssentialPreferences(
   const steAnswer = await rl.question(
     `    Response style (ste)? (off/ste/caveman) [${currentSte}]: `
   );
-  config.project.ste = (
-    steAnswer.trim() ? steAnswer.trim().toLowerCase() : currentSte
-  ) as SteLevel;
+  const steChoice = steAnswer.trim().toLowerCase() as SteLevel;
+  config.project.ste = STE_LEVELS.includes(steChoice) ? steChoice : currentSte;
 
   // 5. Commit style
   const commitAnswer = await rl.question(

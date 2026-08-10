@@ -111,10 +111,7 @@ async function loadExistingConfig(
     packageManager: existing.project.package_manager,
     pydoclintConfigured: existing.tools.doc_style?.name === "pydoclint",
     configAgents: existing.project.agents ?? [],
-    integrationFlags: {
-      codebaseMemoryMcp: initialFlags.codebaseMemoryMcp ?? existing.project.integrations?.codebase_memory_mcp,
-      stePlugin: initialFlags.stePlugin ?? existing.project.integrations?.ste_plugin,
-    },
+    integrationFlags: buildIntegrationFlags(initialFlags, existing),
     figmaMcpConfigured: existing.project.design_tool?.mcp?.name === "figma-dev-mode",
   };
 }

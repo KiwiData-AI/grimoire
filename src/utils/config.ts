@@ -12,6 +12,15 @@ export interface ToolConfig {
 
 export type SteLevel = "off" | "ste" | "caveman";
 
+export const STE_LEVELS: readonly SteLevel[] = ["off", "ste", "caveman"];
+
+export const LEGACY_CAVEMAN_TO_STE: Record<string, SteLevel> = {
+  none: "off",
+  lite: "ste",
+  full: "caveman",
+  ultra: "caveman",
+};
+
 export type CommentLintMode = "block" | "warn" | "off";
 
 export const CURRENT_CONFIG_VERSION = 3;
@@ -163,8 +172,22 @@ function parseIntegrations(projectRaw: Record<string, unknown>): IntegrationsCon
   const it = projectRaw.integrations as Record<string, unknown>;
   return {
     codebase_memory_mcp: typeof it.codebase_memory_mcp === "boolean" ? it.codebase_memory_mcp : undefined,
-    ste_plugin: typeof it.ste_plugin === "boolean" ? it.ste_plugin : undefined,
+    ste_plugin:
+      typeof it.ste_plugin === "boolean"
+        ? it.ste_plugin
+        : typeof it.caveman_plugin === "boolean"
+          ? it.caveman_plugin
+          : undefined,
   };
+}
+
+// Reads unmigrated (pre-v3) configs too: legacy `caveman` levels map onto ste
+// so init/update never silently drop a configured style before migration runs.
+function parseSte(projectRaw: Record<string, unknown>): SteLevel | undefined {
+  const ste = str(projectRaw.ste);
+  if (STE_LEVELS.includes(ste as SteLevel)) return ste as SteLevel;
+  const legacy = str(projectRaw.caveman);
+  return legacy ? LEGACY_CAVEMAN_TO_STE[legacy] : undefined;
 }
 
 function parsePrecommitReview(projectRaw: Record<string, unknown>): PrecommitReviewConfig | undefined {
@@ -200,7 +223,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     doc_tool: str(projectRaw.doc_tool ?? raw.doc_tool),
     comment_style: str(projectRaw.comment_style ?? raw.comment_style),
     comment_lint: parseCommentLint(projectRaw.comment_lint),
-    ste: str(projectRaw.ste) as ProjectConfig["ste"],
+    ste: parseSte(projectRaw),
     compliance: parseStringArray(projectRaw.compliance),
     design_tool: parseDesignTool(projectRaw),
     agents: parseStringArray(projectRaw.agents),

@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by 0040
 date: 2026-04-05
 decision-makers: [Fred]
 ---

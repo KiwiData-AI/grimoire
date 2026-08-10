@@ -205,6 +205,8 @@ function mergeHooks(existing: HookConfig, additions: HookConfig): HookConfig {
     hooks: { ...existing.hooks },
   };
 
+  const isGrimoireCheck = (cmd: string) => cmd.startsWith("grimoire check");
+
   for (const [phase, entries] of Object.entries(additions.hooks)) {
     const key = phase as keyof HookConfig["hooks"];
     const existingEntries = merged.hooks[key] ?? [];
@@ -214,7 +216,14 @@ function mergeHooks(existing: HookConfig, additions: HookConfig): HookConfig {
     const existingCommands = new Set(existingEntries.map((e) => e.command));
     const toAdd = newEntries.filter((e) => !existingCommands.has(e.command));
 
-    merged.hooks[key] = [...existingEntries, ...toAdd];
+    // Grimoire owns its check entry: when the command changes between
+    // versions, replace the stale variant instead of stacking a second one.
+    const addsCheck = toAdd.some((e) => isGrimoireCheck(e.command));
+    const kept = addsCheck
+      ? existingEntries.filter((e) => !isGrimoireCheck(e.command))
+      : existingEntries;
+
+    merged.hooks[key] = [...kept, ...toAdd];
   }
 
   return merged;
