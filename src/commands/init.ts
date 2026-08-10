@@ -9,7 +9,7 @@ export const initCommand = new Command("init")
   .option("--no-detect", "Skip auto-detection of project tools")
   .option("--agent <type>", "Add an AI agent: claude, opencode, codex, cursor, copilot (can be repeated)", collect, [])
   .option("--install-codebase-memory-mcp", "Mark codebase-memory-mcp as a recommended integration (prints install command at end)")
-  .option("--install-caveman-plugin", "Mark caveman skill plugin as a recommended integration (prints install command at end)")
+  .option("--install-ste-plugin", "Mark the ste response-style plugin as a recommended integration (prints install command at end)")
   .option("--full", "Also run all deferred configure sections (compliance, design, LLM models, bug trackers, testing tools)")
   .action(async (path: string, options) => {
     await initProject(path, {
@@ -19,7 +19,7 @@ export const initCommand = new Command("init")
       agents: options.agent ?? [],
       full: options.full ?? false,
       installCodebaseMemoryMcp: options.installCodebaseMemoryMcp,
-      installCavemanPlugin: options.installCavemanPlugin,
+      installStePlugin: options.installStePlugin,
     });
   });
 

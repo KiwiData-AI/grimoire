@@ -1,4 +1,4 @@
-version: 2
+version: 3
 project:
   commit_style: conventional
   language: typescript
@@ -9,10 +9,10 @@ project:
     - claude
   integrations:
     codebase_memory_mcp: true
-    caveman_plugin: true
+    ste_plugin: true
   surface: tui
-  caveman: lite
   comment_lint: block
+  ste: ste
 features_dir: features
 decisions_dir: .grimoire/decisions
 tools:

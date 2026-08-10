@@ -10,11 +10,11 @@ export interface ToolConfig {
   prompt?: string;
 }
 
-export type CavemanLevel = "none" | "lite" | "full" | "ultra";
+export type SteLevel = "off" | "ste" | "caveman";
 
 export type CommentLintMode = "block" | "warn" | "off";
 
-export const CURRENT_CONFIG_VERSION = 2;
+export const CURRENT_CONFIG_VERSION = 3;
 
 interface DesignToolConfig {
   name: string;
@@ -40,7 +40,7 @@ interface ProjectConfig {
   doc_tool?: string;
   comment_style?: string;
   comment_lint?: CommentLintMode;
-  caveman?: CavemanLevel;
+  ste?: SteLevel;
   compliance?: string[];
   design_tool?: DesignToolConfig;
   agents?: string[];
@@ -57,7 +57,7 @@ interface PrecommitReviewConfig {
 
 interface IntegrationsConfig {
   codebase_memory_mcp?: boolean;
-  caveman_plugin?: boolean;
+  ste_plugin?: boolean;
 }
 
 interface LlmAgentConfig {
@@ -163,7 +163,7 @@ function parseIntegrations(projectRaw: Record<string, unknown>): IntegrationsCon
   const it = projectRaw.integrations as Record<string, unknown>;
   return {
     codebase_memory_mcp: typeof it.codebase_memory_mcp === "boolean" ? it.codebase_memory_mcp : undefined,
-    caveman_plugin: typeof it.caveman_plugin === "boolean" ? it.caveman_plugin : undefined,
+    ste_plugin: typeof it.ste_plugin === "boolean" ? it.ste_plugin : undefined,
   };
 }
 
@@ -200,7 +200,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     doc_tool: str(projectRaw.doc_tool ?? raw.doc_tool),
     comment_style: str(projectRaw.comment_style ?? raw.comment_style),
     comment_lint: parseCommentLint(projectRaw.comment_lint),
-    caveman: str(projectRaw.caveman) as ProjectConfig["caveman"],
+    ste: str(projectRaw.ste) as ProjectConfig["ste"],
     compliance: parseStringArray(projectRaw.compliance),
     design_tool: parseDesignTool(projectRaw),
     agents: parseStringArray(projectRaw.agents),

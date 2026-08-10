@@ -14,6 +14,7 @@ import {
   generateAgentFiles,
   detectAgentFiles,
   SKILL_NAMES,
+  printStePluginInstructions,
 } from "./shared-setup.js";
 import { setupHooks } from "./hooks.js";
 import { pydoclintTool } from "./init-config.js";
@@ -79,6 +80,8 @@ export async function updateProject(
 
   await writeVersionStamp(root);
 
+  maybePrintStePlugin(config);
+
   console.log(`\n${chalk.bold.green("Done!")} Grimoire updated.`);
 }
 
@@ -94,10 +97,16 @@ async function resolveTargetAgents(
   };
 }
 
+function maybePrintStePlugin(config: Awaited<ReturnType<typeof loadConfig>>): void {
+  if (!config.project.integrations?.ste_plugin) return;
+  console.log("");
+  printStePluginInstructions();
+}
+
 async function updateAgentsFile(root: string): Promise<void> {
   const config = await loadConfig(root);
-  const caveman = config.project.caveman ?? "none";
-  await upsertAgentsFile(root, PACKAGE_ROOT, "updated", caveman, config.project.comment_style);
+  const ste = config.project.ste ?? "off";
+  await upsertAgentsFile(root, PACKAGE_ROOT, "updated", ste, config.project.comment_style);
   await ensureClaudeAgentsImport(root);
 }
 
@@ -238,6 +247,33 @@ const MIGRATIONS: Migration[] = [
       }
       ensureChecks(raw, ["dep_audit", "secrets", "best_practices"]);
       upgradeFlatlLlm(raw);
+    },
+  },
+  {
+    from: 2,
+    to: 3,
+    apply: (raw) => {
+      if (!raw.project || typeof raw.project !== "object") {
+        raw.project = {};
+      }
+      const project = raw.project as Record<string, unknown>;
+      const levelMap: Record<string, string> = {
+        none: "off",
+        lite: "ste",
+        full: "caveman",
+        ultra: "caveman",
+      };
+      if (project.caveman !== undefined) {
+        project.ste = levelMap[String(project.caveman)] ?? "ste";
+        delete project.caveman;
+      }
+      if (project.integrations && typeof project.integrations === "object") {
+        const it = project.integrations as Record<string, unknown>;
+        if (it.caveman_plugin !== undefined) {
+          it.ste_plugin = it.caveman_plugin;
+          delete it.caveman_plugin;
+        }
+      }
     },
   },
 ];

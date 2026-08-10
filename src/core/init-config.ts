@@ -11,7 +11,7 @@ export const PROMPT_SURFACES: readonly ProjectSurface[] = [
 
 export interface EssentialPrefill {
   codebaseMemoryMcp?: boolean;
-  cavemanPlugin?: boolean;
+  stePlugin?: boolean;
   detectedSurface?: ProjectSurface;
 }
 
@@ -125,12 +125,12 @@ export function surfaceFromDetection(
 }
 
 export function buildIntegrationFlags(
-  initialFlags: { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined },
+  initialFlags: { codebaseMemoryMcp: boolean | undefined; stePlugin: boolean | undefined },
   config: GrimoireConfig,
-): { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined } {
+): { codebaseMemoryMcp: boolean | undefined; stePlugin: boolean | undefined } {
   return {
     codebaseMemoryMcp: initialFlags.codebaseMemoryMcp ?? config.project.integrations?.codebase_memory_mcp,
-    cavemanPlugin: initialFlags.cavemanPlugin ?? config.project.integrations?.caveman_plugin,
+    stePlugin: initialFlags.stePlugin ?? config.project.integrations?.ste_plugin,
   };
 }
 

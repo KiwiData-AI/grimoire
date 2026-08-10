@@ -617,16 +617,17 @@ The plan, apply, and verify skills enforce a contract-first approach for externa
 - **Contract drift detection** — verify flags when external API changes don't have matching test updates
 - **Client code reads only documented fields** — prevents coupling to undocumented API behavior
 
-### Caveman Mode
+### Response Style (STE)
 
-Token optimization for context-constrained agents. Set `project.caveman` in `.grimoire/config.yaml`:
+Brevity-with-clarity response style based on ASD-STE100 (Simplified Technical English). Set `project.ste` in `.grimoire/config.yaml` to write a style section into AGENTS.md:
 
 | Level | Effect |
 |-------|--------|
-| `none` | Full AGENTS.md instructions (default) |
-| `lite` | Trimmed explanations, same workflow |
-| `full` | Minimal instructions, experienced users |
-| `ultra` | Bare-minimum workflow skeleton |
+| `off` | No style directive |
+| `ste` | Complete sentences, keep articles, one fact per sentence; no filler, hedging, or rhetorical scaffolding (default) |
+| `caveman` | Maximum compression: drop articles, fragments OK |
+
+For Claude Code, the `ste` plugin (in this repo's marketplace, `plugins/ste`) enforces the same style with a session hook plus per-turn reinforcement — install it with `/plugin marketplace add KiwiData-AI/grimoire` then `/plugin install ste@grimoire`. `grimoire init` and `grimoire update` print these commands when `integrations.ste_plugin` is enabled.
 
 ### Conflict Detection
 
@@ -700,7 +701,7 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | `grimoire init --no-detect` | Skip auto-detection of project tools |
 | `grimoire init --full` | Also run all deferred configure sections (compliance, design, LLM models, bug trackers, testing tools) |
 | `grimoire init --install-codebase-memory-mcp` | Mark codebase-memory-mcp as a recommended integration |
-| `grimoire init --install-caveman-plugin` | Mark caveman skill plugin as a recommended integration |
+| `grimoire init --install-ste-plugin` | Mark the ste response-style plugin as a recommended integration |
 | `grimoire update [path]` | Update AGENTS.md, skills, and hooks to latest version |
 | `grimoire update --skip-agents\|--skip-skills\|--skip-hooks\|--skip-templates\|--skip-config` | Skip parts of the update |
 | `grimoire update --force-templates` | Overwrite existing template files |
@@ -763,7 +764,7 @@ project:
   commit_style: conventional     # conventional, angular, or custom
   doc_tool: typedoc              # sphinx, mkdocs, typedoc, jsdoc, rustdoc, godoc
   comment_style: tsdoc           # google, numpy, sphinx, jsdoc, tsdoc, pep257
-  caveman: none                  # Token optimization: none, lite, full, ultra
+  ste: ste                       # Response style: off, ste, caveman
   compliance:                    # Compliance frameworks (affects review, plan, verify, check)
     - owasp                      # Options: owasp, pci-dss, hipaa, soc2, gdpr, iso27001
     - gdpr

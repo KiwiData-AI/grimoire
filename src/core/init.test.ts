@@ -259,9 +259,9 @@ describe("initProject", () => {
     const slots: Record<string, string> = {
       agents: "claude",
       cbmInstall: "n",
-      cavemanInstall: "n",
+      steInstall: "n",
       surface: "skip",         // omit surface from config
-      caveman: "",
+      ste: "",
       commit: "",
       designTool: "none",
       captureBrand: "n",
@@ -270,9 +270,9 @@ describe("initProject", () => {
     return [
       slots.agents,
       slots.cbmInstall,
-      slots.cavemanInstall,
+      slots.steInstall,
       slots.surface,
-      slots.caveman,
+      slots.ste,
       slots.commit,
       slots.designTool,
       slots.captureBrand,
