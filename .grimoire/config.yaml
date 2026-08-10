@@ -12,6 +12,7 @@ project:
     caveman_plugin: true
   surface: tui
   caveman: lite
+  comment_lint: block
 features_dir: features
 decisions_dir: .grimoire/decisions
 tools:
@@ -54,6 +55,7 @@ checks:
   - dep_audit
   - best_practices
   - secrets
+  - doc_style
 llm:
   thinking:
     command: claude

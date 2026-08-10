@@ -4,6 +4,10 @@
       {
         "matcher": "*",
         "command": "grimoire check --changed --json"
+      },
+      {
+        "matcher": "*",
+        "command": "grimoire check --changed --json --skip best_practices"
       }
     ],
     "PostCommit": [
