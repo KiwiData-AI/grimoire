@@ -200,12 +200,21 @@ function trailerCheckScript(): string {
   return `sh -c 'if [ -d .grimoire/changes ] && [ "$(ls -A .grimoire/changes 2>/dev/null)" ]; then TRAILER=$(git log -1 --format="%(trailers:key=Change)" 2>/dev/null); if [ -z "$TRAILER" ]; then echo "WARNING: Commit is missing Change: trailer. Active grimoire changes exist."; fi; fi'`;
 }
 
-function mergeHooks(existing: HookConfig, additions: HookConfig): HookConfig {
-  const merged: HookConfig = {
-    hooks: { ...existing.hooks },
-  };
+// Exact commands grimoire installed in past releases. When a grimoire-owned
+// hook command changes, add the superseded string here so update replaces it
+// instead of stacking a duplicate. Exact-match only — user-customized variants
+// are never touched.
+const STALE_GRIMOIRE_COMMANDS = new Set(["grimoire check --changed --json"]);
 
-  const isGrimoireCheck = (cmd: string) => cmd.startsWith("grimoire check");
+function mergeHooks(existing: HookConfig, additions: HookConfig): HookConfig {
+  const merged: HookConfig = { hooks: {} };
+
+  for (const [phase, entries] of Object.entries(existing.hooks)) {
+    const key = phase as keyof HookConfig["hooks"];
+    merged.hooks[key] = (entries ?? []).filter(
+      (e) => !STALE_GRIMOIRE_COMMANDS.has(e.command)
+    );
+  }
 
   for (const [phase, entries] of Object.entries(additions.hooks)) {
     const key = phase as keyof HookConfig["hooks"];
@@ -216,14 +225,7 @@ function mergeHooks(existing: HookConfig, additions: HookConfig): HookConfig {
     const existingCommands = new Set(existingEntries.map((e) => e.command));
     const toAdd = newEntries.filter((e) => !existingCommands.has(e.command));
 
-    // Grimoire owns its check entry: when the command changes between
-    // versions, replace the stale variant instead of stacking a second one.
-    const addsCheck = toAdd.some((e) => isGrimoireCheck(e.command));
-    const kept = addsCheck
-      ? existingEntries.filter((e) => !isGrimoireCheck(e.command))
-      : existingEntries;
-
-    merged.hooks[key] = [...kept, ...toAdd];
+    merged.hooks[key] = [...existingEntries, ...toAdd];
   }
 
   return merged;

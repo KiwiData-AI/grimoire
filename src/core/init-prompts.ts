@@ -1,8 +1,14 @@
 import chalk from "chalk";
 import { detectTools, type Detection } from "./detect.js";
-import { STE_LEVELS, type GrimoireConfig, type SteLevel, type ProjectSurface } from "../utils/config.js";
+import {
+  STE_LEVELS,
+  LEGACY_CAVEMAN_TO_STE,
+  type GrimoireConfig,
+  type SteLevel,
+  type ProjectSurface,
+} from "../utils/config.js";
 import { detectAgentFiles } from "./shared-setup.js";
-import { runSections } from "./configure.js";
+import { runSections, isYes } from "./configure.js";
 import {
   buildMinimalConfig,
   bestByCategory,
@@ -179,8 +185,7 @@ async function askEssentialPreferences(
     const cbmAnswer = await rl.question(
       "    Install codebase-memory-mcp (call graphs, code intelligence)? (Y/n) "
     );
-    integrations.codebase_memory_mcp =
-      !/^no?$/i.test(cbmAnswer.trim());
+    integrations.codebase_memory_mcp = isYes(cbmAnswer);
   } else {
     integrations.codebase_memory_mcp = prefill.codebaseMemoryMcp;
   }
@@ -189,8 +194,7 @@ async function askEssentialPreferences(
     const stePluginAnswer = await rl.question(
       "    Install ste response-style plugin (Claude Code marketplace)? (Y/n) "
     );
-    integrations.ste_plugin =
-      !/^no?$/i.test(stePluginAnswer.trim());
+    integrations.ste_plugin = isYes(stePluginAnswer);
   } else {
     integrations.ste_plugin = prefill.stePlugin;
   }
@@ -201,12 +205,7 @@ async function askEssentialPreferences(
   await askSurface(rl, config, prefill.detectedSurface);
 
   // 4. Response style
-  const currentSte = config.project.ste ?? "ste";
-  const steAnswer = await rl.question(
-    `    Response style (ste)? (off/ste/caveman) [${currentSte}]: `
-  );
-  const steChoice = steAnswer.trim().toLowerCase() as SteLevel;
-  config.project.ste = STE_LEVELS.includes(steChoice) ? steChoice : currentSte;
+  await askSteLevel(rl, config);
 
   // 5. Commit style
   const commitAnswer = await rl.question(
@@ -222,6 +221,24 @@ async function askEssentialPreferences(
   rl.close();
   console.log();
   return config;
+}
+
+async function askSteLevel(
+  rl: import("node:readline/promises").Interface,
+  config: GrimoireConfig
+): Promise<void> {
+  const currentSte = config.project.ste ?? "ste";
+  const steAnswer = await rl.question(
+    `    Response style (ste)? (off/ste/caveman) [${currentSte}]: `
+  );
+  const steChoice = steAnswer.trim().toLowerCase();
+  const steMapped = STE_LEVELS.includes(steChoice as SteLevel)
+    ? (steChoice as SteLevel)
+    : LEGACY_CAVEMAN_TO_STE[steChoice];
+  if (steChoice && !steMapped) {
+    console.log(chalk.dim(`    Unrecognized "${steChoice}" — keeping ${currentSte}.`));
+  }
+  config.project.ste = steMapped ?? currentSte;
 }
 
 async function askSurface(

@@ -4,7 +4,12 @@ import { fileURLToPath } from "node:url";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import chalk from "chalk";
 import { fileExists } from "../utils/fs.js";
-import { loadConfig, CURRENT_CONFIG_VERSION } from "../utils/config.js";
+import {
+  loadConfig,
+  CURRENT_CONFIG_VERSION,
+  LEGACY_CAVEMAN_TO_STE,
+  type GrimoireConfig,
+} from "../utils/config.js";
 import {
   upsertAgentsFile,
   ensureClaudeAgentsImport,
@@ -97,7 +102,7 @@ async function resolveTargetAgents(
   };
 }
 
-function maybePrintStePlugin(config: Awaited<ReturnType<typeof loadConfig>>): void {
+function maybePrintStePlugin(config: GrimoireConfig): void {
   if (!config.project.integrations?.ste_plugin) return;
   console.log("");
   printStePluginInstructions();
@@ -257,14 +262,9 @@ const MIGRATIONS: Migration[] = [
         raw.project = {};
       }
       const project = raw.project as Record<string, unknown>;
-      const levelMap: Record<string, string> = {
-        none: "off",
-        lite: "ste",
-        full: "caveman",
-        ultra: "caveman",
-      };
       if (project.caveman !== undefined) {
-        project.ste = levelMap[String(project.caveman)] ?? "ste";
+        const mapped = LEGACY_CAVEMAN_TO_STE[String(project.caveman)];
+        if (mapped) project.ste = mapped;
         delete project.caveman;
       }
       if (project.integrations && typeof project.integrations === "object") {

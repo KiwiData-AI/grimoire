@@ -101,6 +101,61 @@ describe("setupHooks", () => {
     );
   });
 
+  it("removes a stale entry even when the current command is already present", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [
+          { matcher: "*", command: "grimoire check --changed --json" },
+          { matcher: "*", command: "grimoire check --changed --json --skip best_practices" },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(1);
+    expect(written.hooks.PreCommit[0].command).toBe(
+      "grimoire check --changed --json --skip best_practices",
+    );
+  });
+
+  it("keeps a user-customized grimoire check variant untouched", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [
+          { matcher: "*", command: "grimoire check --changed --json --skip best_practices,secrets" },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    const commands = written.hooks.PreCommit.map((e: { command: string }) => e.command);
+    expect(commands).toContain(
+      "grimoire check --changed --json --skip best_practices,secrets",
+    );
+  });
+
   it("skips git hooks when .git doesn't exist", async () => {
     setExists(); // nothing exists
     await setupHooks("/root");

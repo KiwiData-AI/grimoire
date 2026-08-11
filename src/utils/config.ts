@@ -181,8 +181,7 @@ function parseIntegrations(projectRaw: Record<string, unknown>): IntegrationsCon
   };
 }
 
-// Reads unmigrated (pre-v3) configs too: legacy `caveman` levels map onto ste
-// so init/update never silently drop a configured style before migration runs.
+// Reads unmigrated (pre-v3) configs too: legacy `caveman` levels map onto ste.
 function parseSte(projectRaw: Record<string, unknown>): SteLevel | undefined {
   const ste = str(projectRaw.ste);
   if (STE_LEVELS.includes(ste as SteLevel)) return ste as SteLevel;
