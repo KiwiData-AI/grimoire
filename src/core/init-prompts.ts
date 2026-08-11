@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import { detectTools, type Detection } from "./detect.js";
 import {
-  STE_LEVELS,
-  legacySteLevel,
+  normalizeSteLevel,
   type GrimoireConfig,
-  type SteLevel,
   type ProjectSurface,
 } from "../utils/config.js";
 import { detectAgentFiles } from "./shared-setup.js";
@@ -232,9 +230,7 @@ async function askSteLevel(
     `    Response style (ste)? (off/ste/caveman) [${currentSte}]: `
   );
   const steChoice = steAnswer.trim().toLowerCase();
-  const steMapped = STE_LEVELS.includes(steChoice as SteLevel)
-    ? (steChoice as SteLevel)
-    : legacySteLevel(steChoice);
+  const steMapped = normalizeSteLevel(steChoice);
   if (steChoice && !steMapped) {
     console.log(chalk.dim(`    Unrecognized "${steChoice}" — keeping ${currentSte}.`));
   }

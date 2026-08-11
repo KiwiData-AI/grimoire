@@ -248,11 +248,24 @@ project:
     expect(config.project.integrations?.ste_plugin).toBe(true);
   });
 
-  it("drops ste values outside the enum", async () => {
+  it("maps a legacy level name under the ste key", async () => {
     const yaml = `
 version: 3
 project:
   ste: lite
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.ste).toBe("ste");
+  });
+
+  it("drops unrecognized ste values", async () => {
+    const yaml = `
+version: 3
+project:
+  ste: banana
 `;
     mockReadFile.mockResolvedValue(yaml);
 

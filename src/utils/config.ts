@@ -21,9 +21,11 @@ const LEGACY_CAVEMAN_TO_STE: Record<string, SteLevel> = {
   ultra: "caveman",
 };
 
-// hasOwn guard: a bare index lookup would resolve prototype properties
-// ("constructor", "toString") into non-level values.
-export function legacySteLevel(value: string): SteLevel | undefined {
+// Accepts current levels and legacy caveman names; anything else is undefined.
+// hasOwn guard: a bare index lookup would resolve prototype names ("constructor").
+export function normalizeSteLevel(value: unknown): SteLevel | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  if (STE_LEVELS.includes(value as SteLevel)) return value as SteLevel;
   return Object.hasOwn(LEGACY_CAVEMAN_TO_STE, value)
     ? LEGACY_CAVEMAN_TO_STE[value]
     : undefined;
@@ -189,13 +191,6 @@ function parseIntegrations(projectRaw: Record<string, unknown>): IntegrationsCon
   };
 }
 
-// Reads unmigrated (pre-v3) configs too: legacy `caveman` levels map onto ste.
-function parseSte(projectRaw: Record<string, unknown>): SteLevel | undefined {
-  const ste = str(projectRaw.ste);
-  if (STE_LEVELS.includes(ste as SteLevel)) return ste as SteLevel;
-  const legacy = str(projectRaw.caveman);
-  return legacy ? (legacySteLevel(legacy) ?? "ste") : undefined;
-}
 
 function parsePrecommitReview(projectRaw: Record<string, unknown>): PrecommitReviewConfig | undefined {
   if (!projectRaw.precommit_review || typeof projectRaw.precommit_review !== "object") return undefined;
@@ -230,7 +225,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     doc_tool: str(projectRaw.doc_tool ?? raw.doc_tool),
     comment_style: str(projectRaw.comment_style ?? raw.comment_style),
     comment_lint: parseCommentLint(projectRaw.comment_lint),
-    ste: parseSte(projectRaw),
+    ste: normalizeSteLevel(projectRaw.ste) ?? normalizeSteLevel(projectRaw.caveman),
     compliance: parseStringArray(projectRaw.compliance),
     design_tool: parseDesignTool(projectRaw),
     agents: parseStringArray(projectRaw.agents),

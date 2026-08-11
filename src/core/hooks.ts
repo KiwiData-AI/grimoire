@@ -23,10 +23,8 @@ export async function setupHooks(root: string): Promise<void> {
 }
 
 
-// Grimoire-owned check command histories, oldest first; the last entry is the
-// one currently installed. When changing a command, append it here — every
-// earlier entry is treated as stale and upgraded in place on init/update.
-// Exact-match only, so user-customized variants are never touched.
+// Grimoire-owned command ledgers, oldest first; the last entry is installed.
+// When changing a command, append it — earlier entries upgrade in place on update.
 const CLAUDE_CHECK_COMMANDS = [
   "grimoire check --changed --json",
   "grimoire check --changed --json --skip best_practices",
@@ -37,7 +35,9 @@ const GIT_CHECK_COMMANDS = [
 ];
 const CURRENT_CLAUDE_CHECK = CLAUDE_CHECK_COMMANDS[CLAUDE_CHECK_COMMANDS.length - 1];
 const CURRENT_GIT_CHECK = GIT_CHECK_COMMANDS[GIT_CHECK_COMMANDS.length - 1];
-const STALE_GRIMOIRE_COMMANDS = new Set(CLAUDE_CHECK_COMMANDS.slice(0, -1));
+const CLAUDE_COMMAND_UPGRADES = new Map(
+  CLAUDE_CHECK_COMMANDS.slice(0, -1).map((stale) => [stale, CURRENT_CLAUDE_CHECK])
+);
 const STALE_GIT_CHECK_COMMANDS = new Set(GIT_CHECK_COMMANDS.slice(0, -1));
 
 async function setupClaudeHooks(root: string): Promise<void> {
@@ -86,6 +86,28 @@ async function setupClaudeHooks(root: string): Promise<void> {
 }
 
 
+// Removes every stale grimoire-owned check line, substituting the current
+// command for the first one unless it is already present (exact-line match).
+// Returns null when no stale line exists.
+function upgradeStaleGitLines(existing: string): string | null {
+  const lines = existing.split("\n");
+  if (!lines.some((l) => STALE_GIT_CHECK_COMMANDS.has(l.trim()))) return null;
+
+  let replaced = lines.some((l) => l.trim() === CURRENT_GIT_CHECK);
+  const updated: string[] = [];
+  for (const line of lines) {
+    if (STALE_GIT_CHECK_COMMANDS.has(line.trim())) {
+      if (!replaced) {
+        updated.push((line.match(/^\s*/)?.[0] ?? "") + CURRENT_GIT_CHECK);
+        replaced = true;
+      }
+      continue;
+    }
+    updated.push(line);
+  }
+  return updated.join("\n");
+}
+
 async function setupGitHooks(root: string): Promise<void> {
   const gitHooksDir = join(root, ".git", "hooks");
 
@@ -98,13 +120,9 @@ async function setupGitHooks(root: string): Promise<void> {
   if (await fileExists(preCommitPath)) {
     const existing = await readFile(preCommitPath, "utf-8");
 
-    // Upgrade a stale grimoire-owned check line in place
-    const lines = existing.split("\n");
-    const staleIdx = lines.findIndex((l) => STALE_GIT_CHECK_COMMANDS.has(l.trim()));
-    if (staleIdx !== -1 && !existing.includes(CURRENT_GIT_CHECK)) {
-      const indent = lines[staleIdx].match(/^\s*/)?.[0] ?? "";
-      lines[staleIdx] = indent + CURRENT_GIT_CHECK;
-      await writeFile(preCommitPath, lines.join("\n"));
+    const upgraded = upgradeStaleGitLines(existing);
+    if (upgraded !== null) {
+      await writeFile(preCommitPath, upgraded);
       console.log(`  ${chalk.blue("updated")} .git/hooks/pre-commit (stale grimoire check upgraded)`);
       return;
     }
@@ -229,26 +247,40 @@ function trailerCheckScript(): string {
   return `sh -c 'if [ -d .grimoire/changes ] && [ "$(ls -A .grimoire/changes 2>/dev/null)" ]; then TRAILER=$(git log -1 --format="%(trailers:key=Change)" 2>/dev/null); if [ -z "$TRAILER" ]; then echo "WARNING: Commit is missing Change: trailer. Active grimoire changes exist."; fi; fi'`;
 }
 
+// Foreign phases and malformed values pass through untouched. In phases
+// grimoire installs into: stale grimoire-owned commands upgrade in place
+// (keeping the user's matcher), duplicates collapse, and a grimoire check
+// entry is only added when no grimoire check variant is already present.
 function mergeHooks(existing: HookConfig, additions: HookConfig): HookConfig {
-  const merged: HookConfig = { hooks: {} };
-
-  for (const [phase, entries] of Object.entries(existing.hooks ?? {})) {
-    const key = phase as keyof HookConfig["hooks"];
-    merged.hooks[key] = (entries ?? []).filter(
-      (e) => !STALE_GRIMOIRE_COMMANDS.has(e.command)
-    );
-  }
+  const merged: HookConfig = { hooks: { ...(existing.hooks ?? {}) } };
 
   for (const [phase, entries] of Object.entries(additions.hooks)) {
     const key = phase as keyof HookConfig["hooks"];
-    const existingEntries = merged.hooks[key] ?? [];
-    const newEntries = entries ?? [];
+    const raw = merged.hooks[key];
+    const existingEntries = Array.isArray(raw) ? raw : [];
 
-    // Only add entries that don't already exist (by command)
-    const existingCommands = new Set(existingEntries.map((e) => e.command));
-    const toAdd = newEntries.filter((e) => !existingCommands.has(e.command));
+    const upgraded = existingEntries.map((e) => {
+      const current = CLAUDE_COMMAND_UPGRADES.get(e.command);
+      return current ? { ...e, command: current } : e;
+    });
 
-    merged.hooks[key] = [...existingEntries, ...toAdd];
+    const seen = new Set<string>();
+    const deduped = upgraded.filter((e) => {
+      const id = `${e.matcher} ${e.command}`;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    const hasCheckVariant = deduped.some((e) => e.command.startsWith("grimoire check"));
+    const commands = new Set(deduped.map((e) => e.command));
+    const toAdd = (entries ?? []).filter(
+      (e) =>
+        !commands.has(e.command) &&
+        !(e.command.startsWith("grimoire check") && hasCheckVariant)
+    );
+
+    merged.hooks[key] = [...deduped, ...toAdd];
   }
 
   return merged;

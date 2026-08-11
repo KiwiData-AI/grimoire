@@ -631,6 +631,33 @@ describe("updateProject", () => {
     expect(written).not.toContain("caveman");
   });
 
+  it("drops an unrecognized caveman value with a notice instead of activating a style", async () => {
+    mockFileExists.mockImplementation(async (path: string) => {
+      if (path.endsWith(".grimoire")) return true;
+      if (path.endsWith("config.yaml")) return true;
+      return false;
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("config.yaml")) {
+        return "version: 2\nproject:\n  commit_style: conventional\n  caveman: nonee\n" as any;
+      }
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      return "# content" as any;
+    });
+
+    await updateProject(".", { ...ALL_SKIPPED, skipConfig: false });
+
+    const configWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("config.yaml")
+    );
+    expect(configWrite).toBeDefined();
+    const written = String(configWrite![1]);
+    expect(written).toContain("version: 3");
+    expect(written).not.toContain("ste:");
+    expect(written).not.toContain("caveman");
+  });
+
   it("migrates v2 caveman keys to ste equivalents", async () => {
     mockFileExists.mockImplementation(async (path: string) => {
       if (path.endsWith(".grimoire")) return true;

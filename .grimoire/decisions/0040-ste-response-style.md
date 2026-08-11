@@ -26,8 +26,8 @@ Chosen option: "STE levels", because ASD-STE100 cuts the same filler while keepi
 ### Consequences
 - Good: responses stay terse without dropping grammar; slop phrases are banned explicitly
 - Good: per-turn plugin reinforcement survives context compression, where static text failed
-- Good: single ruleset source (`plugins/ste/skills/ste/SKILL.md`) serves hook and directive
-- Bad: two enforcement paths (plugin, directive) must stay consistent by hand
+- Good: the plugin reads `plugins/ste/skills/ste/SKILL.md` at runtime, so rule edits reach Claude Code without a reinstall
+- Bad: the CLI's condensed AGENTS.md directive and the plugin's hook fallback restate the rules — three wordings to keep aligned by hand when the ruleset changes
 - Bad: downstream projects need one `grimoire update` run to migrate config keys
 
 ### Confirmation

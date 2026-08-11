@@ -7,7 +7,7 @@ import { fileExists } from "../utils/fs.js";
 import {
   loadConfig,
   CURRENT_CONFIG_VERSION,
-  legacySteLevel,
+  normalizeSteLevel,
   type GrimoireConfig,
 } from "../utils/config.js";
 import {
@@ -62,12 +62,11 @@ export async function updateProject(
     await installTemplates(root, PACKAGE_ROOT, options.forceTemplates);
   }
 
-  if (!options.skipAgents) {
-    await updateAgentsFile(root);
-  }
-
-  // legacy projects predate the agents config — fall back to auto-detect
   const config = await loadConfig(root);
+
+  if (!options.skipAgents) {
+    await updateAgentsFile(root, config);
+  }
   const { instructionAgents, skillAgents } = await resolveTargetAgents(config, root);
 
   if (!options.skipAgents && instructionAgents.length > 0) {
@@ -108,8 +107,7 @@ function maybePrintStePlugin(config: GrimoireConfig): void {
   printStePluginInstructions();
 }
 
-async function updateAgentsFile(root: string): Promise<void> {
-  const config = await loadConfig(root);
+async function updateAgentsFile(root: string, config: GrimoireConfig): Promise<void> {
   const ste = config.project.ste ?? "off";
   await upsertAgentsFile(root, PACKAGE_ROOT, "updated", ste, config.project.comment_style);
   await ensureClaudeAgentsImport(root);
@@ -247,7 +245,7 @@ const MIGRATIONS: Migration[] = [
         raw.project = {};
       }
       const project = raw.project as Record<string, unknown>;
-      if (!project.caveman && project.ste === undefined) {
+      if (!project.caveman) {
         project.caveman = "lite";
       }
       ensureChecks(raw, ["dep_audit", "secrets", "best_practices"]);
@@ -261,23 +259,30 @@ const MIGRATIONS: Migration[] = [
       if (!raw.project || typeof raw.project !== "object") {
         raw.project = {};
       }
-      const project = raw.project as Record<string, unknown>;
-      if (project.caveman !== undefined) {
-        if (project.ste === undefined) {
-          project.ste = legacySteLevel(String(project.caveman)) ?? "ste";
-        }
-        delete project.caveman;
-      }
-      if (project.integrations && typeof project.integrations === "object") {
-        const it = project.integrations as Record<string, unknown>;
-        if (it.caveman_plugin !== undefined) {
-          if (it.ste_plugin === undefined) it.ste_plugin = it.caveman_plugin;
-          delete it.caveman_plugin;
-        }
-      }
+      migrateSteKeys(raw.project as Record<string, unknown>);
     },
   },
 ];
+
+function migrateSteKeys(project: Record<string, unknown>): void {
+  const ste = normalizeSteLevel(project.ste) ?? normalizeSteLevel(project.caveman);
+  if (ste) {
+    project.ste = ste;
+  } else if (project.ste !== undefined || project.caveman !== undefined) {
+    delete project.ste;
+    console.log(
+      `  ${chalk.yellow("notice")} unrecognized response-style value — style is off; set project.ste (off/ste/caveman) to change`
+    );
+  }
+  delete project.caveman;
+  if (project.integrations && typeof project.integrations === "object") {
+    const it = project.integrations as Record<string, unknown>;
+    if (it.caveman_plugin !== undefined) {
+      if (it.ste_plugin === undefined) it.ste_plugin = it.caveman_plugin;
+      delete it.caveman_plugin;
+    }
+  }
+}
 
 
 async function writeVersionStamp(root: string): Promise<void> {
