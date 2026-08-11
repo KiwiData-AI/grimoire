@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { stringify as yamlStringify } from "yaml";
 import chalk from "chalk";
 import type { Detection } from "./detect.js";
-import type { GrimoireConfig, CavemanLevel } from "../utils/config.js";
+import type { GrimoireConfig, SteLevel } from "../utils/config.js";
 import { setupHooks } from "./hooks.js";
 import { fileExists } from "../utils/fs.js";
 import {
@@ -15,6 +15,7 @@ import {
   GRIMOIRE_DIRS,
   TEMPLATE_FILES,
   generateAgentFiles,
+  printStePluginInstructions,
 } from "./shared-setup.js";
 import { runSections, type SectionName } from "./configure.js";
 import {
@@ -34,16 +35,16 @@ interface InitOptions {
   agents: string[];
   full: boolean;
   installCodebaseMemoryMcp?: boolean;
-  installCavemanPlugin?: boolean;
+  installStePlugin?: boolean;
 }
 
 interface ConfigSetupResult {
-  cavemanLevel: CavemanLevel;
+  steLevel: SteLevel;
   commentStyle?: string;
   packageManager?: string;
   pydoclintConfigured: boolean;
   configAgents: string[];
-  integrationFlags: { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined };
+  integrationFlags: { codebaseMemoryMcp: boolean | undefined; stePlugin: boolean | undefined };
   figmaMcpConfigured: boolean;
   projectDetection: Detection | null;
 }
@@ -63,7 +64,7 @@ async function runFullConfigSections(root: string, config: GrimoireConfig): Prom
 async function createGrimoireConfig(
   root: string,
   options: InitOptions,
-  initialFlags: { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined }
+  initialFlags: { codebaseMemoryMcp: boolean | undefined; stePlugin: boolean | undefined }
 ): Promise<ConfigSetupResult> {
   let projectDetection: Detection | null = null;
   let config: GrimoireConfig;
@@ -86,7 +87,7 @@ async function createGrimoireConfig(
   if (options.full) await runFullConfigSections(root, config);
 
   return {
-    cavemanLevel: config.project.caveman ?? "lite",
+    steLevel: config.project.ste ?? "off",
     commentStyle: config.project.comment_style,
     packageManager: config.project.package_manager,
     pydoclintConfigured: config.tools.doc_style?.name === "pydoclint",
@@ -99,21 +100,18 @@ async function createGrimoireConfig(
 
 async function loadExistingConfig(
   root: string,
-  initialFlags: { codebaseMemoryMcp: boolean | undefined; cavemanPlugin: boolean | undefined }
+  initialFlags: { codebaseMemoryMcp: boolean | undefined; stePlugin: boolean | undefined }
 ): Promise<Omit<ConfigSetupResult, "projectDetection">> {
   console.log(`  ${chalk.yellow("exists")}  .grimoire/config.yaml`);
   const { loadConfig } = await import("../utils/config.js");
   const existing = await loadConfig(root);
   return {
-    cavemanLevel: existing.project.caveman ?? "none",
+    steLevel: existing.project.ste ?? "off",
     commentStyle: existing.project.comment_style,
     packageManager: existing.project.package_manager,
     pydoclintConfigured: existing.tools.doc_style?.name === "pydoclint",
     configAgents: existing.project.agents ?? [],
-    integrationFlags: {
-      codebaseMemoryMcp: initialFlags.codebaseMemoryMcp ?? existing.project.integrations?.codebase_memory_mcp,
-      cavemanPlugin: initialFlags.cavemanPlugin ?? existing.project.integrations?.caveman_plugin,
-    },
+    integrationFlags: buildIntegrationFlags(initialFlags, existing),
     figmaMcpConfigured: existing.project.design_tool?.mcp?.name === "figma-dev-mode",
   };
 }
@@ -170,7 +168,7 @@ async function setupAgents(root: string, options: InitOptions, setup: ConfigSetu
     }
   }
 
-  if (!options.skipAgents) await setupAgentsFile(root, setup.cavemanLevel, setup.commentStyle);
+  if (!options.skipAgents) await setupAgentsFile(root, setup.steLevel, setup.commentStyle);
   if (!options.skipSkills) await installSkills(root, skillAgents.length > 0 ? skillAgents : ["claude"]);
   if (instructionAgents.length > 0) await generateAgentFiles(root, PACKAGE_ROOT, instructionAgents, "created");
   if (!options.skipAgents) await setupHooks(root);
@@ -186,7 +184,7 @@ export async function initProject(
   await scaffoldProject(root);
 
   const configPath = join(root, ".grimoire", "config.yaml");
-  const initialFlags = { codebaseMemoryMcp: options.installCodebaseMemoryMcp, cavemanPlugin: options.installCavemanPlugin };
+  const initialFlags = { codebaseMemoryMcp: options.installCodebaseMemoryMcp, stePlugin: options.installStePlugin };
   const setup = await fileExists(configPath)
     ? { ...(await loadExistingConfig(root, initialFlags)), projectDetection: null as Detection | null }
     : await createGrimoireConfig(root, options, initialFlags);
@@ -210,12 +208,12 @@ const PYDOCLINT_INSTALL: Record<string, string> = {
 
 function printIntegrationInstructions(flags: {
   codebaseMemoryMcp?: boolean;
-  cavemanPlugin?: boolean;
+  stePlugin?: boolean;
   figmaMcp?: boolean;
   pydoclint?: boolean;
   packageManager?: string;
 }): void {
-  if (!flags.codebaseMemoryMcp && !flags.cavemanPlugin && !flags.figmaMcp && !flags.pydoclint)
+  if (!flags.codebaseMemoryMcp && !flags.stePlugin && !flags.figmaMcp && !flags.pydoclint)
     return;
 
   console.log(chalk.bold("Recommended integrations to install:\n"));
@@ -235,18 +233,7 @@ function printIntegrationInstructions(flags: {
     console.log(`    Restart your agent, then say "Index this project".\n`);
   }
 
-  if (flags.cavemanPlugin) {
-    console.log(
-      `  ${chalk.cyan("caveman skill plugin")} — token-efficient response style for Claude Code`
-    );
-    console.log("    In Claude Code:");
-    console.log(
-      `      ${chalk.dim("/plugin marketplace add JuliusBrussee/caveman")}`
-    );
-    console.log(
-      `      ${chalk.dim("/plugin install caveman@JuliusBrussee/caveman")}\n`
-    );
-  }
+  if (flags.stePlugin) printStePluginInstructions();
 
   if (flags.pydoclint) printPydoclintInstructions(flags.packageManager);
 
@@ -278,10 +265,10 @@ function printPydoclintInstructions(packageManager?: string): void {
 
 async function setupAgentsFile(
   root: string,
-  caveman: CavemanLevel,
+  ste: SteLevel,
   commentStyle?: string
 ): Promise<void> {
-  await upsertAgentsFile(root, PACKAGE_ROOT, "created", caveman, commentStyle);
+  await upsertAgentsFile(root, PACKAGE_ROOT, "created", ste, commentStyle);
   await ensureClaudeAgentsImport(root);
 }
 

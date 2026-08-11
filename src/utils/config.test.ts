@@ -27,7 +27,7 @@ describe("loadConfig", () => {
 
     const config = await loadConfig("/fake/root");
 
-    expect(config.version).toBe(2);
+    expect(config.version).toBe(3);
     expect(config.project.commit_style).toBe("conventional");
     expect(config.features_dir).toBe("features");
     expect(config.checks).toContain("lint");
@@ -108,7 +108,7 @@ doc_tool: typedoc
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0][0]).toContain("Warning: failed to parse");
-    expect(config.version).toBe(2);
+    expect(config.version).toBe(3);
     expect(config.project.commit_style).toBe("conventional");
 
     warnSpy.mockRestore();
@@ -207,7 +207,7 @@ project:
 
     const config = await loadConfig();
 
-    expect(config.version).toBe(2);
+    expect(config.version).toBe(3);
     expect(config.project.commit_style).toBe("conventional");
   });
 
@@ -232,20 +232,75 @@ tools:
     expect(config.tools.best_practices?.prompt).toBe("Review for best practices");
   });
 
+  it("maps legacy caveman keys onto ste before migration runs", async () => {
+    const yaml = `
+version: 2
+project:
+  caveman: lite
+  integrations:
+    caveman_plugin: true
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.ste).toBe("ste");
+    expect(config.project.integrations?.ste_plugin).toBe(true);
+  });
+
+  it("maps a legacy level name under the ste key", async () => {
+    const yaml = `
+version: 3
+project:
+  ste: lite
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.ste).toBe("ste");
+  });
+
+  it("maps mixed-case legacy values", async () => {
+    const yaml = `
+version: 2
+project:
+  caveman: Lite
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.ste).toBe("ste");
+  });
+
+  it("drops unrecognized ste values", async () => {
+    const yaml = `
+version: 3
+project:
+  ste: banana
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.ste).toBeUndefined();
+  });
+
   it("parses project.integrations booleans", async () => {
     const yaml = `
 version: 2
 project:
   integrations:
     codebase_memory_mcp: true
-    caveman_plugin: false
+    ste_plugin: false
 `;
     mockReadFile.mockResolvedValue(yaml);
 
     const config = await loadConfig("/fake/root");
 
     expect(config.project.integrations?.codebase_memory_mcp).toBe(true);
-    expect(config.project.integrations?.caveman_plugin).toBe(false);
+    expect(config.project.integrations?.ste_plugin).toBe(false);
   });
 
   it("drops non-boolean integration values", async () => {

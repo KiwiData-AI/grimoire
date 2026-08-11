@@ -1,8 +1,12 @@
 import chalk from "chalk";
 import { detectTools, type Detection } from "./detect.js";
-import type { GrimoireConfig, CavemanLevel, ProjectSurface } from "../utils/config.js";
+import {
+  normalizeSteLevel,
+  type GrimoireConfig,
+  type ProjectSurface,
+} from "../utils/config.js";
 import { detectAgentFiles } from "./shared-setup.js";
-import { runSections } from "./configure.js";
+import { runSections, isYes } from "./configure.js";
 import {
   buildMinimalConfig,
   bestByCategory,
@@ -172,27 +176,25 @@ async function askEssentialPreferences(
 
   const integrations: {
     codebase_memory_mcp?: boolean;
-    caveman_plugin?: boolean;
+    ste_plugin?: boolean;
   } = {};
 
   if (prefill.codebaseMemoryMcp === undefined) {
     const cbmAnswer = await rl.question(
       "    Install codebase-memory-mcp (call graphs, code intelligence)? (Y/n) "
     );
-    integrations.codebase_memory_mcp =
-      cbmAnswer.trim().toLowerCase() !== "n";
+    integrations.codebase_memory_mcp = isYes(cbmAnswer);
   } else {
     integrations.codebase_memory_mcp = prefill.codebaseMemoryMcp;
   }
 
-  if (prefill.cavemanPlugin === undefined) {
-    const cavemanPluginAnswer = await rl.question(
-      "    Install caveman skill plugin (Claude Code marketplace)? (y/N) "
+  if (prefill.stePlugin === undefined) {
+    const stePluginAnswer = await rl.question(
+      "    Install ste response-style plugin (Claude Code marketplace)? (Y/n) "
     );
-    integrations.caveman_plugin =
-      cavemanPluginAnswer.trim().toLowerCase() === "y";
+    integrations.ste_plugin = isYes(stePluginAnswer);
   } else {
-    integrations.caveman_plugin = prefill.cavemanPlugin;
+    integrations.ste_plugin = prefill.stePlugin;
   }
 
   config.project.integrations = integrations;
@@ -200,14 +202,8 @@ async function askEssentialPreferences(
   // 3. Surface
   await askSurface(rl, config, prefill.detectedSurface);
 
-  // 4. Caveman level
-  const currentCaveman = config.project.caveman ?? "lite";
-  const cavemanAnswer = await rl.question(
-    `    Token optimization (caveman)? (none/lite/full/ultra) [${currentCaveman}]: `
-  );
-  config.project.caveman = (
-    cavemanAnswer.trim() ? cavemanAnswer.trim().toLowerCase() : currentCaveman
-  ) as CavemanLevel;
+  // 4. Response style
+  await askSteLevel(rl, config);
 
   // 5. Commit style
   const commitAnswer = await rl.question(
@@ -223,6 +219,22 @@ async function askEssentialPreferences(
   rl.close();
   console.log();
   return config;
+}
+
+async function askSteLevel(
+  rl: import("node:readline/promises").Interface,
+  config: GrimoireConfig
+): Promise<void> {
+  const currentSte = config.project.ste ?? "ste";
+  const steAnswer = await rl.question(
+    `    Response style (ste)? (off/ste/caveman) [${currentSte}]: `
+  );
+  const steChoice = steAnswer.trim().toLowerCase();
+  const steMapped = normalizeSteLevel(steChoice);
+  if (steChoice && !steMapped) {
+    console.log(chalk.dim(`    Unrecognized "${steChoice}" — keeping ${currentSte}.`));
+  }
+  config.project.ste = steMapped ?? currentSte;
 }
 
 async function askSurface(

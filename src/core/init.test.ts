@@ -133,7 +133,8 @@ describe("initProject", () => {
     );
     expect(configWrite).toBeDefined();
     const content = String(configWrite![1]);
-    expect(content).toContain("version: 1");
+    expect(content).toContain("version: 3");
+    expect(content).toContain("ste: ste");
   });
 
   it("skips existing config.yaml", async () => {
@@ -259,9 +260,9 @@ describe("initProject", () => {
     const slots: Record<string, string> = {
       agents: "claude",
       cbmInstall: "n",
-      cavemanInstall: "n",
+      steInstall: "n",
       surface: "skip",         // omit surface from config
-      caveman: "",
+      ste: "",
       commit: "",
       designTool: "none",
       captureBrand: "n",
@@ -270,9 +271,9 @@ describe("initProject", () => {
     return [
       slots.agents,
       slots.cbmInstall,
-      slots.cavemanInstall,
+      slots.steInstall,
       slots.surface,
-      slots.caveman,
+      slots.ste,
       slots.commit,
       slots.designTool,
       slots.captureBrand,

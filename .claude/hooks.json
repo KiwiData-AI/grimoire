@@ -3,7 +3,7 @@
     "PreCommit": [
       {
         "matcher": "*",
-        "command": "grimoire check --changed --json"
+        "command": "grimoire check --changed --json --skip best_practices"
       }
     ],
     "PostCommit": [

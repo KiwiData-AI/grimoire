@@ -4,7 +4,12 @@ import { fileURLToPath } from "node:url";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import chalk from "chalk";
 import { fileExists } from "../utils/fs.js";
-import { loadConfig, CURRENT_CONFIG_VERSION } from "../utils/config.js";
+import {
+  loadConfig,
+  CURRENT_CONFIG_VERSION,
+  normalizeSteLevel,
+  type GrimoireConfig,
+} from "../utils/config.js";
 import {
   upsertAgentsFile,
   ensureClaudeAgentsImport,
@@ -14,6 +19,7 @@ import {
   generateAgentFiles,
   detectAgentFiles,
   SKILL_NAMES,
+  printStePluginInstructions,
 } from "./shared-setup.js";
 import { setupHooks } from "./hooks.js";
 import { pydoclintTool } from "./init-config.js";
@@ -56,12 +62,11 @@ export async function updateProject(
     await installTemplates(root, PACKAGE_ROOT, options.forceTemplates);
   }
 
-  if (!options.skipAgents) {
-    await updateAgentsFile(root);
-  }
-
-  // legacy projects predate the agents config — fall back to auto-detect
   const config = await loadConfig(root);
+
+  if (!options.skipAgents) {
+    await updateAgentsFile(root, config);
+  }
   const { instructionAgents, skillAgents } = await resolveTargetAgents(config, root);
 
   if (!options.skipAgents && instructionAgents.length > 0) {
@@ -79,6 +84,8 @@ export async function updateProject(
 
   await writeVersionStamp(root);
 
+  maybePrintStePlugin(config);
+
   console.log(`\n${chalk.bold.green("Done!")} Grimoire updated.`);
 }
 
@@ -94,10 +101,15 @@ async function resolveTargetAgents(
   };
 }
 
-async function updateAgentsFile(root: string): Promise<void> {
-  const config = await loadConfig(root);
-  const caveman = config.project.caveman ?? "none";
-  await upsertAgentsFile(root, PACKAGE_ROOT, "updated", caveman, config.project.comment_style);
+function maybePrintStePlugin(config: GrimoireConfig): void {
+  if (!config.project.integrations?.ste_plugin) return;
+  console.log("");
+  printStePluginInstructions();
+}
+
+async function updateAgentsFile(root: string, config: GrimoireConfig): Promise<void> {
+  const ste = config.project.ste ?? "off";
+  await upsertAgentsFile(root, PACKAGE_ROOT, "updated", ste, config.project.comment_style);
   await ensureClaudeAgentsImport(root);
 }
 
@@ -123,7 +135,8 @@ async function migrateConfig(root: string): Promise<void> {
     return;
   }
 
-  const currentVersion = Number(raw.version ?? 1);
+  const parsedVersion = Number(raw.version ?? 1);
+  const currentVersion = Number.isFinite(parsedVersion) ? parsedVersion : 1;
   if (currentVersion >= CURRENT_CONFIG_VERSION) {
     return; // already up to date
   }
@@ -240,7 +253,37 @@ const MIGRATIONS: Migration[] = [
       upgradeFlatlLlm(raw);
     },
   },
+  {
+    from: 2,
+    to: 3,
+    apply: (raw) => {
+      if (!raw.project || typeof raw.project !== "object") {
+        raw.project = {};
+      }
+      migrateSteKeys(raw.project as Record<string, unknown>);
+    },
+  },
 ];
+
+function migrateSteKeys(project: Record<string, unknown>): void {
+  const ste = normalizeSteLevel(project.ste) ?? normalizeSteLevel(project.caveman);
+  if (ste) {
+    project.ste = ste;
+  } else if (project.ste !== undefined || project.caveman !== undefined) {
+    delete project.ste;
+    console.log(
+      `  ${chalk.yellow("notice")} unrecognized response-style value — style is off; set project.ste (off/ste/caveman) to change`
+    );
+  }
+  delete project.caveman;
+  if (project.integrations && typeof project.integrations === "object") {
+    const it = project.integrations as Record<string, unknown>;
+    if (typeof it.caveman_plugin === "boolean" && it.ste_plugin === undefined) {
+      it.ste_plugin = it.caveman_plugin;
+    }
+    delete it.caveman_plugin;
+  }
+}
 
 
 async function writeVersionStamp(root: string): Promise<void> {

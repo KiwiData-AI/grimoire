@@ -137,8 +137,8 @@ describe("updateProject", () => {
   });
 
   it("does not duplicate END marker when the source AGENTS.md carries its own markers", async () => {
-    // Regression: grimoire's own AGENTS.md is a managed file (it carries a
-    // caveman block between markers). Shipped verbatim as source content, those
+    // Regression: grimoire's own AGENTS.md is a managed file (it carries an
+    // ste block between markers). Shipped verbatim as source content, those
     // embedded markers nested and left an orphaned END tag on every update.
     mockFileExists.mockResolvedValue(true);
     mockReadFile.mockImplementation(async (path: any) => {
@@ -147,7 +147,7 @@ describe("updateProject", () => {
       if (p.endsWith("AGENTS.md")) {
         // Source (package) AGENTS.md — itself a managed file.
         if (!p.includes(TEST_PROJECT_ROOT)) {
-          return "# Grimoire\n<!-- GRIMOIRE:START -->\n## Caveman Mode\n<!-- GRIMOIRE:END -->\n" as any;
+          return "# Grimoire\n<!-- GRIMOIRE:START -->\n## Response Style (STE)\n<!-- GRIMOIRE:END -->\n" as any;
         }
         // Project AGENTS.md — already updated once.
         return "# Project\n<!-- GRIMOIRE:START -->\nold\n<!-- GRIMOIRE:END -->\n" as any;
@@ -166,12 +166,12 @@ describe("updateProject", () => {
     expect(written.match(/GRIMOIRE:START/g)?.length).toBe(1);
   });
 
-  it("skips in-place AGENTS.md write when root === packageRoot and caveman is none", async () => {
+  it("skips in-place AGENTS.md write when root === packageRoot and ste is off", async () => {
     setupBasicFs();
     // When the test runs from inside the grimoire repo, `updateProject(".")`
     // resolves root to the same absolute path as PACKAGE_ROOT (computed from
     // update.ts's own __dirname). That is the in-place case the guard handles.
-    // With no caveman directive there is nothing to write, so the upsert is a no-op.
+    // With no ste directive there is nothing to write, so the upsert is a no-op.
     await updateProject(".", { ...ALL_SKIPPED, skipAgents: false });
 
     const agentsWrite = mockWriteFile.mock.calls.find((c) =>
@@ -338,7 +338,7 @@ describe("updateProject", () => {
 
   // --- Config migration ---
 
-  it("migrates v1 config to v2", async () => {
+  it("migrates v1 config to current version", async () => {
     mockFileExists.mockImplementation(async (path: string) => {
       if (path.endsWith(".grimoire")) return true;
       if (path.endsWith("config.yaml")) return true;
@@ -360,7 +360,7 @@ describe("updateProject", () => {
     );
     expect(configWrite).toBeDefined();
     const written = String(configWrite![1]);
-    expect(written).toContain("version: 2");
+    expect(written).toContain("version: 3");
     // Should have migrated flat llm to nested
     expect(written).toContain("thinking:");
     expect(written).toContain("coding:");
@@ -379,7 +379,7 @@ describe("updateProject", () => {
     mockReadFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("config.yaml")) {
-        return "version: 2\nproject:\n  commit_style: conventional\n  comment_lint: block\n" as any;
+        return "version: 3\nproject:\n  commit_style: conventional\n  comment_lint: block\n" as any;
       }
       if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
       return "# content" as any;
@@ -402,7 +402,7 @@ describe("updateProject", () => {
     mockReadFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("config.yaml")) {
-        return "version: 2\nproject:\n  commit_style: conventional\n" as any;
+        return "version: 3\nproject:\n  commit_style: conventional\n" as any;
       }
       if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
       return "# content" as any;
@@ -426,7 +426,7 @@ describe("updateProject", () => {
     mockReadFile.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.endsWith("config.yaml")) {
-        return "version: 2\nproject:\n  commit_style: conventional\n  comment_lint: block\n  language: python\n  comment_style: sphinx\nchecks:\n  - lint\n" as any;
+        return "version: 3\nproject:\n  commit_style: conventional\n  comment_lint: block\n  language: python\n  comment_style: sphinx\nchecks:\n  - lint\n" as any;
       }
       if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
       return "# content" as any;
@@ -600,8 +600,128 @@ describe("updateProject", () => {
     );
     expect(configWrite).toBeDefined();
     const written = String(configWrite![1]);
-    expect(written).toContain("version: 2");
-    expect(written).toContain("caveman: lite");
+    expect(written).toContain("version: 3");
+    expect(written).toContain("ste: ste");
+  });
+
+  it("preserves an explicit ste level through the v1 migration chain", async () => {
+    mockFileExists.mockImplementation(async (path: string) => {
+      if (path.endsWith(".grimoire")) return true;
+      if (path.endsWith("config.yaml")) return true;
+      return false;
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("config.yaml")) {
+        return "version: 1\nproject:\n  commit_style: conventional\n  ste: off\n" as any;
+      }
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      return "# content" as any;
+    });
+
+    await updateProject(".", { ...ALL_SKIPPED, skipConfig: false });
+
+    const configWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("config.yaml")
+    );
+    expect(configWrite).toBeDefined();
+    const written = String(configWrite![1]);
+    expect(written).toContain("version: 3");
+    expect(written).toContain("ste: off");
+    expect(written).not.toContain("caveman");
+  });
+
+  it("treats a non-numeric config version as v1 and migrates", async () => {
+    mockFileExists.mockImplementation(async (path: string) => {
+      if (path.endsWith(".grimoire")) return true;
+      if (path.endsWith("config.yaml")) return true;
+      return false;
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("config.yaml")) {
+        return "version: v2\nproject:\n  commit_style: conventional\n  caveman: full\n" as any;
+      }
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      return "# content" as any;
+    });
+
+    await updateProject(".", { ...ALL_SKIPPED, skipConfig: false });
+
+    const configWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("config.yaml")
+    );
+    expect(configWrite).toBeDefined();
+    const written = String(configWrite![1]);
+    expect(written).toContain("version: 3");
+    expect(written).toContain("ste: caveman");
+    expect(written).not.toContain("caveman: full");
+  });
+
+  it("drops an unrecognized caveman value with a notice instead of activating a style", async () => {
+    mockFileExists.mockImplementation(async (path: string) => {
+      if (path.endsWith(".grimoire")) return true;
+      if (path.endsWith("config.yaml")) return true;
+      return false;
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("config.yaml")) {
+        return "version: 2\nproject:\n  commit_style: conventional\n  caveman: nonee\n" as any;
+      }
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      return "# content" as any;
+    });
+
+    await updateProject(".", { ...ALL_SKIPPED, skipConfig: false });
+
+    const configWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("config.yaml")
+    );
+    expect(configWrite).toBeDefined();
+    const written = String(configWrite![1]);
+    expect(written).toContain("version: 3");
+    expect(written).not.toContain("ste:");
+    expect(written).not.toContain("caveman");
+  });
+
+  it("migrates v2 caveman keys to ste equivalents", async () => {
+    mockFileExists.mockImplementation(async (path: string) => {
+      if (path.endsWith(".grimoire")) return true;
+      if (path.endsWith("config.yaml")) return true;
+      return false;
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.endsWith("config.yaml")) {
+        return [
+          "version: 2",
+          "project:",
+          "  caveman: full",
+          "  comment_lint: block",
+          "  integrations:",
+          "    caveman_plugin: true",
+          "checks:",
+          "  - lint",
+          "  - doc_style",
+        ].join("\n") as any;
+      }
+      if (p.endsWith("package.json")) return JSON.stringify({ version: "1.0.0" }) as any;
+      return "# content" as any;
+    });
+
+    await updateProject(".", { ...ALL_SKIPPED, skipConfig: false });
+
+    const configWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("config.yaml")
+    );
+    expect(configWrite).toBeDefined();
+    const written = String(configWrite![1]);
+    expect(written).toContain("version: 3");
+    expect(written).toContain("ste: caveman");
+    expect(written).toContain("ste_plugin: true");
+    expect(written).not.toContain("caveman: full");
+    expect(written).not.toContain("caveman_plugin");
   });
 
   it("skips config migration when config.yaml doesn't exist", async () => {

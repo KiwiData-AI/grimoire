@@ -1,45 +1,33 @@
 import { describe, it, expect } from "vitest";
-import { buildCavemanDirective, buildCommentStyleDirective, SKILL_NAMES } from "./shared-setup.js";
+import { buildSteDirective, buildCommentStyleDirective, SKILL_NAMES } from "./shared-setup.js";
 import { pydoclintTool, applyDocStyleTool, buildMinimalConfig } from "./init-config.js";
 
-describe("buildCavemanDirective", () => {
-  it("returns empty string for none", () => {
-    expect(buildCavemanDirective("none")).toBe("");
+describe("buildSteDirective", () => {
+  it("returns empty string for off", () => {
+    expect(buildSteDirective("off")).toBe("");
   });
 
-  it("includes lite rules for lite level", () => {
-    const result = buildCavemanDirective("lite");
-    expect(result).toContain("## Caveman Mode");
-    expect(result).toContain("**lite**");
-    expect(result).toContain("Keep articles");
-    expect(result).toContain("caveman:lite");
+  it("includes STE grammar rules for ste level", () => {
+    const result = buildSteDirective("ste");
+    expect(result).toContain("## Response Style (STE)");
+    expect(result).toContain("keep articles");
+    expect(result).toContain("rhetorical scaffolding");
+    expect(result).toContain("ste:ste");
   });
 
-  it("includes fragment rules for full level", () => {
-    const result = buildCavemanDirective("full");
-    expect(result).toContain("**full**");
+  it("includes fragment rules for caveman level", () => {
+    const result = buildSteDirective("caveman");
     expect(result).toContain("Drop articles");
     expect(result).toContain("Fragments OK");
-  });
-
-  it("includes abbreviation rules for ultra level", () => {
-    const result = buildCavemanDirective("ultra");
-    expect(result).toContain("**ultra**");
-    expect(result).toContain("Abbreviate");
-    expect(result).toContain("arrows for causality");
+    expect(result).toContain("ste:caveman");
   });
 
   it("includes auto-clarity exception for all active levels", () => {
-    for (const level of ["lite", "full", "ultra"] as const) {
-      const result = buildCavemanDirective(level);
+    for (const level of ["ste", "caveman"] as const) {
+      const result = buildSteDirective(level);
       expect(result).toContain("security warnings");
       expect(result).toContain("irreversible");
     }
-  });
-
-  it("includes attribution comment", () => {
-    const result = buildCavemanDirective("full");
-    expect(result).toContain("github.com/JuliusBrussee/caveman");
   });
 });
 

@@ -201,6 +201,16 @@ function stripNone(answer: string): string | undefined {
   return trimmed && trimmed !== "none" ? trimmed : undefined;
 }
 
+// Default-yes (Y/n) prompt.
+export function isYes(answer: string): boolean {
+  return !/^no?$/i.test(answer.trim());
+}
+
+// Default-no (y/N) prompt.
+export function saidYes(answer: string): boolean {
+  return /^y(es)?$/i.test(answer.trim());
+}
+
 // ---------------------------------------------------------------------------
 // Section functions (exported so init --full can call them directly)
 // ---------------------------------------------------------------------------
@@ -325,7 +335,7 @@ export async function configureDesignSection(
       const installAnswer = await rl.question(
         `    Install ${mcp.display} MCP server? (Y/n) `
       );
-      if (installAnswer.trim().toLowerCase() !== "n") {
+      if (isYes(installAnswer)) {
         mcpServer = {
           name: mcp.mcpName,
           command: mcp.command,
@@ -369,7 +379,7 @@ export async function configureDesignSection(
     const useExisting = await rl.question(
       `    Use existing tokens file at ${existing}? (Y/n) `
     );
-    if (useExisting.trim().toLowerCase() !== "n") {
+    if (isYes(useExisting)) {
       await copyFile(
         existing,
         join(root, ".grimoire", "brand", "tokens.json")
@@ -384,7 +394,7 @@ export async function configureDesignSection(
   const captureAnswer = await rl.question(
     `    Capture brand guidelines now? (y/N) `
   );
-  if (captureAnswer.trim().toLowerCase() !== "y") {
+  if (!saidYes(captureAnswer)) {
     console.log(
       chalk.dim(
         "    Run `grimoire configure design` later to add brand tokens."
@@ -501,7 +511,7 @@ export async function configureTrackersSection(
       const installAnswer = await rl.question(
         `    Install ${known.display} MCP server? (Y/n) `
       );
-      if (installAnswer.trim().toLowerCase() !== "n") {
+      if (isYes(installAnswer)) {
         tracker.mcp = {
           name: known.display.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
           command: known.command,
@@ -556,7 +566,7 @@ export async function configureTestingSection(
       const installAnswer = await rl.question(
         `    Install ${known.display} MCP server? (Y/n) `
       );
-      if (installAnswer.trim().toLowerCase() !== "n") {
+      if (isYes(installAnswer)) {
         tool.mcp = { name: trimmed, command: known.command, args: known.args };
         console.log(chalk.green(`    ✓ ${known.display} MCP configured`));
       }

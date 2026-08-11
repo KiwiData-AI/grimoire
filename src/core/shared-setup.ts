@@ -2,7 +2,7 @@ import { readFile, writeFile, copyFile, mkdir, readdir, stat } from "node:fs/pro
 import { join, relative, resolve } from "node:path";
 import chalk from "chalk";
 import { fileExists, escapeRegex } from "../utils/fs.js";
-import type { CavemanLevel } from "../utils/config.js";
+import type { SteLevel } from "../utils/config.js";
 
 const GRIMOIRE_START_MARKER = "<!-- GRIMOIRE:START -->";
 const GRIMOIRE_END_MARKER = "<!-- GRIMOIRE:END -->";
@@ -67,7 +67,7 @@ function buildManagedBlock(content: string): string {
 }
 
 
-// Grimoire's own AGENTS.md is itself a managed file (it carries a caveman
+// Grimoire's own AGENTS.md is itself a managed file (it carries an ste
 // block between markers). When that file is shipped as the *source* content
 // for a downstream project, the embedded markers must be removed first —
 // otherwise the block gets wrapped again, nesting markers and leaving an
@@ -111,41 +111,57 @@ async function upsertManagedBlock(
 }
 
 
-export function buildCavemanDirective(level: CavemanLevel): string {
-  if (level === "none") return "";
+export function buildSteDirective(level: SteLevel): string {
+  if (level === "off") return "";
 
   const lines = [
-    "## Caveman Mode",
-    "",
-    `Respond terse like smart caveman at **${level}** intensity. All technical substance stay. Only fluff die.`,
+    "## Response Style (STE)",
     "",
   ];
 
-  if (level === "lite") {
+  if (level === "ste") {
     lines.push(
-      "Rules: No filler/hedging. Keep articles + full sentences. Professional but tight.",
+      "Write like a technical manual: terse, complete, unambiguous. Cut noise, never grammar.",
+      "",
+      "Delete: pleasantries, hedging, filler, restated questions, rhetorical scaffolding (\"honestly\", \"load-bearing\", \"it's not X, it's Y\", \"the key insight\").",
+      "",
+      "Construct: keep articles, complete sentences, max ~20 words per sentence, one fact per sentence, same full name for each thing every time, no invented labels.",
     );
-  } else if (level === "full") {
+  } else {
     lines.push(
-      "Rules: Drop articles (a/an/the), filler, pleasantries, hedging. Fragments OK. Short synonyms. Technical terms exact. Code blocks unchanged.",
-    );
-  } else if (level === "ultra") {
-    lines.push(
-      "Rules: Abbreviate (DB/auth/config/req/res/fn/impl), strip conjunctions, arrows for causality (X → Y), one word when one word enough. Code blocks unchanged.",
+      "Respond terse like smart caveman. All technical substance stay. Only fluff die.",
+      "",
+      "Rules: Drop articles (a/an/the), filler, pleasantries, hedging. Fragments OK. Short synonyms. Technical terms exact.",
     );
   }
 
   lines.push(
     "",
-    "Auto-clarity exception: revert to normal for security warnings, irreversible action confirmations, and multi-step sequences where fragments risk misread.",
+    "Auto-clarity exception: revert to normal for security warnings, irreversible action confirmations, and multi-step sequences where terseness risks misread.",
     "",
-    "Boundaries: code, commits, PRs written normally. Stop with \"stop caveman\" or \"normal mode\".",
+    "Boundaries: code blocks unchanged, errors quoted exact; code, commits, PRs written normally. Stop with \"stop ste\" or \"normal mode\".",
     "",
-    `<!-- caveman:${level} — based on github.com/JuliusBrussee/caveman -->`,
+    `<!-- ste:${level} -->`,
     "",
   );
 
   return lines.join("\n");
+}
+
+
+export function printStePluginInstructions(): void {
+  console.log(
+    `  ${chalk.cyan("ste plugin")} — brevity-with-clarity response style for Claude Code (session hook + per-turn reinforcement)`
+  );
+  console.log("    In Claude Code:");
+  console.log(
+    `      ${chalk.dim("/plugin marketplace add KiwiData-AI/grimoire")}`
+  );
+  console.log(`      ${chalk.dim("/plugin install ste@grimoire")}`);
+  console.log(
+    `    ${chalk.dim("If the old caveman plugin is installed, remove it — its rules contradict ste:")}`
+  );
+  console.log(`      ${chalk.dim("/plugin uninstall caveman@caveman")}\n`);
 }
 
 
@@ -174,18 +190,18 @@ export async function upsertAgentsFile(
   root: string,
   packageRoot: string,
   verb: "created" | "updated",
-  caveman: CavemanLevel = "none",
+  ste: SteLevel = "off",
   commentStyle?: string
 ): Promise<void> {
   const agentsPath = join(root, "AGENTS.md");
   if (resolve(root) === resolve(packageRoot)) {
-    await upsertInPlaceAgentsFile(agentsPath, verb, caveman, commentStyle);
+    await upsertInPlaceAgentsFile(agentsPath, verb, ste, commentStyle);
     return;
   }
   const grimoireAgents = stripManagedBlock(
     await readFile(join(packageRoot, "AGENTS.md"), "utf-8")
   );
-  const directives = buildCavemanDirective(caveman) + buildCommentStyleDirective(commentStyle);
+  const directives = buildSteDirective(ste) + buildCommentStyleDirective(commentStyle);
   const content = directives ? directives + grimoireAgents : grimoireAgents;
   const managedBlock = buildManagedBlock(content);
   await upsertManagedBlock(agentsPath, managedBlock, verb, "AGENTS.md");
@@ -194,22 +210,22 @@ export async function upsertAgentsFile(
 async function upsertInPlaceAgentsFile(
   agentsPath: string,
   verb: "created" | "updated",
-  caveman: CavemanLevel,
+  ste: SteLevel,
   commentStyle?: string
 ): Promise<void> {
-  const cavemanBlock = buildCavemanDirective(caveman) + buildCommentStyleDirective(commentStyle);
-  if (cavemanBlock) {
-    const managedBlock = buildManagedBlock(cavemanBlock);
+  const steBlock = buildSteDirective(ste) + buildCommentStyleDirective(commentStyle);
+  if (steBlock) {
+    const managedBlock = buildManagedBlock(steBlock);
     await upsertManagedBlock(agentsPath, managedBlock, verb, "AGENTS.md");
     return;
   }
   if (!(await fileExists(agentsPath))) {
-    console.log(`  ${chalk.dim("skipped")} AGENTS.md (in-place — no caveman directive to install)`);
+    console.log(`  ${chalk.dim("skipped")} AGENTS.md (in-place — no ste directive to install)`);
     return;
   }
   const existing = await readFile(agentsPath, "utf-8");
   if (!existing.includes(GRIMOIRE_START_MARKER)) {
-    console.log(`  ${chalk.dim("skipped")} AGENTS.md (in-place — no caveman directive, no managed block)`);
+    console.log(`  ${chalk.dim("skipped")} AGENTS.md (in-place — no ste directive, no managed block)`);
     return;
   }
   const stripped = existing.replace(

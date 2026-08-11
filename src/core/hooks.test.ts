@@ -72,6 +72,273 @@ describe("setupHooks", () => {
     );
   });
 
+  it("replaces a stale grimoire check entry instead of stacking a second one", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [
+          { matcher: "*.py", command: "black --check ." },
+          { matcher: "*", command: "grimoire check --changed --json" },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(2);
+    expect(written.hooks.PreCommit[0].command).toBe("black --check .");
+    expect(written.hooks.PreCommit[1].command).toBe(
+      "grimoire check --changed --json --skip best_practices",
+    );
+  });
+
+  it("removes a stale entry even when the current command is already present", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [
+          { matcher: "*", command: "grimoire check --changed --json" },
+          { matcher: "*", command: "grimoire check --changed --json --skip best_practices" },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(1);
+    expect(written.hooks.PreCommit[0].command).toBe(
+      "grimoire check --changed --json --skip best_practices",
+    );
+  });
+
+  it("keeps a user-customized grimoire check variant untouched", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [
+          { matcher: "*", command: "grimoire check --changed --json --skip best_practices,secrets" },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(1);
+    expect(written.hooks.PreCommit[0].command).toBe(
+      "grimoire check --changed --json --skip best_practices,secrets",
+    );
+  });
+
+  it("preserves a user matcher when upgrading a stale grimoire entry", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [{ matcher: "*.py", command: "grimoire check --changed --json" }],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(1);
+    expect(written.hooks.PreCommit[0]).toEqual({
+      matcher: "*.py",
+      command: "grimoire check --changed --json --skip best_practices",
+    });
+  });
+
+  it("tolerates an entry without a command instead of replacing the file", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [{ matcher: "*" }],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const bakWrite = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith(".bak"));
+    expect(bakWrite).toBeUndefined();
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(2);
+    expect(written.hooks.PreCommit[0]).toEqual({ matcher: "*" });
+  });
+
+  it("leaves a non-array grimoire phase untouched instead of clobbering it", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: { matcher: "*", command: "make lint" },
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const bakWrite = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith(".bak"));
+    expect(bakWrite).toBeUndefined();
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toEqual({ matcher: "*", command: "make lint" });
+  });
+
+  it("collapses an upgraded stale entry into an existing current entry", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [
+          { matcher: "*.py", command: "grimoire check --changed --json" },
+          { matcher: "*", command: "grimoire check --changed --json --skip best_practices" },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(1);
+    expect(written.hooks.PreCommit[0]).toEqual({
+      matcher: "*",
+      command: "grimoire check --changed --json --skip best_practices",
+    });
+  });
+
+  it("keeps duplicate foreign entries untouched", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [
+          { matcher: "*", command: "make lint" },
+          { matcher: "*", command: "make lint" },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    const lintEntries = written.hooks.PreCommit.filter(
+      (e: { command: string }) => e.command === "make lint"
+    );
+    expect(lintEntries).toHaveLength(2);
+  });
+
+  it("installs the gate alongside an unrelated grimoire command", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [{ matcher: "*", command: "grimoire check best_practices" }],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    const commands = written.hooks.PreCommit.map((e: { command: string }) => e.command);
+    expect(commands).toContain("grimoire check best_practices");
+    expect(commands).toContain("grimoire check --changed --json --skip best_practices");
+  });
+
+  it("passes foreign phases through untouched, even malformed ones", async () => {
+    const existingHooks = {
+      hooks: {
+        Notification: { not: "an array" },
+        PreToolUse: [{ matcher: "*", command: "my-lint" }],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const bakWrite = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith(".bak"));
+    expect(bakWrite).toBeUndefined();
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.Notification).toEqual({ not: "an array" });
+    expect(written.hooks.PreToolUse).toEqual([{ matcher: "*", command: "my-lint" }]);
+    expect(written.hooks.PreCommit).toHaveLength(1);
+  });
+
   it("skips git hooks when .git doesn't exist", async () => {
     setExists(); // nothing exists
     await setupHooks("/root");
@@ -80,10 +347,11 @@ describe("setupHooks", () => {
     expect(writeArgs.some((p) => p.includes("pre-commit"))).toBe(false);
   });
 
-  it("skips pre-commit when it already has grimoire", async () => {
+  it("skips pre-commit when it already has the current grimoire check", async () => {
     setExists("/root/.git", "/root/.git/hooks/pre-commit");
     mockReadFile.mockImplementation(async (path: any) => {
-      if (String(path).includes("pre-commit")) return "#!/bin/sh\ngrimoire check --changed\n" as any;
+      if (String(path).includes("pre-commit"))
+        return "#!/bin/sh\ngrimoire check --changed --skip best_practices\n" as any;
       throw new Error("ENOENT");
     });
 
@@ -91,6 +359,68 @@ describe("setupHooks", () => {
 
     const writeArgs = mockWriteFile.mock.calls.map((c) => String(c[0]));
     expect(writeArgs.some((p) => p.includes("pre-commit"))).toBe(false);
+  });
+
+  it("substitutes every stale pre-commit line in place, never deleting lines", async () => {
+    setExists("/root/.git", "/root/.git/hooks/pre-commit");
+    const original =
+      "#!/bin/sh\nif command -v grimoire >/dev/null 2>&1; then\n  grimoire check --changed\nfi\ngrimoire check --changed --skip best_practices || true\n";
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("pre-commit")) return original as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const preCommitWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("pre-commit")
+    );
+    expect(preCommitWrite).toBeDefined();
+    const written = String(preCommitWrite![1]);
+    expect(written).not.toMatch(/grimoire check --changed\n/);
+    expect(written).toContain("  grimoire check --changed --skip best_practices\n");
+    expect(written).toContain("grimoire check --changed --skip best_practices || true");
+    expect(written.split("\n")).toHaveLength(original.split("\n").length);
+  });
+
+  it("upgrades a stale grimoire check line in pre-commit", async () => {
+    setExists("/root/.git", "/root/.git/hooks/pre-commit");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("pre-commit"))
+        return "#!/bin/sh\nif command -v grimoire >/dev/null 2>&1; then\n  grimoire check --changed\nfi\n" as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const preCommitWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("pre-commit")
+    );
+    expect(preCommitWrite).toBeDefined();
+    const written = String(preCommitWrite![1]);
+    expect(written).toContain("  grimoire check --changed --skip best_practices\n");
+    expect(written).not.toMatch(/grimoire check --changed\n/);
+  });
+
+  it("merges into a hooks.json that has no hooks key without replacing it", async () => {
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return "{}" as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const bakWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith(".bak")
+    );
+    expect(bakWrite).toBeUndefined();
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(1);
   });
 
   it("wires UserPromptSubmit branch-check into .claude/settings.json when none exists", async () => {

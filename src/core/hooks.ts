@@ -23,6 +23,14 @@ export async function setupHooks(root: string): Promise<void> {
 }
 
 
+// Stale sets hold commands grimoire installed in past releases; update
+// upgrades them in place. Exact-match only — customized variants stay untouched.
+const CURRENT_CLAUDE_CHECK = "grimoire check --changed --json --skip best_practices";
+const STALE_CLAUDE_CHECKS = new Set(["grimoire check --changed --json"]);
+const CURRENT_GIT_CHECK = "grimoire check --changed --skip best_practices";
+const STALE_GIT_CHECKS = new Set(["grimoire check --changed"]);
+const GATE_PREFIX = "grimoire check --changed";
+
 async function setupClaudeHooks(root: string): Promise<void> {
   const claudeDir = join(root, ".claude");
   const hooksPath = join(claudeDir, "hooks.json");
@@ -35,7 +43,7 @@ async function setupClaudeHooks(root: string): Promise<void> {
           // Fast deterministic checks only — the LLM best_practices review is
           // excluded from the blocking commit gate (slow + non-deterministic).
           // Run it explicitly at review time: grimoire check best_practices
-          command: "grimoire check --changed --json --skip best_practices",
+          command: CURRENT_CLAUDE_CHECK,
         },
       ],
       PostCommit: [
@@ -69,6 +77,20 @@ async function setupClaudeHooks(root: string): Promise<void> {
 }
 
 
+// Substitutes stale grimoire check lines in place — never deletes a line, so
+// surrounding shell structure (if/fi blocks) can never be broken.
+function upgradeStaleGitLines(existing: string): string | null {
+  const lines = existing.split("\n");
+  if (!lines.some((l) => STALE_GIT_CHECKS.has(l.trim()))) return null;
+
+  const updated = lines.map((line) =>
+    STALE_GIT_CHECKS.has(line.trim())
+      ? (line.match(/^\s*/)?.[0] ?? "") + CURRENT_GIT_CHECK
+      : line
+  );
+  return updated.join("\n");
+}
+
 async function setupGitHooks(root: string): Promise<void> {
   const gitHooksDir = join(root, ".git", "hooks");
 
@@ -80,17 +102,27 @@ async function setupGitHooks(root: string): Promise<void> {
   // Don't overwrite existing hooks
   if (await fileExists(preCommitPath)) {
     const existing = await readFile(preCommitPath, "utf-8");
+
+    const upgraded = upgradeStaleGitLines(existing);
+    if (upgraded !== null) {
+      await writeFile(preCommitPath, upgraded);
+      console.log(`  ${chalk.blue("updated")} .git/hooks/pre-commit (stale grimoire check upgraded)`);
+      return;
+    }
+
     if (existing.includes("grimoire check")) {
-      console.log(`  ${chalk.yellow("exists")}  .git/hooks/pre-commit (already has grimoire)`);
+      console.log(
+        `  ${chalk.yellow("exists")}  .git/hooks/pre-commit (has a grimoire check; current command: ${CURRENT_GIT_CHECK})`
+      );
       return;
     }
     // Check if existing hook has exit/exec that would prevent our code from running
     if (/^[^#]*\b(exit\s|exec\s)/m.test(existing)) {
-      console.log(`  ${chalk.yellow("manual")}  .git/hooks/pre-commit contains exit/exec — add manually: grimoire check --changed --skip best_practices`);
+      console.log(`  ${chalk.yellow("manual")}  .git/hooks/pre-commit contains exit/exec — add manually: ${CURRENT_GIT_CHECK}`);
       return;
     }
     // Append grimoire check to existing hook
-    const appended = existing.trimEnd() + "\n\n# Grimoire pre-commit checks\ngrimoire check --changed --skip best_practices\n";
+    const appended = existing.trimEnd() + "\n\n# Grimoire pre-commit checks\n" + CURRENT_GIT_CHECK + "\n";
     await writeFile(preCommitPath, appended);
     console.log(`  ${chalk.blue("appended")} .git/hooks/pre-commit`);
     return;
@@ -107,7 +139,7 @@ async function setupGitHooks(root: string): Promise<void> {
 # (different findings each run), which turns committing into a fix-loop. Run it
 # explicitly at review/pre-push time:  grimoire check best_practices
 if command -v grimoire >/dev/null 2>&1; then
-  grimoire check --changed --skip best_practices
+  ${CURRENT_GIT_CHECK}
 fi
 `;
 
@@ -200,21 +232,44 @@ function trailerCheckScript(): string {
   return `sh -c 'if [ -d .grimoire/changes ] && [ "$(ls -A .grimoire/changes 2>/dev/null)" ]; then TRAILER=$(git log -1 --format="%(trailers:key=Change)" 2>/dev/null); if [ -z "$TRAILER" ]; then echo "WARNING: Commit is missing Change: trailer. Active grimoire changes exist."; fi; fi'`;
 }
 
+// Entry commands come from a user-edited file, so read them defensively.
+function commandOf(entry: { command?: unknown }): string {
+  return typeof entry.command === "string" ? entry.command : "";
+}
+
+// Grimoire-owned check entries collapse to one, upgraded to the current
+// command; every other entry passes through untouched, as do foreign phases.
 function mergeHooks(existing: HookConfig, additions: HookConfig): HookConfig {
-  const merged: HookConfig = {
-    hooks: { ...existing.hooks },
-  };
+  const merged: HookConfig = { hooks: { ...(existing.hooks ?? {}) } };
 
   for (const [phase, entries] of Object.entries(additions.hooks)) {
     const key = phase as keyof HookConfig["hooks"];
-    const existingEntries = merged.hooks[key] ?? [];
+    const raw = merged.hooks[key];
+    if (raw !== undefined && !Array.isArray(raw)) continue;
+    const existingEntries = raw ?? [];
     const newEntries = entries ?? [];
 
-    // Only add entries that don't already exist (by command)
-    const existingCommands = new Set(existingEntries.map((e) => e.command));
-    const toAdd = newEntries.filter((e) => !existingCommands.has(e.command));
+    const owned = (e: { command?: unknown }) =>
+      commandOf(e) === CURRENT_CLAUDE_CHECK || STALE_CLAUDE_CHECKS.has(commandOf(e));
+    const foreign = existingEntries.filter((e) => !owned(e));
+    const ownedEntries = existingEntries.filter(owned);
 
-    merged.hooks[key] = [...existingEntries, ...toAdd];
+    // Prefer the wildcard matcher so check coverage never narrows.
+    const kept = ownedEntries.find((e) => e.matcher === "*") ?? ownedEntries[0];
+    const upgraded = kept ? [{ ...kept, command: CURRENT_CLAUDE_CHECK }] : [];
+
+    // A customized gate variant occupies the grimoire slot; do not stack the
+    // stock command next to it. Unrelated grimoire commands are not gates.
+    const present = [...foreign, ...upgraded];
+    const commands = new Set(present.map(commandOf));
+    const hasGate = present.some((e) => commandOf(e).startsWith(GATE_PREFIX));
+    const toAdd = newEntries.filter(
+      (e) =>
+        !commands.has(commandOf(e)) &&
+        !(commandOf(e).startsWith(GATE_PREFIX) && hasGate)
+    );
+
+    merged.hooks[key] = [...foreign, ...upgraded, ...toAdd];
   }
 
   return merged;

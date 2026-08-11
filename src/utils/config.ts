@@ -10,11 +10,30 @@ export interface ToolConfig {
   prompt?: string;
 }
 
-export type CavemanLevel = "none" | "lite" | "full" | "ultra";
+export type SteLevel = "off" | "ste" | "caveman";
+
+export const STE_LEVELS: readonly SteLevel[] = ["off", "ste", "caveman"];
+
+const LEGACY_CAVEMAN_TO_STE: Record<string, SteLevel> = {
+  none: "off",
+  lite: "ste",
+  full: "caveman",
+  ultra: "caveman",
+};
+
+// hasOwn guard: a bare index lookup would resolve prototype names ("constructor").
+export function normalizeSteLevel(value: unknown): SteLevel | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  const v = value.toLowerCase();
+  if (STE_LEVELS.includes(v as SteLevel)) return v as SteLevel;
+  return Object.hasOwn(LEGACY_CAVEMAN_TO_STE, v)
+    ? LEGACY_CAVEMAN_TO_STE[v]
+    : undefined;
+}
 
 export type CommentLintMode = "block" | "warn" | "off";
 
-export const CURRENT_CONFIG_VERSION = 2;
+export const CURRENT_CONFIG_VERSION = 3;
 
 interface DesignToolConfig {
   name: string;
@@ -40,7 +59,7 @@ interface ProjectConfig {
   doc_tool?: string;
   comment_style?: string;
   comment_lint?: CommentLintMode;
-  caveman?: CavemanLevel;
+  ste?: SteLevel;
   compliance?: string[];
   design_tool?: DesignToolConfig;
   agents?: string[];
@@ -57,7 +76,7 @@ interface PrecommitReviewConfig {
 
 interface IntegrationsConfig {
   codebase_memory_mcp?: boolean;
-  caveman_plugin?: boolean;
+  ste_plugin?: boolean;
 }
 
 interface LlmAgentConfig {
@@ -163,9 +182,15 @@ function parseIntegrations(projectRaw: Record<string, unknown>): IntegrationsCon
   const it = projectRaw.integrations as Record<string, unknown>;
   return {
     codebase_memory_mcp: typeof it.codebase_memory_mcp === "boolean" ? it.codebase_memory_mcp : undefined,
-    caveman_plugin: typeof it.caveman_plugin === "boolean" ? it.caveman_plugin : undefined,
+    ste_plugin:
+      typeof it.ste_plugin === "boolean"
+        ? it.ste_plugin
+        : typeof it.caveman_plugin === "boolean"
+          ? it.caveman_plugin
+          : undefined,
   };
 }
+
 
 function parsePrecommitReview(projectRaw: Record<string, unknown>): PrecommitReviewConfig | undefined {
   if (!projectRaw.precommit_review || typeof projectRaw.precommit_review !== "object") return undefined;
@@ -200,7 +225,7 @@ function parseProject(raw: Record<string, unknown>): ProjectConfig {
     doc_tool: str(projectRaw.doc_tool ?? raw.doc_tool),
     comment_style: str(projectRaw.comment_style ?? raw.comment_style),
     comment_lint: parseCommentLint(projectRaw.comment_lint),
-    caveman: str(projectRaw.caveman) as ProjectConfig["caveman"],
+    ste: normalizeSteLevel(projectRaw.ste) ?? normalizeSteLevel(projectRaw.caveman),
     compliance: parseStringArray(projectRaw.compliance),
     design_tool: parseDesignTool(projectRaw),
     agents: parseStringArray(projectRaw.agents),
@@ -245,7 +270,9 @@ function parseLlm(raw: Record<string, unknown>): LlmConfig {
 
 function buildConfig(raw: Record<string, unknown>): GrimoireConfig {
   return {
-    version: Number(raw.version ?? 1),
+    // The parsed shape is always current — legacy keys are normalized on read —
+    // so writers that serialize this object must not stamp a stale version.
+    version: CURRENT_CONFIG_VERSION,
     project: parseProject(raw),
     features_dir: String(raw.features_dir ?? DEFAULT_CONFIG.features_dir),
     decisions_dir: String(raw.decisions_dir ?? DEFAULT_CONFIG.decisions_dir),

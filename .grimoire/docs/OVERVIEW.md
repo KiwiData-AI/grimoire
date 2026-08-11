@@ -263,7 +263,7 @@ Key decisions recorded as MADR (Markdown Any Decision Records).
 | 0010 | Skills are pure markdown instructions, not executable code | accepted | 2026-04-01 |
 | 0011 | Use managed block markers for AGENTS.md and README badges | accepted | 2026-04-01 |
 | 0012 | Install both Claude Code hooks and git pre-commit hooks | accepted | 2026-04-05 |
-| 0013 | Caveman mode for token-optimized AGENTS.md | accepted | 2026-04-05 |
+| 0013 | Caveman mode for token-optimized AGENTS.md | superseded by 0040 | 2026-04-05 |
 | 0014 | Contract-first external API testing strategy | accepted | 2026-04-05 |
 | 0016 | Use W3C Design Tokens (DTCG) format for brand guidelines | accepted | 2026-05-17 |
 | 0017 | One `grimoire-design` skill, not split (brand/design/figma) | accepted | 2026-05-17 |
@@ -280,6 +280,8 @@ Key decisions recorded as MADR (Markdown Any Decision Records).
 | 0036 | Capability-surface selection: where a new capability belongs | accepted | 2026-06-26 |
 | 0037 | Shared named-methodology references for cross-skill guidance | proposed | 2026-06-27 |
 | 0038 | Living `draft.md` as the single design surface, projected into homes after agreement | proposed | 2026-06-17 |
+| 0039 | Delegate docstring-format enforcement to pydoclint; make comment policy reach every session | accepted | 2026-07-03 |
+| 0040 | STE response style replaces caveman mode | accepted | 2026-08-10 |
 
 ### Use Gherkin instead of custom WHEN/THEN format
 
@@ -353,11 +355,11 @@ Grimoire needs to run `grimoire check` before commits and validate `Change:` tra
 
 **Outcome:** Chosen option: "Dual hooks", because Claude Code hooks provide richer integration (post-commit feedback, structured output) while git hooks catch commits from any tool. The git hook is a simple shell script that runs `grimoire check --changed`. The Claude hook adds Change trailer validation for active grimoire changes.
 
-### Caveman mode for token-optimized AGENTS.md
+### STE response style for AGENTS.md
 
-AGENTS.md contains detailed workflow instructions that consume significant context window tokens. Smaller models or constrained contexts may not have room for full instructions alongside the user's code. How should grimoire handle varying context budgets?
+Agent responses drift verbose, and the earlier caveman levels cut tokens by dropping grammar — which hurt comprehension. How should grimoire keep responses terse without losing clarity?
 
-**Outcome:** Chosen option: "Caveman levels", because different projects have different context budgets and the right verbosity depends on team experience. `none` gives full instructions, `lite` trims explanations while keeping the workflow, `full` strips to essentials, and `ultra` is a bare skeleton. Set via `project.caveman` in config and applied during `grimoire init` / `grimoire update`.
+**Outcome:** Chosen option: "STE levels", because ASD-STE100 grammar cuts filler while keeping articles and complete sentences. `off` writes no style directive, `ste` (default) enforces brevity-with-clarity, `caveman` keeps the old maximum compression. Set via `project.ste` in config and applied during `grimoire init` / `grimoire update`; the `ste@grimoire` Claude Code plugin reinforces the same rules per turn.
 
 ### Contract-first external API testing strategy
 

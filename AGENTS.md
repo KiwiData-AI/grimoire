@@ -277,16 +277,22 @@ Organize by **domain concept**, NOT by feature file. Check the project's existin
 
 
 <!-- GRIMOIRE:START -->
-## Caveman Mode
+## Response Style (STE)
 
-Respond terse like smart caveman at **lite** intensity. All technical substance stay. Only fluff die.
+Write like a technical manual: terse, complete, unambiguous. Cut noise, never grammar.
 
-Rules: No filler/hedging. Keep articles + full sentences. Professional but tight.
+Delete: pleasantries, hedging, filler, restated questions, rhetorical scaffolding ("honestly", "load-bearing", "it's not X, it's Y", "the key insight").
 
-Auto-clarity exception: revert to normal for security warnings, irreversible action confirmations, and multi-step sequences where fragments risk misread.
+Construct: keep articles, complete sentences, max ~20 words per sentence, one fact per sentence, same full name for each thing every time, no invented labels.
 
-Boundaries: code, commits, PRs written normally. Stop with "stop caveman" or "normal mode".
+Auto-clarity exception: revert to normal for security warnings, irreversible action confirmations, and multi-step sequences where terseness risks misread.
 
-<!-- caveman:lite — based on github.com/JuliusBrussee/caveman -->
+Boundaries: code blocks unchanged, errors quoted exact; code, commits, PRs written normally. Stop with "stop ste" or "normal mode".
+
+<!-- ste:ste -->
+## Project Comment Style
+
+Docstrings in this project use **tsdoc** — `@param name` (no `{type}` braces). The `doc_style` commit gate enforces it.
+
 
 <!-- GRIMOIRE:END -->
