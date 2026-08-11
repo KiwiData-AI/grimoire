@@ -23,6 +23,23 @@ export async function setupHooks(root: string): Promise<void> {
 }
 
 
+// Grimoire-owned check command histories, oldest first; the last entry is the
+// one currently installed. When changing a command, append it here — every
+// earlier entry is treated as stale and upgraded in place on init/update.
+// Exact-match only, so user-customized variants are never touched.
+const CLAUDE_CHECK_COMMANDS = [
+  "grimoire check --changed --json",
+  "grimoire check --changed --json --skip best_practices",
+];
+const GIT_CHECK_COMMANDS = [
+  "grimoire check --changed",
+  "grimoire check --changed --skip best_practices",
+];
+const CURRENT_CLAUDE_CHECK = CLAUDE_CHECK_COMMANDS[CLAUDE_CHECK_COMMANDS.length - 1];
+const CURRENT_GIT_CHECK = GIT_CHECK_COMMANDS[GIT_CHECK_COMMANDS.length - 1];
+const STALE_GRIMOIRE_COMMANDS = new Set(CLAUDE_CHECK_COMMANDS.slice(0, -1));
+const STALE_GIT_CHECK_COMMANDS = new Set(GIT_CHECK_COMMANDS.slice(0, -1));
+
 async function setupClaudeHooks(root: string): Promise<void> {
   const claudeDir = join(root, ".claude");
   const hooksPath = join(claudeDir, "hooks.json");
@@ -35,7 +52,7 @@ async function setupClaudeHooks(root: string): Promise<void> {
           // Fast deterministic checks only — the LLM best_practices review is
           // excluded from the blocking commit gate (slow + non-deterministic).
           // Run it explicitly at review time: grimoire check best_practices
-          command: "grimoire check --changed --json --skip best_practices",
+          command: CURRENT_CLAUDE_CHECK,
         },
       ],
       PostCommit: [
@@ -80,17 +97,29 @@ async function setupGitHooks(root: string): Promise<void> {
   // Don't overwrite existing hooks
   if (await fileExists(preCommitPath)) {
     const existing = await readFile(preCommitPath, "utf-8");
+
+    // Upgrade a stale grimoire-owned check line in place
+    const lines = existing.split("\n");
+    const staleIdx = lines.findIndex((l) => STALE_GIT_CHECK_COMMANDS.has(l.trim()));
+    if (staleIdx !== -1 && !existing.includes(CURRENT_GIT_CHECK)) {
+      const indent = lines[staleIdx].match(/^\s*/)?.[0] ?? "";
+      lines[staleIdx] = indent + CURRENT_GIT_CHECK;
+      await writeFile(preCommitPath, lines.join("\n"));
+      console.log(`  ${chalk.blue("updated")} .git/hooks/pre-commit (stale grimoire check upgraded)`);
+      return;
+    }
+
     if (existing.includes("grimoire check")) {
       console.log(`  ${chalk.yellow("exists")}  .git/hooks/pre-commit (already has grimoire)`);
       return;
     }
     // Check if existing hook has exit/exec that would prevent our code from running
     if (/^[^#]*\b(exit\s|exec\s)/m.test(existing)) {
-      console.log(`  ${chalk.yellow("manual")}  .git/hooks/pre-commit contains exit/exec — add manually: grimoire check --changed --skip best_practices`);
+      console.log(`  ${chalk.yellow("manual")}  .git/hooks/pre-commit contains exit/exec — add manually: ${CURRENT_GIT_CHECK}`);
       return;
     }
     // Append grimoire check to existing hook
-    const appended = existing.trimEnd() + "\n\n# Grimoire pre-commit checks\ngrimoire check --changed --skip best_practices\n";
+    const appended = existing.trimEnd() + "\n\n# Grimoire pre-commit checks\n" + CURRENT_GIT_CHECK + "\n";
     await writeFile(preCommitPath, appended);
     console.log(`  ${chalk.blue("appended")} .git/hooks/pre-commit`);
     return;
@@ -107,7 +136,7 @@ async function setupGitHooks(root: string): Promise<void> {
 # (different findings each run), which turns committing into a fix-loop. Run it
 # explicitly at review/pre-push time:  grimoire check best_practices
 if command -v grimoire >/dev/null 2>&1; then
-  grimoire check --changed --skip best_practices
+  ${CURRENT_GIT_CHECK}
 fi
 `;
 
@@ -200,16 +229,10 @@ function trailerCheckScript(): string {
   return `sh -c 'if [ -d .grimoire/changes ] && [ "$(ls -A .grimoire/changes 2>/dev/null)" ]; then TRAILER=$(git log -1 --format="%(trailers:key=Change)" 2>/dev/null); if [ -z "$TRAILER" ]; then echo "WARNING: Commit is missing Change: trailer. Active grimoire changes exist."; fi; fi'`;
 }
 
-// Exact commands grimoire installed in past releases. When a grimoire-owned
-// hook command changes, add the superseded string here so update replaces it
-// instead of stacking a duplicate. Exact-match only — user-customized variants
-// are never touched.
-const STALE_GRIMOIRE_COMMANDS = new Set(["grimoire check --changed --json"]);
-
 function mergeHooks(existing: HookConfig, additions: HookConfig): HookConfig {
   const merged: HookConfig = { hooks: {} };
 
-  for (const [phase, entries] of Object.entries(existing.hooks)) {
+  for (const [phase, entries] of Object.entries(existing.hooks ?? {})) {
     const key = phase as keyof HookConfig["hooks"];
     merged.hooks[key] = (entries ?? []).filter(
       (e) => !STALE_GRIMOIRE_COMMANDS.has(e.command)

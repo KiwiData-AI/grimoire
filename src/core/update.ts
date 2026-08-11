@@ -7,7 +7,7 @@ import { fileExists } from "../utils/fs.js";
 import {
   loadConfig,
   CURRENT_CONFIG_VERSION,
-  LEGACY_CAVEMAN_TO_STE,
+  legacySteLevel,
   type GrimoireConfig,
 } from "../utils/config.js";
 import {
@@ -247,7 +247,7 @@ const MIGRATIONS: Migration[] = [
         raw.project = {};
       }
       const project = raw.project as Record<string, unknown>;
-      if (!project.caveman) {
+      if (!project.caveman && project.ste === undefined) {
         project.caveman = "lite";
       }
       ensureChecks(raw, ["dep_audit", "secrets", "best_practices"]);
@@ -263,14 +263,15 @@ const MIGRATIONS: Migration[] = [
       }
       const project = raw.project as Record<string, unknown>;
       if (project.caveman !== undefined) {
-        const mapped = LEGACY_CAVEMAN_TO_STE[String(project.caveman)];
-        if (mapped) project.ste = mapped;
+        if (project.ste === undefined) {
+          project.ste = legacySteLevel(String(project.caveman)) ?? "ste";
+        }
         delete project.caveman;
       }
       if (project.integrations && typeof project.integrations === "object") {
         const it = project.integrations as Record<string, unknown>;
         if (it.caveman_plugin !== undefined) {
-          it.ste_plugin = it.caveman_plugin;
+          if (it.ste_plugin === undefined) it.ste_plugin = it.caveman_plugin;
           delete it.caveman_plugin;
         }
       }

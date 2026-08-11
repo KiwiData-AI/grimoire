@@ -206,6 +206,11 @@ export function isYes(answer: string): boolean {
   return !/^no?$/i.test(answer.trim());
 }
 
+// Default-no (y/N) prompt: only "y" or "yes" accepts.
+export function saidYes(answer: string): boolean {
+  return /^y(es)?$/i.test(answer.trim());
+}
+
 // ---------------------------------------------------------------------------
 // Section functions (exported so init --full can call them directly)
 // ---------------------------------------------------------------------------
@@ -389,7 +394,7 @@ export async function configureDesignSection(
   const captureAnswer = await rl.question(
     `    Capture brand guidelines now? (y/N) `
   );
-  if (captureAnswer.trim().toLowerCase() !== "y") {
+  if (!saidYes(captureAnswer)) {
     console.log(
       chalk.dim(
         "    Run `grimoire configure design` later to add brand tokens."

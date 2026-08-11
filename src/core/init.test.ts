@@ -133,7 +133,8 @@ describe("initProject", () => {
     );
     expect(configWrite).toBeDefined();
     const content = String(configWrite![1]);
-    expect(content).toContain("version: 1");
+    expect(content).toContain("version: 3");
+    expect(content).toContain("ste: ste");
   });
 
   it("skips existing config.yaml", async () => {

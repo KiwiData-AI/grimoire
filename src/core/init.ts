@@ -87,7 +87,7 @@ async function createGrimoireConfig(
   if (options.full) await runFullConfigSections(root, config);
 
   return {
-    steLevel: config.project.ste ?? "ste",
+    steLevel: config.project.ste ?? "off",
     commentStyle: config.project.comment_style,
     packageManager: config.project.package_manager,
     pydoclintConfigured: config.tools.doc_style?.name === "pydoclint",

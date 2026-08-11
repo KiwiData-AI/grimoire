@@ -14,12 +14,20 @@ export type SteLevel = "off" | "ste" | "caveman";
 
 export const STE_LEVELS: readonly SteLevel[] = ["off", "ste", "caveman"];
 
-export const LEGACY_CAVEMAN_TO_STE: Record<string, SteLevel> = {
+const LEGACY_CAVEMAN_TO_STE: Record<string, SteLevel> = {
   none: "off",
   lite: "ste",
   full: "caveman",
   ultra: "caveman",
 };
+
+// hasOwn guard: a bare index lookup would resolve prototype properties
+// ("constructor", "toString") into non-level values.
+export function legacySteLevel(value: string): SteLevel | undefined {
+  return Object.hasOwn(LEGACY_CAVEMAN_TO_STE, value)
+    ? LEGACY_CAVEMAN_TO_STE[value]
+    : undefined;
+}
 
 export type CommentLintMode = "block" | "warn" | "off";
 
@@ -186,7 +194,7 @@ function parseSte(projectRaw: Record<string, unknown>): SteLevel | undefined {
   const ste = str(projectRaw.ste);
   if (STE_LEVELS.includes(ste as SteLevel)) return ste as SteLevel;
   const legacy = str(projectRaw.caveman);
-  return legacy ? LEGACY_CAVEMAN_TO_STE[legacy] : undefined;
+  return legacy ? (legacySteLevel(legacy) ?? "ste") : undefined;
 }
 
 function parsePrecommitReview(projectRaw: Record<string, unknown>): PrecommitReviewConfig | undefined {

@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { detectTools, type Detection } from "./detect.js";
 import {
   STE_LEVELS,
-  LEGACY_CAVEMAN_TO_STE,
+  legacySteLevel,
   type GrimoireConfig,
   type SteLevel,
   type ProjectSurface,
@@ -234,7 +234,7 @@ async function askSteLevel(
   const steChoice = steAnswer.trim().toLowerCase();
   const steMapped = STE_LEVELS.includes(steChoice as SteLevel)
     ? (steChoice as SteLevel)
-    : LEGACY_CAVEMAN_TO_STE[steChoice];
+    : legacySteLevel(steChoice);
   if (steChoice && !steMapped) {
     console.log(chalk.dim(`    Unrecognized "${steChoice}" — keeping ${currentSte}.`));
   }

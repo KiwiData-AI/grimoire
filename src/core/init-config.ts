@@ -1,4 +1,4 @@
-import type { GrimoireConfig, ToolConfig, ProjectSurface } from "../utils/config.js";
+import { CURRENT_CONFIG_VERSION, type GrimoireConfig, type ToolConfig, type ProjectSurface } from "../utils/config.js";
 import type { Detection } from "./detect.js";
 
 export const PROMPT_SURFACES: readonly ProjectSurface[] = [
@@ -17,10 +17,11 @@ export interface EssentialPrefill {
 
 export function buildMinimalConfig(): GrimoireConfig {
   return {
-    version: 1,
+    version: CURRENT_CONFIG_VERSION,
     project: {
       commit_style: "conventional",
       comment_lint: "block",
+      ste: "ste",
     },
     features_dir: "features",
     decisions_dir: ".grimoire/decisions",

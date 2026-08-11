@@ -164,10 +164,11 @@ describe("setupHooks", () => {
     expect(writeArgs.some((p) => p.includes("pre-commit"))).toBe(false);
   });
 
-  it("skips pre-commit when it already has grimoire", async () => {
+  it("skips pre-commit when it already has the current grimoire check", async () => {
     setExists("/root/.git", "/root/.git/hooks/pre-commit");
     mockReadFile.mockImplementation(async (path: any) => {
-      if (String(path).includes("pre-commit")) return "#!/bin/sh\ngrimoire check --changed\n" as any;
+      if (String(path).includes("pre-commit"))
+        return "#!/bin/sh\ngrimoire check --changed --skip best_practices\n" as any;
       throw new Error("ENOENT");
     });
 
@@ -175,6 +176,46 @@ describe("setupHooks", () => {
 
     const writeArgs = mockWriteFile.mock.calls.map((c) => String(c[0]));
     expect(writeArgs.some((p) => p.includes("pre-commit"))).toBe(false);
+  });
+
+  it("upgrades a stale grimoire check line in pre-commit", async () => {
+    setExists("/root/.git", "/root/.git/hooks/pre-commit");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("pre-commit"))
+        return "#!/bin/sh\nif command -v grimoire >/dev/null 2>&1; then\n  grimoire check --changed\nfi\n" as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const preCommitWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("pre-commit")
+    );
+    expect(preCommitWrite).toBeDefined();
+    const written = String(preCommitWrite![1]);
+    expect(written).toContain("  grimoire check --changed --skip best_practices\n");
+    expect(written).not.toMatch(/grimoire check --changed\n/);
+  });
+
+  it("merges into a hooks.json that has no hooks key without replacing it", async () => {
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return "{}" as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const bakWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith(".bak")
+    );
+    expect(bakWrite).toBeUndefined();
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(1);
   });
 
   it("wires UserPromptSubmit branch-check into .claude/settings.json when none exists", async () => {
