@@ -21,7 +21,6 @@ const LEGACY_CAVEMAN_TO_STE: Record<string, SteLevel> = {
   ultra: "caveman",
 };
 
-// Accepts current levels and legacy caveman names; anything else is undefined.
 // hasOwn guard: a bare index lookup would resolve prototype names ("constructor").
 export function normalizeSteLevel(value: unknown): SteLevel | undefined {
   if (typeof value !== "string" || !value) return undefined;
@@ -271,7 +270,9 @@ function parseLlm(raw: Record<string, unknown>): LlmConfig {
 
 function buildConfig(raw: Record<string, unknown>): GrimoireConfig {
   return {
-    version: Number(raw.version ?? 1),
+    // The parsed shape is always current — legacy keys are normalized on read —
+    // so writers that serialize this object must not stamp a stale version.
+    version: CURRENT_CONFIG_VERSION,
     project: parseProject(raw),
     features_dir: String(raw.features_dir ?? DEFAULT_CONFIG.features_dir),
     decisions_dir: String(raw.decisions_dir ?? DEFAULT_CONFIG.decisions_dir),

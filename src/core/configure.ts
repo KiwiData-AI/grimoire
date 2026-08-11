@@ -201,12 +201,12 @@ function stripNone(answer: string): string | undefined {
   return trimmed && trimmed !== "none" ? trimmed : undefined;
 }
 
-// Default-yes (Y/n) prompt: only "n" or "no" declines.
+// Default-yes (Y/n) prompt.
 export function isYes(answer: string): boolean {
   return !/^no?$/i.test(answer.trim());
 }
 
-// Default-no (y/N) prompt: only "y" or "yes" accepts.
+// Default-no (y/N) prompt.
 export function saidYes(answer: string): boolean {
   return /^y(es)?$/i.test(answer.trim());
 }
