@@ -261,6 +261,19 @@ project:
     expect(config.project.ste).toBe("ste");
   });
 
+  it("maps mixed-case legacy values", async () => {
+    const yaml = `
+version: 2
+project:
+  caveman: Lite
+`;
+    mockReadFile.mockResolvedValue(yaml);
+
+    const config = await loadConfig("/fake/root");
+
+    expect(config.project.ste).toBe("ste");
+  });
+
   it("drops unrecognized ste values", async () => {
     const yaml = `
 version: 3

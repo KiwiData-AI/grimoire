@@ -182,6 +182,84 @@ describe("setupHooks", () => {
     });
   });
 
+  it("tolerates an entry without a command instead of replacing the file", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [{ matcher: "*" }],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const bakWrite = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith(".bak"));
+    expect(bakWrite).toBeUndefined();
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(2);
+    expect(written.hooks.PreCommit[0]).toEqual({ matcher: "*" });
+  });
+
+  it("leaves a non-array grimoire phase untouched instead of clobbering it", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: { matcher: "*", command: "make lint" },
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const bakWrite = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith(".bak"));
+    expect(bakWrite).toBeUndefined();
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toEqual({ matcher: "*", command: "make lint" });
+  });
+
+  it("collapses an upgraded stale entry into an existing current entry", async () => {
+    const existingHooks = {
+      hooks: {
+        PreCommit: [
+          { matcher: "*.py", command: "grimoire check --changed --json" },
+          { matcher: "*", command: "grimoire check --changed --json --skip best_practices" },
+        ],
+      },
+    };
+    setExists("/root/.git", "/root/.claude/hooks.json");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("hooks.json")) return JSON.stringify(existingHooks) as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const hooksWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("hooks.json")
+    );
+    expect(hooksWrite).toBeDefined();
+    const written = JSON.parse(String(hooksWrite![1]));
+    expect(written.hooks.PreCommit).toHaveLength(1);
+    expect(written.hooks.PreCommit[0]).toEqual({
+      matcher: "*.py",
+      command: "grimoire check --changed --json --skip best_practices",
+    });
+  });
+
   it("passes foreign phases through untouched, even malformed ones", async () => {
     const existingHooks = {
       hooks: {
@@ -247,6 +325,26 @@ describe("setupHooks", () => {
     expect(preCommitWrite).toBeDefined();
     const written = String(preCommitWrite![1]);
     expect(written).not.toMatch(/grimoire check --changed\n/);
+    expect(written.match(/grimoire check --changed --skip best_practices/g)?.length).toBe(1);
+  });
+
+  it("does not insert a duplicate when the current pre-commit line is decorated", async () => {
+    setExists("/root/.git", "/root/.git/hooks/pre-commit");
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("pre-commit"))
+        return "#!/bin/sh\ngrimoire check --changed\ngrimoire check --changed --skip best_practices || true\n" as any;
+      throw new Error("ENOENT");
+    });
+
+    await setupHooks("/root");
+
+    const preCommitWrite = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).includes("pre-commit")
+    );
+    expect(preCommitWrite).toBeDefined();
+    const written = String(preCommitWrite![1]);
+    expect(written).not.toMatch(/grimoire check --changed\n/);
+    expect(written).toContain("grimoire check --changed --skip best_practices || true");
     expect(written.match(/grimoire check --changed --skip best_practices/g)?.length).toBe(1);
   });
 

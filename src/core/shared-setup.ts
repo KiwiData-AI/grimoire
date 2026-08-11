@@ -157,7 +157,11 @@ export function printStePluginInstructions(): void {
   console.log(
     `      ${chalk.dim("/plugin marketplace add KiwiData-AI/grimoire")}`
   );
-  console.log(`      ${chalk.dim("/plugin install ste@grimoire")}\n`);
+  console.log(`      ${chalk.dim("/plugin install ste@grimoire")}`);
+  console.log(
+    `    ${chalk.dim("If the old caveman plugin is installed, remove it — its rules contradict ste:")}`
+  );
+  console.log(`      ${chalk.dim("/plugin uninstall caveman@caveman")}\n`);
 }
 
 

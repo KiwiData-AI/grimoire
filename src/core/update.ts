@@ -135,7 +135,8 @@ async function migrateConfig(root: string): Promise<void> {
     return;
   }
 
-  const currentVersion = Number(raw.version ?? 1);
+  const parsedVersion = Number(raw.version ?? 1);
+  const currentVersion = Number.isFinite(parsedVersion) ? parsedVersion : 1;
   if (currentVersion >= CURRENT_CONFIG_VERSION) {
     return; // already up to date
   }
@@ -277,10 +278,10 @@ function migrateSteKeys(project: Record<string, unknown>): void {
   delete project.caveman;
   if (project.integrations && typeof project.integrations === "object") {
     const it = project.integrations as Record<string, unknown>;
-    if (it.caveman_plugin !== undefined) {
-      if (it.ste_plugin === undefined) it.ste_plugin = it.caveman_plugin;
-      delete it.caveman_plugin;
+    if (typeof it.caveman_plugin === "boolean" && it.ste_plugin === undefined) {
+      it.ste_plugin = it.caveman_plugin;
     }
+    delete it.caveman_plugin;
   }
 }
 

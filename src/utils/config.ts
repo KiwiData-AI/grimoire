@@ -25,9 +25,10 @@ const LEGACY_CAVEMAN_TO_STE: Record<string, SteLevel> = {
 // hasOwn guard: a bare index lookup would resolve prototype names ("constructor").
 export function normalizeSteLevel(value: unknown): SteLevel | undefined {
   if (typeof value !== "string" || !value) return undefined;
-  if (STE_LEVELS.includes(value as SteLevel)) return value as SteLevel;
-  return Object.hasOwn(LEGACY_CAVEMAN_TO_STE, value)
-    ? LEGACY_CAVEMAN_TO_STE[value]
+  const v = value.toLowerCase();
+  if (STE_LEVELS.includes(v as SteLevel)) return v as SteLevel;
+  return Object.hasOwn(LEGACY_CAVEMAN_TO_STE, v)
+    ? LEGACY_CAVEMAN_TO_STE[v]
     : undefined;
 }
 
