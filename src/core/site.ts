@@ -39,59 +39,82 @@ export async function buildSite(
 
   await writeFile(join(siteDir, ".gitignore"), "docs/\nmkdocs.yml\n");
   await writeFile(join(docsDir, "index.md"), overviewMarkdown);
-  const featurePages = await writeFeaturePages(root, docsDir);
-  const decisionPages = await writeDecisionPages(root, docsDir);
+  const hasFeatures = await writeFeaturesPage(root, docsDir);
+  const hasDecisions = await writeDecisionsPage(root, docsDir);
   const hasConstraints = await writeConstraintsPage(root, docsDir);
   await copyAssets(docsDir);
 
-  const nav = buildNav(featurePages, decisionPages, hasConstraints);
+  const nav = buildNav(hasFeatures, hasDecisions, hasConstraints);
   await writeMkdocsConfig(root, siteDir, nav);
   await runBuildCommand(command, root);
   return { skipped: false };
 }
 
-async function writeFeaturePages(root: string, docsDir: string): Promise<string[]> {
+async function writeFeaturesPage(root: string, docsDir: string): Promise<boolean> {
   const featuresDir = join(root, "features");
   let files: string[];
   try {
     files = await findFiles(featuresDir, ".feature");
   } catch {
-    return [];
+    return false;
   }
 
-  const pages: string[] = [];
+  const groups = groupFeatures(featuresDir, files);
+  if (groups.size === 0) return false;
+
+  const sections: string[] = [];
+  for (const group of [...groups.keys()].sort(rootFirst)) {
+    sections.push(`## ${group}\n`);
+    for (const file of groups.get(group) ?? []) {
+      const content = await readFile(file, "utf-8");
+      const fenced = content.endsWith("\n") ? content : content + "\n";
+      sections.push(`### ${basename(file, ".feature")}\n\n\`\`\`gherkin\n${fenced}\`\`\`\n`);
+    }
+  }
+  await writeFile(join(docsDir, "features.md"), GENERATED_HEADER + sections.join("\n"));
+  return true;
+}
+
+function groupFeatures(featuresDir: string, files: string[]): Map<string, string[]> {
+  const groups = new Map<string, string[]>();
   for (const file of files.sort()) {
     const rel = relative(featuresDir, file);
     if (rel.split("/")[0] === "steps") continue;
-    const content = await readFile(file, "utf-8");
-    const fenced = content.endsWith("\n") ? content : content + "\n";
-    const page = rel.replace(/\.feature$/, ".md");
-    const target = join(docsDir, "features", page);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, GENERATED_HEADER + "```gherkin\n" + fenced + "```\n");
-    pages.push(page);
+    const group = rel.includes("/") ? rel.split("/")[0] : "(root)";
+    groups.set(group, [...(groups.get(group) ?? []), file]);
   }
-  return pages;
+  return groups;
 }
 
-async function writeDecisionPages(root: string, docsDir: string): Promise<string[]> {
+function rootFirst(a: string, b: string): number {
+  if (a === "(root)") return -1;
+  if (b === "(root)") return 1;
+  return a.localeCompare(b);
+}
+
+async function writeDecisionsPage(root: string, docsDir: string): Promise<boolean> {
   const decisionsDir = join(root, ".grimoire", "decisions");
   let files: string[];
   try {
     const entries = await readdir(decisionsDir);
     files = entries.filter((f) => f.endsWith(".md") && f !== "template.md").sort();
   } catch {
-    return [];
+    return false;
   }
+  if (files.length === 0) return false;
 
-  if (files.length > 0) await mkdir(join(docsDir, "decisions"), { recursive: true });
+  const sections: string[] = [];
   for (const file of files) {
     const { data, content } = matter(await readFile(join(decisionsDir, file), "utf-8"));
     const status = data.status ? String(data.status).trim() : "proposed";
-    const chip = `<span class="st-${status.split(" ")[0].toLowerCase()}">${status}</span>\n`;
-    await writeFile(join(docsDir, "decisions", file), GENERATED_HEADER + chip + content);
+    const chip = `<span class="st-${status.split(" ")[0].toLowerCase()}">${status}</span>`;
+    const titleMatch = content.match(/^# (.+)$/m);
+    const title = titleMatch ? titleMatch[1] : basename(file, ".md");
+    const body = titleMatch ? content.replace(titleMatch[0], "").trimStart() : content;
+    sections.push(`## ${title}\n\n${chip}\n\n${body.trimEnd()}\n`);
   }
-  return files;
+  await writeFile(join(docsDir, "decisions.md"), GENERATED_HEADER + sections.join("\n"));
+  return true;
 }
 
 async function writeConstraintsPage(root: string, docsDir: string): Promise<boolean> {
@@ -109,37 +132,13 @@ async function copyAssets(docsDir: string): Promise<void> {
 }
 
 function buildNav(
-  featurePages: string[],
-  decisionPages: string[],
+  hasFeatures: boolean,
+  hasDecisions: boolean,
   hasConstraints: boolean
 ): string {
   const lines = ["  - Overview: index.md"];
-
-  if (featurePages.length > 0) {
-    lines.push("  - Features:");
-    for (const page of featurePages.filter((p) => !p.includes("/"))) {
-      lines.push(`      - ${basename(page, ".md")}: features/${page}`);
-    }
-    const groups = new Map<string, string[]>();
-    for (const page of featurePages.filter((p) => p.includes("/"))) {
-      const dir = page.split("/")[0];
-      groups.set(dir, [...(groups.get(dir) ?? []), page]);
-    }
-    for (const [dir, pages] of groups) {
-      lines.push(`      - ${dir}:`);
-      for (const page of pages) {
-        lines.push(`          - ${basename(page, ".md")}: features/${page}`);
-      }
-    }
-  }
-
-  if (decisionPages.length > 0) {
-    lines.push("  - Decisions:");
-    for (const file of decisionPages) {
-      lines.push(`      - ${basename(file, ".md")}: decisions/${file}`);
-    }
-  }
-
+  if (hasFeatures) lines.push("  - Features: features.md");
+  if (hasDecisions) lines.push("  - Decisions: decisions.md");
   if (hasConstraints) lines.push("  - Constraints: constraints.md");
   return lines.join("\n");
 }

@@ -299,10 +299,10 @@ Then(
     assert.equal(this.result.code, 0, `docs failed:\n${this.out}`);
     const site = join(this.dir, ".grimoire", "site");
     assert.ok(existsSync(join(site, "mkdocs.yml")), "mkdocs.yml was not generated");
-    const featurePage = readFileSync(join(site, "docs", "features", "example.md"), "utf-8");
-    assert.ok(featurePage.includes("```gherkin"), "feature page has no gherkin fence");
-    const decisionPage = readFileSync(join(site, "docs", "decisions", "0001-use-example.md"), "utf-8");
-    assert.ok(decisionPage.includes("accepted"), "decision page does not show the status");
+    const featuresPage = readFileSync(join(site, "docs", "features.md"), "utf-8");
+    assert.ok(featuresPage.includes("```gherkin"), "features page has no gherkin fence");
+    const decisionsPage = readFileSync(join(site, "docs", "decisions.md"), "utf-8");
+    assert.ok(decisionsPage.includes("accepted"), "decisions page does not show the status");
     assert.ok(existsSync(join(site, "docs", "constraints.md")), "constraints page missing");
     assert.ok(existsSync(join(site, "html", "index.html")), "configured build command did not run");
   }

@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-08-21
 decision-makers: [Fred]
 ---
@@ -33,6 +33,7 @@ Mechanics: `grimoire docs` (existing overview command) additionally regenerates 
 - Good: config-over-hardcode — the build command is user-owned, matching the existing `tools:` pattern.
 - Bad: a Python-ecosystem tool in possibly-JS repos; mitigated by `uvx` zero-install invocation and the feature being optional.
 - Bad: committed static HTML adds diff noise at finalize; accepted, and consumers can mark `.grimoire/site/` as `linguist-generated`.
+- Bad: the logo asset ships twice in the npm package (repo root and `templates/site/`, ~1.3 MB each); accepted for now — consolidate if package size becomes a concern.
 
 ### Quality Attributes
 

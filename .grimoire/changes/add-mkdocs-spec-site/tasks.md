@@ -4,7 +4,7 @@
 > **Features**: `features/generate-a-spec-site.feature`
 > **Decisions**: `.grimoire/decisions/0038-mkdocs-material-spec-site.md`
 > **Test command**: `npm run test:bdd` (cucumber-js) · unit: `npx vitest run`
-> **Status**: 12/12 tasks complete
+> **Status**: 15/15 tasks complete
 
 ## Reuse (import, don't rewrite)
 - `generateDocs` — `src/core/docs.ts:14` (overview generation; site index reuses its `OVERVIEW.md` output)
@@ -92,3 +92,20 @@
 - [x] 4.2 Run `npm run test:bdd` — both new scenarios green, existing scenarios green
 - [x] 4.3 Run `npm run lint`
 - [x] 4.4 Real-build smoke test (validates the Pygments-gherkin assumption): in a scratch consumer project with `uv` available, configure `tools.spec_site.command`, run `grimoire docs`, open `.grimoire/site/html/index.html` — Gherkin highlighted, Midnight Kiwi palette applied, search returns a scenario name
+
+## 5. Flat single-page sections (user feedback, draft D10)
+<!-- context:
+  - src/core/site.ts
+  - src/core/site.test.ts
+  - features/steps/cli.steps.ts
+  - templates/site/mkdocs.yml.tpl
+-->
+- [x] 5.1 (verify: characterization) Update `src/core/site.test.ts` — replace the per-file page assertions with the flat layout, red first:
+      - `docs/features.md` is ONE page: H2 per capability (subdirectory name; root-level features under H2 "(root)"), H3 per feature file, each followed by its gherkin fence; still carries the auto-generated header
+      - `docs/decisions.md` is ONE page: H2 per decision (title from the MADR H1), status chip span after each H2, MADR body preserved below (frontmatter stripped)
+      - `docs/constraints.md` and `docs/index.md` unchanged
+      - `{{NAV}}` renders exactly four flat entries: Overview→index.md, Features→features.md, Decisions→decisions.md, Constraints→constraints.md (Constraints omitted when the source file is absent)
+      - no `docs/features/` or `docs/decisions/` directories are created
+- [x] 5.2 Rework `src/core/site.ts` to emit the flat layout (concatenate instead of per-file writes; keep everything else — gitignore, assets, template substitution, command run — unchanged). Update the BDD Then "a static spec site is produced…" in `features/steps/cli.steps.ts` to assert `docs/features.md` containing "```gherkin", `docs/decisions.md` containing the status, `docs/constraints.md`, `mkdocs.yml`, `html/index.html` (red before the rework where the assertions differ)
+<!-- SESSION: 5.1+5.2 done, test-first (unit: 4 red before rework; BDD: configured-site scenario red on docs/features.md ENOENT). Flat layout: writeFeaturesPage/writeDecisionsPage each emit ONE page returning boolean for nav; features.md groups H2 per capability with "(root)" first (rootFirst comparator), H3 per file basename + gherkin fence; decisions.md uses MADR H1 as H2 title (H1 stripped from body, fallback: file basename), chip span on the line after the H2, remaining body verbatim; buildNav is now 4 flat entries, Features/Decisions omitted when empty, Constraints when absent. groupFeatures/rootFirst extracted to clear a new eslint complexity-11 warning. Counts: vitest 446/446 (9 in site.test.ts, was 7), BDD 23/23, lint 0 errors + 2 pre-existing warnings. 5.3 (real smoke build) left to orchestrator. -->
+- [x] 5.3 Re-run the smoke build in the scratch consumer project (real uvx mkdocs) — one click from nav to any decision's content; report

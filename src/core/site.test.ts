@@ -91,25 +91,43 @@ describe("buildSite", () => {
     return join(root, ".grimoire", "site", ...parts);
   }
 
-  it("wraps feature content in a gherkin fence with an auto-generated header", async () => {
+  it("concatenates all features into one page grouped by capability", async () => {
     await build();
 
-    const page = await readFile(sitePath("docs", "features", "example.md"), "utf-8");
+    const page = await readFile(sitePath("docs", "features.md"), "utf-8");
     expect(page.split("\n")[0]).toMatch(/auto-generated.*do not edit/i);
+    expect(page).toContain("## (root)");
+    expect(page).toContain("### example");
+    expect(page).toContain("## auth");
+    expect(page).toContain("### login");
+    expect(page.indexOf("## (root)")).toBeLessThan(page.indexOf("## auth"));
+    const fences = page.match(/```gherkin\n/g);
+    expect(fences).toHaveLength(2);
     expect(page).toContain("```gherkin\n" + FEATURE + "```");
   });
 
-  it("prepends a status chip to decision pages and preserves the MADR body", async () => {
+  it("concatenates all decisions into one page with title headings and status chips", async () => {
     await build();
 
-    const accepted = await readFile(sitePath("docs", "decisions", "0001-use-example.md"), "utf-8");
-    expect(accepted).toContain('class="st-accepted"');
-    expect(accepted).toContain("# Use the example approach");
-    expect(accepted).toContain("## Context and Problem Statement");
-    expect(accepted).toContain('Chosen option: "example", because it is illustrative.');
+    const page = await readFile(sitePath("docs", "decisions.md"), "utf-8");
+    expect(page.split("\n")[0]).toMatch(/auto-generated.*do not edit/i);
+    expect(page).toContain("## Use the example approach");
+    expect(page).toContain("## Try the other approach");
+    expect(page).toContain('class="st-accepted"');
+    expect(page).toContain('class="st-proposed"');
+    expect(page.indexOf("## Use the example approach")).toBeLessThan(
+      page.indexOf('class="st-accepted"')
+    );
+    expect(page).toContain("Context and Problem Statement");
+    expect(page).toContain('Chosen option: "example", because it is illustrative.');
+    expect(page).not.toContain("status: accepted");
+  });
 
-    const proposed = await readFile(sitePath("docs", "decisions", "0002-try-other.md"), "utf-8");
-    expect(proposed).toContain('class="st-proposed"');
+  it("creates no per-file page directories", async () => {
+    await build();
+
+    expect(existsSync(sitePath("docs", "features"))).toBe(false);
+    expect(existsSync(sitePath("docs", "decisions"))).toBe(false);
   });
 
   it("writes the overview markdown as index.md verbatim", async () => {
@@ -119,7 +137,7 @@ describe("buildSite", () => {
     expect(index).toBe(OVERVIEW);
   });
 
-  it("fills {{NAV}} with Overview, grouped Features, Decisions, and Constraints", async () => {
+  it("fills {{NAV}} with four flat entries", async () => {
     await build();
 
     const mkdocs = await readFile(sitePath("mkdocs.yml"), "utf-8");
@@ -128,18 +146,26 @@ describe("buildSite", () => {
 
     const parsed = parseYaml(mkdocs) as {
       site_name: string;
-      nav: Array<Record<string, unknown>>;
+      nav: Array<Record<string, string>>;
     };
     expect(parsed.site_name).toBe(basename(root));
-    const titles = parsed.nav.map((entry) => Object.keys(entry)[0]);
-    expect(titles).toEqual(["Overview", "Features", "Decisions", "Constraints"]);
+    expect(parsed.nav).toEqual([
+      { Overview: "index.md" },
+      { Features: "features.md" },
+      { Decisions: "decisions.md" },
+      { Constraints: "constraints.md" },
+    ]);
+  });
 
-    expect(mkdocs).toContain("Overview: index.md");
-    expect(mkdocs).toContain("example: features/example.md");
-    expect(mkdocs).toContain("auth:");
-    expect(mkdocs).toContain("login: features/auth/login.md");
-    expect(mkdocs).toContain("0001-use-example: decisions/0001-use-example.md");
-    expect(mkdocs).toContain("Constraints: constraints.md");
+  it("omits the Constraints nav entry when constraints.md is absent", async () => {
+    await rm(join(root, ".grimoire", "docs", "constraints.md"));
+    await build();
+
+    const mkdocs = await readFile(sitePath("mkdocs.yml"), "utf-8");
+    const parsed = parseYaml(mkdocs) as { nav: Array<Record<string, string>> };
+    const titles = parsed.nav.map((entry) => Object.keys(entry)[0]);
+    expect(titles).toEqual(["Overview", "Features", "Decisions"]);
+    expect(existsSync(sitePath("docs", "constraints.md"))).toBe(false);
   });
 
   it("returns skipped and writes nothing when no build command is configured", async () => {
