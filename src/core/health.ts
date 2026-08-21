@@ -491,6 +491,10 @@ async function findDecisionReferences(root: string): Promise<SpecDriftItem[]> {
   return stdout
     .split("\n")
     .filter(Boolean)
+    .filter((line) => {
+      const path = line.split(":")[0];
+      return !/\.(test|spec)\./.test(path) && !path.startsWith("features/steps/");
+    })
     .map((line) => ({
       severity: "review" as const,
       message: `decision reference in ${line.trim()}`,

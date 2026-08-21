@@ -323,7 +323,7 @@ When all implementation tasks are complete:
 **The verify step is not optional. Do not proceed to finalize with failing tests.**
 
 ### 7. Finalize
-When all tests are green. Features, decisions, and constraints were edited live on the branch — finalize flips states, applies the schema delta, and clears the ephemeral scaffolding:
+When all tests are green. Finalize is part of apply, not optional — a session that ends at "tests green" without finalizing leaves the change unfinished; `/grimoire:pr` executes this section before any PR. Features, decisions, and constraints were edited live on the branch — finalize flips states, applies the schema delta, and clears the ephemeral scaffolding:
 1. Decision records already live in `.grimoire/decisions/` (drafted there, numbered at draft time). Flip MADR status from `proposed` to `accepted` and set the date.
 2. Constraints (`.grimoire/docs/constraints.md`) were edited in place — nothing to move.
 3. If the change has a `data.yml` (schema delta), apply its `add`/`modify`/`remove` entries to the live `.grimoire/docs/data/schema.yml` so the baseline schema stays current. `data.yml` is a migration-delta spec (ephemeral scaffolding carrying nullability/safety/ordering intent a raw diff wouldn't), not a copy of the schema — `schema.yml` is the live target; the delta is discarded with the change folder.
@@ -394,6 +394,7 @@ Present a brief summary:
 - Existing tests must keep passing. A grimoire change that breaks existing behavior is not complete.
 
 ## Done
-When all tasks are complete, tests pass, and artifacts are finalized, the workflow is complete. Present the summary and suggest:
+When all tasks are complete, tests pass, and artifacts are finalized, the workflow is complete. A session that ends at "tests green" without finalizing leaves the change unfinished — §7 is part of apply. Present the summary and suggest:
 - `grimoire-verify` to confirm implementation matches specs
 - `grimoire-commit` to commit the changes
+- `/grimoire:pr` to create the PR — it executes §7 first if the change folder is still present

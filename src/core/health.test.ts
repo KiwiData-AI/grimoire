@@ -321,6 +321,24 @@ describe("runHealth", () => {
       expect(item.severity).toBe("review");
     });
 
+    it("does not flag decision references in test files", async () => {
+      mockExec.mockImplementation(async (_file: string, args: string[]) => {
+        if (args.includes("grep")) {
+          return {
+            stdout:
+              "src/core/foo.test.ts:5:see ADR-0001\n" +
+              "src/core/foo.ts:5:see ADR-0001\n",
+            stderr: "",
+          };
+        }
+        return { stdout: "", stderr: "" };
+      });
+
+      const drift = await driftMetric();
+      expect(drift.items.some((i: any) => i.message.includes("foo.test.ts"))).toBe(false);
+      expect(drift.items.some((i: any) => i.message.includes("src/core/foo.ts"))).toBe(true);
+    });
+
     it("flags broken relative links in docs", async () => {
       mockReaddir.mockImplementation(async (path: any) => {
         if (String(path).endsWith(join(".grimoire", "docs"))) return ["OVERVIEW.md"] as any;

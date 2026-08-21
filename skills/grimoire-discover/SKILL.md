@@ -1,6 +1,6 @@
 ---
 name: grimoire-discover
-description: Generate intent-focused area docs and data schema by querying the codebase graph. Use when initializing grimoire on an existing project or when an area's intent/boundaries have changed.
+description: Generate intent-focused area docs and data schema by querying the codebase graph. Use when initializing grimoire on an existing project or when an area's intent/boundaries have changed. Also runs the repo-wide health check (drift report).
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
@@ -15,7 +15,8 @@ Generate **intent-focused** area docs and a data schema in `.grimoire/docs/`. Ar
 - User wants to document an area's purpose, boundaries, or conventions
 - User asks about coding standards or where new code of a type should go
 - User is onboarding an existing project to grimoire
-- Loose match: "discover", "standards", "conventions", "boundaries", "onboard codebase"
+- User wants a repo-wide health or drift report
+- Loose match: "discover", "standards", "conventions", "boundaries", "onboard codebase", "health check", "drift report", "pre-release check", "spring cleaning", "what's stale"
 
 Note: "find existing utilities", "what calls what", "codebase layout/structure" are **graph** queries, not discover — use codebase-memory-mcp (`search_graph`, `get_architecture`, `trace_path`) directly.
 
@@ -300,10 +301,25 @@ areas:
 
 **Why this matters:** Area docs are the primary mechanism for reducing context window usage and preventing hallucinations. Stale docs are worse than no docs — they give the agent confident but wrong information about file paths, function names, and patterns. Freshness tracking lets other skills know when to trust the docs vs. when to fall back to reading source files.
 
+### 7.5 Health Check (repo-wide)
+
+The check is defined in `../references/health-check.md` §B — cite it, do not restate its rows here.
+
+1. Run `grimoire health` — its integrated report covers §B's `mechanical` rows alongside the code metrics.
+2. Walk §B's `judgment` rows and report your reasoning in-session, with the evidence you actually read.
+
+**Report-only.** Nothing is fixed or deleted without explicit user approval. Route findings onward:
+
+- Stale merged change folders → confirm with the user, then delete
+- Spec/implementation mismatch → `grimoire-verify`
+- Tech debt → `grimoire-refactor`
+- Unproven constraint-register rows → a small change via `grimoire-draft`, or a trivial direct fix
+
 ### 8. Present Summary
 After generating, show the user:
 - How many areas documented
 - Any areas whose boundaries seem unclear or whose conventions are inconsistent
+- Drift headline counts from the health check (fix-now / review / info)
 - Suggest which area docs are most critical for the plan skill to read
 
 ## Integration with Other Skills
@@ -322,6 +338,7 @@ After generating, show the user:
 - **Keep docs lean.** Each area doc should be scannable in 30 seconds. If it's too long, it's probably transcribing structure — cut it back to intent.
 - **Don't document the obvious.** Skip areas self-explanatory from file names. Focus on areas where intent or boundaries are non-obvious.
 - **Update, don't accumulate.** When refreshing, replace stale docs rather than appending.
+- **Re-run periodically.** The health check makes discover the recurring reality-check — onboarding runs get an audited starting point for free.
 
 ## Done
 When area docs, schema, context, and index are generated, the workflow is complete. Suggest `grimoire-audit` to document existing features and decisions as Gherkin specs and ADRs.
