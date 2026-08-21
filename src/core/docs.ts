@@ -11,7 +11,8 @@ interface DocsOptions {
   output?: string;
 }
 
-export async function generateDocs(options: DocsOptions): Promise<void> {
+/** Render and write the project overview; returns the rendered markdown. */
+export async function generateDocs(options: DocsOptions): Promise<string> {
   const root = await findProjectRoot();
   const config = await loadConfig(root);
 
@@ -63,6 +64,7 @@ export async function generateDocs(options: DocsOptions): Promise<void> {
       `  ${countSection(features, "capability group")} · ${countSection(decisions, "decision")} · ${countSection(dataModel, "model")}`
     )
   );
+  return output;
 }
 
 function countSection(

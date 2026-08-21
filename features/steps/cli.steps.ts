@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Given, When, Then, After } from "@cucumber/cucumber";
 import { GrimoireWorld } from "./world.js";
@@ -30,6 +30,17 @@ We needed an example.
 ## Decision Outcome
 Chosen option: "example", because it is illustrative.
 `;
+
+const CONSTRAINTS = `# Constraints
+| Constraint (assertion) | Rationale | How verified | Links |
+|---|---|---|---|
+| Logs never contain PII | confidential data | tests/test_logs.py | ADR-0008 |
+`;
+
+const SPEC_SITE_TOOL = `tools:
+  spec_site:
+    name: stub
+    command: mkdir -p .grimoire/site/html && touch .grimoire/site/html/index.html`;
 
 function manifest(status: string): string {
   return `---
@@ -73,6 +84,24 @@ Given("a grimoire project with a documented feature and a decision", function (t
   this.initProject();
   this.write("features/example.feature", VALID_FEATURE);
   this.write(".grimoire/decisions/0001-use-example.md", DECISION);
+});
+
+function scaffoldSpecs(world: GrimoireWorld): void {
+  world.initProject();
+  world.write("features/example.feature", VALID_FEATURE);
+  world.write(".grimoire/decisions/0001-use-example.md", DECISION);
+  world.write(".grimoire/docs/constraints.md", CONSTRAINTS);
+}
+
+Given("a grimoire project with a spec site build configured", function (this: GrimoireWorld) {
+  scaffoldSpecs(this);
+  const configPath = join(this.dir, ".grimoire", "config.yaml");
+  const config = readFileSync(configPath, "utf-8").replace("tools: {}", SPEC_SITE_TOOL);
+  this.write(".grimoire/config.yaml", config);
+});
+
+Given("a grimoire project with no spec site build configured", function (this: GrimoireWorld) {
+  scaffoldSpecs(this);
 });
 
 Given(
@@ -261,6 +290,29 @@ Then("a browsable overview of the project is produced", function (this: Grimoire
   assert.ok(
     existsSync(join(this.dir, ".grimoire", "docs", "OVERVIEW.md")),
     "OVERVIEW.md was not created"
+  );
+});
+
+Then(
+  "a static spec site is produced containing the features, decisions, and constraints",
+  function (this: GrimoireWorld) {
+    assert.equal(this.result.code, 0, `docs failed:\n${this.out}`);
+    const site = join(this.dir, ".grimoire", "site");
+    assert.ok(existsSync(join(site, "mkdocs.yml")), "mkdocs.yml was not generated");
+    const featurePage = readFileSync(join(site, "docs", "features", "example.md"), "utf-8");
+    assert.ok(featurePage.includes("```gherkin"), "feature page has no gherkin fence");
+    const decisionPage = readFileSync(join(site, "docs", "decisions", "0001-use-example.md"), "utf-8");
+    assert.ok(decisionPage.includes("accepted"), "decision page does not show the status");
+    assert.ok(existsSync(join(site, "docs", "constraints.md")), "constraints page missing");
+    assert.ok(existsSync(join(site, "html", "index.html")), "configured build command did not run");
+  }
+);
+
+Then("no spec site is produced", function (this: GrimoireWorld) {
+  assert.equal(this.result.code, 0, `docs failed:\n${this.out}`);
+  assert.ok(
+    !existsSync(join(this.dir, ".grimoire", "site")),
+    ".grimoire/site/ should not exist when no build is configured"
   );
 });
 
