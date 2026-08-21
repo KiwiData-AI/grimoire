@@ -723,5 +723,5 @@ Caveman mode (0013) cut tokens by dropping grammar: no articles, sentence fragme
 
 Changes currently in progress.
 
-- **add-mkdocs-spec-site**: Generate a branded MkDocs spec site in consumer repos (implementing — 13/13 tasks)
+- **add-mkdocs-spec-site**: Generate a branded MkDocs spec site in consumer repos (implementing — 16/16 tasks)
 - **consolidate-skill-guidance**: Consolidate skill guidance into named-methodology shared references (draft)
