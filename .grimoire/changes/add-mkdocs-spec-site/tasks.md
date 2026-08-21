@@ -4,7 +4,7 @@
 > **Features**: `features/generate-a-spec-site.feature`
 > **Decisions**: `.grimoire/decisions/0038-mkdocs-material-spec-site.md`
 > **Test command**: `npm run test:bdd` (cucumber-js) · unit: `npx vitest run`
-> **Status**: 7/12 tasks complete
+> **Status**: 12/12 tasks complete
 
 ## Reuse (import, don't rewrite)
 - `generateDocs` — `src/core/docs.ts:14` (overview generation; site index reuses its `OVERVIEW.md` output)
@@ -82,11 +82,13 @@
   - .claude/skills/grimoire-apply/SKILL.md  (finalize section, ~line 326)
   - README.md
 -->
-- [ ] 3.1 Edit `.claude/skills/grimoire-apply/SKILL.md` finalize section (~line 326 "When all tests are green…"): add a finalize step — run `grimoire docs` before the finalize commit, so the overview and (when configured) the committed spec site in `.grimoire/site/` reflect the finished change; a failing site build blocks finalize (fix or unconfigure, don't skip silently)
-- [ ] 3.2 README: document the optional spec site — `tools.spec_site` config example (`command: uvx --with mkdocs-material mkdocs build -f .grimoire/site/mkdocs.yml`), what gets generated, that only `.grimoire/site/html/` is committed (intermediates gitignored), the `.gitattributes` `.grimoire/site/** linguist-generated=true` recommendation (pre-mortem mitigation), and one line: publishing the built site publishes your config/tooling summary (the index embeds the overview's Configured Tools table) — review before hosting publicly
+- [x] 3.1 Edit `.claude/skills/grimoire-apply/SKILL.md` finalize section (~line 326 "When all tests are green…"): add a finalize step — run `grimoire docs` before the finalize commit, so the overview and (when configured) the committed spec site in `.grimoire/site/` reflect the finished change; a failing site build blocks finalize (fix or unconfigure, don't skip silently)
+- [x] 3.2 README: document the optional spec site — `tools.spec_site` config example (`command: uvx --with mkdocs-material mkdocs build -f .grimoire/site/mkdocs.yml`), what gets generated, that only `.grimoire/site/html/` is committed (intermediates gitignored), the `.gitattributes` `.grimoire/site/** linguist-generated=true` recommendation (pre-mortem mitigation), and one line: publishing the built site publishes your config/tooling summary (the index embeds the overview's Configured Tools table) — review before hosting publicly
+<!-- SESSION: Section 3 done. 3.1: extended existing finalize step 4 in .claude/skills/grimoire-apply/SKILL.md (no duplicate step added) — 2-line paragraph after the "Refresh the project overview" line: spec_site regenerates/builds .grimoire/site/html/, failing build blocks finalize (fix or unconfigure, never skip silently). 3.2: added "#### Spec site" subsection at the end of README "### Rendering into your doc site" (before "### Pre-Commit Pipeline", ~line 521) — config yaml example, generated pages + Midnight Kiwi, only html/ committed via generated .gitignore, .gitattributes linguist-generated line, publish-warning sentence. Docs-only; no tests run. -->
+
 
 ## 4. Verification
-- [ ] 4.1 Run `npx vitest run` — `site.test.ts` green, no regressions
-- [ ] 4.2 Run `npm run test:bdd` — both new scenarios green, existing scenarios green
-- [ ] 4.3 Run `npm run lint`
-- [ ] 4.4 Real-build smoke test (validates the Pygments-gherkin assumption): in a scratch consumer project with `uv` available, configure `tools.spec_site.command`, run `grimoire docs`, open `.grimoire/site/html/index.html` — Gherkin highlighted, Midnight Kiwi palette applied, search returns a scenario name
+- [x] 4.1 Run `npx vitest run` — `site.test.ts` green, no regressions
+- [x] 4.2 Run `npm run test:bdd` — both new scenarios green, existing scenarios green
+- [x] 4.3 Run `npm run lint`
+- [x] 4.4 Real-build smoke test (validates the Pygments-gherkin assumption): in a scratch consumer project with `uv` available, configure `tools.spec_site.command`, run `grimoire docs`, open `.grimoire/site/html/index.html` — Gherkin highlighted, Midnight Kiwi palette applied, search returns a scenario name
