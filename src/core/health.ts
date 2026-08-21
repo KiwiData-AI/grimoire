@@ -21,6 +21,7 @@ interface Metric {
   score: number | null; // 0-100, null = informational
   label: string; // human-readable status
   detail?: string;
+  items?: SpecDriftItem[];
 }
 
 interface HealthResult {
@@ -35,20 +36,21 @@ export async function runHealth(options: HealthOptions): Promise<void> {
   const metrics: Metric[] = [];
 
   // Run all checks in parallel where possible
-  const [features, decisions, areaDocs, dataSchema, conventionsDrift, testCoverage, unitCoverage, duplicates, complexity] =
+  const [features, decisions, areaDocs, dataSchema, conventionsDrift, specDrift, testCoverage, unitCoverage, duplicates, complexity] =
     await Promise.all([
       checkFeatures(root),
       checkDecisions(root),
       checkAreaDocs(root),
       checkDataSchema(root),
       checkConventionsDrift(root),
+      checkSpecDrift(root),
       checkTestCoverage(root),
       checkUnitTestCoverage(root, config),
       checkDuplicates(root, config),
       checkComplexity(root, config),
     ]);
 
-  metrics.push(features, decisions, areaDocs, dataSchema, conventionsDrift, testCoverage, unitCoverage, duplicates, complexity);
+  metrics.push(features, decisions, areaDocs, dataSchema, conventionsDrift, specDrift, testCoverage, unitCoverage, duplicates, complexity);
 
   // Calculate overall (average of scored metrics)
   const scored = metrics.filter((m) => m.score !== null);
@@ -257,6 +259,297 @@ async function checkConventionsDrift(root: string): Promise<Metric> {
     label: `${drift.length} stale path${drift.length !== 1 ? "s" : ""}`,
     detail: drift.map((d) => `${d.conventionsFile}: ${d.path}`).join("; "),
   };
+}
+
+// --- Spec-process drift ---
+// Mechanical repo-wide checks: stale change folders, unproven constraint rows,
+// terminal ADRs, decision references in code, broken doc links, archive trees.
+
+type DriftSeverity = "fix-now" | "review" | "info";
+
+interface SpecDriftItem {
+  severity: DriftSeverity;
+  message: string;
+  action: string;
+}
+
+const STALE_DAYS = 30;
+
+async function checkSpecDrift(root: string): Promise<Metric> {
+  const trailers = await mainChangeTrailers(root);
+  const groups = await Promise.all([
+    findStaleChanges(root, trailers?.ids ?? new Set<string>()),
+    findUnprovenConstraints(root),
+    findTerminalDecisions(root),
+    findDecisionReferences(root),
+    findBrokenDocLinks(root),
+    findArchiveTrees(root),
+  ]);
+  const items = groups.flat();
+
+  if (trailers && trailers.total > 0) {
+    const pct = Math.round((trailers.withTrailer / trailers.total) * 100);
+    items.push({
+      severity: "info",
+      message: `Change: trailer coverage on main: ${pct}%`,
+      action: "carry the Change: trailer on every commit",
+    });
+  }
+
+  const actionable = items.filter((i) => i.severity !== "info").length;
+  return {
+    name: "spec_drift",
+    score: actionable === 0 ? 100 : 0,
+    label:
+      actionable === 0
+        ? "no spec-process drift"
+        : `${actionable} drift item${actionable !== 1 ? "s" : ""}`,
+    items,
+  };
+}
+
+async function mainChangeTrailers(
+  root: string
+): Promise<{ ids: Set<string>; total: number; withTrailer: number } | null> {
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync(
+      "git",
+      ["log", "main", "--format=%H%x09%(trailers:key=Change,valueonly,separator=%x2C)"],
+      { cwd: root, timeout: 30_000 }
+    ));
+  } catch {
+    return null;
+  }
+
+  const ids = new Set<string>();
+  let total = 0;
+  let withTrailer = 0;
+  for (const line of stdout.split("\n").filter(Boolean)) {
+    total++;
+    const value = line.split("\t")[1]?.trim();
+    if (!value) continue;
+    withTrailer++;
+    for (const id of value.split(",")) ids.add(id.trim());
+  }
+  return { ids, total, withTrailer };
+}
+
+async function findStaleChanges(root: string, merged: Set<string>): Promise<SpecDriftItem[]> {
+  const changesDir = join(root, ".grimoire", "changes");
+  let entries: string[];
+  try {
+    entries = await readdir(changesDir);
+  } catch {
+    return [];
+  }
+
+  const items: SpecDriftItem[] = [];
+  for (const id of entries) {
+    const manifest = await readFileOrNull(join(changesDir, id, "manifest.md"));
+    if (!manifest) continue;
+
+    if (merged.has(id)) {
+      items.push({
+        severity: "fix-now",
+        message: `change ${id} is merged on main but its folder remains`,
+        action: `remove .grimoire/changes/${id}/`,
+      });
+      continue;
+    }
+
+    const stalled = await stalledItem(changesDir, id, manifest);
+    if (stalled) items.push(stalled);
+  }
+  return items;
+}
+
+async function stalledItem(
+  changesDir: string,
+  id: string,
+  manifest: string
+): Promise<SpecDriftItem | null> {
+  const { data } = matter(manifest);
+  const date = data.date ? new Date(String(data.date)) : null;
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const ageDays = Math.floor((Date.now() - date.getTime()) / 86_400_000);
+  if (ageDays <= STALE_DAYS) return null;
+
+  const tasks = await readFileOrNull(join(changesDir, id, "tasks.md"));
+  const done = tasks?.match(/^\s*- \[x\]/gim)?.length ?? 0;
+  if (done > 0) return null;
+  return {
+    severity: "review",
+    message: `change ${id} stalled — ${ageDays} days old with no tasks done`,
+    action: "re-triage the change or remove its folder",
+  };
+}
+
+async function findUnprovenConstraints(root: string): Promise<SpecDriftItem[]> {
+  const content = await readFileOrNull(join(root, ".grimoire", "docs", "constraints.md"));
+  if (!content) return [];
+
+  const items: SpecDriftItem[] = [];
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("|") || /^[|\s-]+$/.test(trimmed)) continue;
+    const cells = trimmed.split("|").slice(1, -1).map((c) => c.trim());
+    if (cells.length < 3 || cells[0].toLowerCase().startsWith("constraint")) continue;
+
+    if (/\bTODO\b/.test(cells[2])) {
+      items.push({
+        severity: "fix-now",
+        message: `constraints.md: "${cells[0]}" — verification cell is TODO`,
+        action: "add the proving test or remove the row",
+      });
+      continue;
+    }
+    items.push(...(await staleCitations(root, cells[0], cells[2])));
+  }
+  return items;
+}
+
+async function staleCitations(
+  root: string,
+  constraint: string,
+  cell: string
+): Promise<SpecDriftItem[]> {
+  const items: SpecDriftItem[] = [];
+  for (const [, token] of cell.matchAll(/`([^`]+)`/g)) {
+    let found: boolean | null;
+    if (token.includes("/")) {
+      const resolved = resolve(join(root, token));
+      found = resolved.startsWith(root + "/") ? await pathExists(resolved) : null;
+    } else {
+      found = await grepHits(root, token);
+    }
+    if (found === false) {
+      items.push({
+        severity: "fix-now",
+        message: `constraints.md: "${constraint}" cites \`${token}\`, which was not found`,
+        action: "update or remove the stale citation",
+      });
+    }
+  }
+  return items;
+}
+
+async function grepHits(root: string, text: string): Promise<boolean | null> {
+  try {
+    await execFileAsync(
+      "git",
+      ["grep", "-I", "-l", "--untracked", "-F", "-e", text, "--", ".", ":!.grimoire"],
+      { cwd: root, timeout: 30_000 }
+    );
+    return true;
+  } catch (err) {
+    return (err as { code?: number }).code === 1 ? false : null;
+  }
+}
+
+async function findTerminalDecisions(root: string): Promise<SpecDriftItem[]> {
+  const dir = join(root, ".grimoire", "decisions");
+  let files: string[];
+  try {
+    const entries = await readdir(dir);
+    files = entries.filter((f) => f.endsWith(".md") && f !== "template.md");
+  } catch {
+    return [];
+  }
+
+  const items: SpecDriftItem[] = [];
+  for (const file of files) {
+    const content = await readFileOrNull(join(dir, file));
+    if (!content) continue;
+    const status = String(matter(content).data.status ?? "").toLowerCase();
+    if (status.includes("superseded") || status.includes("deprecated")) {
+      items.push({
+        severity: "review",
+        message: `${file}: status "${status}" — terminal decision still present`,
+        action: "delete the file; git history keeps the record",
+      });
+    }
+  }
+  return items;
+}
+
+async function findDecisionReferences(root: string): Promise<SpecDriftItem[]> {
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync(
+      "git",
+      [
+        "grep", "-I", "-n", "--untracked", "-E", "ADR-[0-9]|decisions/0",
+        "--", ".", ":!.grimoire/decisions", ":!.grimoire/changes",
+      ],
+      { cwd: root, timeout: 30_000 }
+    ));
+  } catch {
+    return [];
+  }
+
+  return stdout
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => ({
+      severity: "review" as const,
+      message: `decision reference in ${line.trim()}`,
+      action: "make the comment or doc self-contained",
+    }));
+}
+
+async function findBrokenDocLinks(root: string): Promise<SpecDriftItem[]> {
+  const docsDir = join(root, ".grimoire", "docs");
+  let files: string[];
+  try {
+    files = (await readdir(docsDir)).filter((f) => f.endsWith(".md"));
+  } catch {
+    return [];
+  }
+
+  const items: SpecDriftItem[] = [];
+  for (const file of files) {
+    const content = await readFileOrNull(join(docsDir, file));
+    if (!content) continue;
+    for (const [, target] of content.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
+      if (/^(https?:|mailto:|#)/.test(target)) continue;
+      const path = resolve(docsDir, target.split("#")[0]);
+      if (!path.startsWith(root + "/")) continue;
+      if (!(await pathExists(path))) {
+        items.push({
+          severity: "review",
+          message: `${file}: broken link to ${target}`,
+          action: "fix or remove the link",
+        });
+      }
+    }
+  }
+  return items;
+}
+
+async function findArchiveTrees(root: string): Promise<SpecDriftItem[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(join(root, ".grimoire"));
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((e) => /archive|backup/i.test(e))
+    .map((e) => ({
+      severity: "review" as const,
+      message: `.grimoire/${e}/ looks like an archive tree`,
+      action: "delete it; git history is the record",
+    }));
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function checkDataSchema(root: string): Promise<Metric> {
@@ -544,6 +837,11 @@ function printHealth(result: HealthResult): void {
     const color = m.score !== null ? scoreColor(m.score) : chalk.dim;
 
     console.log(`  ${name} ${color(scoreText)}  ${bar}  ${m.label}`);
+
+    for (const item of m.items ?? []) {
+      const sev = severityColor(item.severity)(item.severity.padEnd(7));
+      console.log(`    ${sev}  ${item.message} — ${item.action}`);
+    }
   }
 
   console.log();
@@ -565,6 +863,12 @@ function scoreColor(score: number): typeof chalk.green {
   if (score >= 80) return chalk.green;
   if (score >= 60) return chalk.yellow;
   return chalk.red;
+}
+
+function severityColor(severity: DriftSeverity): typeof chalk.green {
+  if (severity === "fix-now") return chalk.red;
+  if (severity === "review") return chalk.yellow;
+  return chalk.dim;
 }
 
 // --- Badges ---

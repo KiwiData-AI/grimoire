@@ -31,6 +31,25 @@ We needed an example.
 Chosen option: "example", because it is illustrative.
 `;
 
+const STALE_MANIFEST = `---
+status: implementing
+branch: feat/stale-change
+date: 2026-01-01
+---
+
+# Change: Stale change
+
+## Why
+It went stale.
+`;
+
+const UNPROVEN_CONSTRAINTS = `# Constraints
+
+| Constraint (assertion) | Rationale | How verified | Links |
+|------------------------|-----------|--------------|-------|
+| Sessions expire after 15 minutes | Limits token replay | TODO: unit-invariant test | — |
+`;
+
 function manifest(status: string): string {
   return `---
 status: ${status}
@@ -117,6 +136,19 @@ Given(
     this.write("features/login.feature", VALID_FEATURE);
     this.git(["add", "."]);
     this.git(["commit", "-q", "-m", `feat: add login\n\nChange: ${change}`]);
+  }
+);
+
+Given(
+  "a grimoire project with a stale change and an unproven constraint",
+  function (this: GrimoireWorld) {
+    this.initProject();
+    this.write(".grimoire/changes/stale-change/manifest.md", STALE_MANIFEST);
+    this.write(
+      ".grimoire/changes/stale-change/tasks.md",
+      "# Tasks\n\n- [ ] First task\n- [ ] Second task\n"
+    );
+    this.write(".grimoire/docs/constraints.md", UNPROVEN_CONSTRAINTS);
   }
 );
 
@@ -254,6 +286,35 @@ Then("I am given an overall health score", function (this: GrimoireWorld) {
   const { overall } = this.json<{ overall: number }>();
   assert.equal(typeof overall, "number", "overall score is not a number");
   assert.ok(overall >= 0 && overall <= 100, `overall score out of range: ${overall}`);
+});
+
+interface DriftMetric {
+  name: string;
+  items?: Array<{ severity: string; message: string }>;
+}
+
+function driftMetric(world: GrimoireWorld): DriftMetric {
+  const { metrics } = world.json<{ metrics: DriftMetric[] }>();
+  const drift = metrics.find((m) => m.name === "spec_drift");
+  assert.ok(drift, `no spec_drift metric; got ${metrics.map((m) => m.name).join(", ")}`);
+  return drift;
+}
+
+Then("the report flags the stale change", function (this: GrimoireWorld) {
+  assert.equal(this.result.code, 0, `health failed:\n${this.out}`);
+  const drift = driftMetric(this);
+  assert.ok(
+    drift.items?.some((i) => i.message.includes("stale-change")),
+    `stale change not flagged; items: ${JSON.stringify(drift.items)}`
+  );
+});
+
+Then("the report flags the constraint that lacks a proving test", function (this: GrimoireWorld) {
+  const drift = driftMetric(this);
+  assert.ok(
+    drift.items?.some((i) => /TODO/.test(i.message)),
+    `unproven constraint not flagged; items: ${JSON.stringify(drift.items)}`
+  );
 });
 
 Then("a browsable overview of the project is produced", function (this: GrimoireWorld) {
