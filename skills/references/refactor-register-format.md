@@ -5,7 +5,7 @@ Reference for `grimoire-refactor` step 4. The register is `.grimoire/docs/debt-r
 ## Required Fields
 
 - `id` — `debt-NNN`, monotonically increasing
-- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `dead_code`, `test_debt`, `deferred-task`
+- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `dead_code`, `test_debt`, `deferred_task`
 - `severity` — `high`, `medium`, `low`
 - `location` — file path (with optional `:line`), or `path <> path` for relationships
 - `title` — short human-readable summary

@@ -34,7 +34,6 @@ Chosen option: "example", because it is illustrative.
 const STALE_MANIFEST = `---
 status: implementing
 branch: feat/stale-change
-date: 2026-01-01
 ---
 
 # Change: Stale change
@@ -149,6 +148,11 @@ Given(
       "# Tasks\n\n- [ ] First task\n- [ ] Second task\n"
     );
     this.write(".grimoire/docs/constraints.md", UNPROVEN_CONSTRAINTS);
+    this.git(["add", "."]);
+    this.git(["commit", "-q", "-m", "chore: scaffold stale change"], {
+      GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z",
+      GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z",
+    });
   }
 );
 

@@ -47,7 +47,7 @@ Run the per-change checks in `../references/health-check.md` §A.
 - **Warnings** (e.g. `@not-implemented` tags) → collect them for the PR description.
 
 ### 4. Ensure Finalized
-If the change folder is still present, the change is not finalized. Execute `grimoire-apply` §7 (Finalize) — that section is the definition of finalize; do not re-derive its steps here. One addition at PR time: open tasks carrying deferral notes are logged to the debt register (`.grimoire/docs/debt-register.yml`, format per `../references/refactor-register-format.md`) with `category: deferred-task` and the source change-id in `detail`, so deferred work survives the folder removal.
+If the change folder is still present, the change is not finalized. Execute `grimoire-apply` §7 (Finalize) — that section is the definition of finalize; do not re-derive its steps here. One addition at PR time: open tasks carrying deferral notes are logged to the debt register (`.grimoire/docs/debt-register.yml`, format per `../references/refactor-register-format.md`) with `category: deferred_task` and the source change-id in `detail`, so deferred work survives the folder removal.
 
 If the folder is already gone, finalize already ran — continue.
 
