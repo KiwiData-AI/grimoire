@@ -45,6 +45,12 @@ What the app does, for whom. Grouped by functional story; each scenario is an ex
 
 - An overview is produced from the project's specs and decisions
 
+**Generate a browsable spec site** (`features/generate-a-spec-site.feature`)
+> As a developer · I want a searchable website built from my project's features, decisions, and constraints · So that the team can review specs without reading raw files
+
+- The spec site is built alongside the overview
+- Spec site generation is skipped when not configured
+
 **Initialize a project for spec-driven development** (`features/initialize-a-project.feature`)
 > As a developer adopting grimoire · I want to set grimoire up in my project · So that I can start capturing specs and running checks
 
@@ -280,6 +286,7 @@ Key decisions recorded as MADR (Markdown Any Decision Records).
 | 0036 | Capability-surface selection: where a new capability belongs | accepted | 2026-06-26 |
 | 0037 | Shared named-methodology references for cross-skill guidance | proposed | 2026-06-27 |
 | 0038 | Living `draft.md` as the single design surface, projected into homes after agreement | proposed | 2026-06-17 |
+| 0038 | MkDocs Material for the Generated Spec Site | accepted | 2026-08-21 |
 | 0039 | PR Gate Enforces Finalization with a Shared Health Check | accepted | 2026-08-21 |
 | 0039 | Delegate docstring-format enforcement to pydoclint; make comment policy reach every session | accepted | 2026-07-03 |
 | 0040 | STE response style replaces caveman mode | accepted | 2026-08-10 |
@@ -687,6 +694,14 @@ Concrete changes shipped together:
   at projection each novel decision becomes a sequential MADR (novelty gate unchanged),
   obvious picks fold into the baseline ADR. The at-rest decision model from [0031] is intact.
 
+### MkDocs Material for the Generated Spec Site
+
+Consumer repos accumulate specs as flat files (`features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`). Reviewing them means reading raw markdown in an editor. Grimoire should generate a browsable, searchable, statically built site over those artifacts in any consumer repo. Which site generator, and how does grimoire drive it without owning a Python toolchain?
+
+**Outcome:** Chosen option: "MkDocs Material", because it ships client-side search, tokenized theming, and Pygments Gherkin highlighting out of the box, so grimoire only pre-generates markdown pages and runs a user-configured build command.
+
+Mechanics: `grimoire docs` (existing overview command) additionally regenerates `.grimoire/site/` — mkdocs config, markdown pages (features in Gherkin fences, decisions with status, constraints, overview as index), and a dark-only "Midnight Kiwi" stylesheet derived from the grimoire logo (ground `#141a24`, primary `#a8c94e`, accent `#6fd3f2`) — then runs the build command from `tools.spec_site.command` in `.grimoire/config.yaml` (e.g. `uvx --with mkdocs-material mkdocs build …`). No `spec_site` tool configured → site step skipped. The finalize step runs the same command, so the committed static HTML in `.grimoire/site/html/` is current when a change lands. Only the built `html/` is committed; the markdown intermediates and generated mkdocs config are gitignored via a generated `.grimoire/site/.gitignore` — they serve only the build.
+
 ### PR Gate Enforces Finalization with a Shared Health Check
 
 An audit of a consumer repo (bake, 2026-08-21) showed finalization never runs in practice: stale change folders, trivial ADRs, constraint rows citing nonexistent tests, and most commits missing the `Change:` trailer. The package's own artifacts cause this: the `grimoire-pr` skill's prerequisites demand the change folder be already removed while its workflow reads that folder (it can literally never run), `AGENTS.md` points the PR stage at the bare CLI, and nothing stops `gh pr create` from bypassing the workflow entirely. Where should finalization be enforced, and where does health checking live?
@@ -719,4 +734,3 @@ Caveman mode (0013) cut tokens by dropping grammar: no articles, sentence fragme
 Changes currently in progress.
 
 - **consolidate-skill-guidance**: Consolidate skill guidance into named-methodology shared references (draft)
-- **fix-pr-finalize-add-health-check**: PR gate enforces finalization; shared health check (implementing — 15/15 tasks)

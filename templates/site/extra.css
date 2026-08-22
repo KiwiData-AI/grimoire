@@ -1,0 +1,31 @@
+/* Midnight Kiwi — dark-only theme tokens for the generated spec site. */
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #141a24;
+  --md-default-fg-color: #d9dfe6;
+  --md-primary-fg-color: #0e131b;
+  --md-primary-fg-color--dark: #0e131b;
+  --md-accent-fg-color: #6fd3f2;
+  --md-typeset-a-color: #a8c94e;
+  --md-code-bg-color: #0e131b;
+}
+
+[data-md-color-scheme="slate"] .st-accepted,
+[data-md-color-scheme="slate"] .st-proposed {
+  display: inline-block;
+  padding: 0.1em 0.6em;
+  border-radius: 1em;
+  font-size: 0.75em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+[data-md-color-scheme="slate"] .st-accepted {
+  color: #a8c94e;
+  background-color: #2c3a1c;
+}
+
+[data-md-color-scheme="slate"] .st-proposed {
+  color: #8fdcf5;
+  background-color: #173442;
+}
