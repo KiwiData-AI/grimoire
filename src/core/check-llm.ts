@@ -26,7 +26,7 @@ async function resolveChangedFiles(root: string): Promise<{ files: string[]; dif
   }
 }
 
-function buildLlmPrompt(prompt: string, files: string[], diff: string): string {
+export function buildLlmPrompt(prompt: string, files: string[], diff: string): string {
   // Strip newlines and backticks from each filename to prevent prompt injection.
   const safeFiles = files.map((f) => `\`${f.replace(/[\n\r`]/g, "")}\``).filter((f) => f.length > 2);
   const fileList = safeFiles.length > 0 ? `\n\nFiles changed:\n${safeFiles.join("\n")}` : "";

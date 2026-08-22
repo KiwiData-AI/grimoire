@@ -151,8 +151,9 @@ async function buildArchitectureSection(
   lines.push("| Area | Directory | Description |");
   lines.push("|------|-----------|-------------|");
   for (const area of index.areas) {
+    // OVERVIEW lives in .grimoire/docs/, so area docs are siblings.
     lines.push(
-      `| [${area.name}](${area.path}) | \`${area.directory}\` | ${area.description} |`
+      `| [${area.name}](${basename(area.path)}) | \`${area.directory}\` | ${area.description} |`
     );
   }
 
@@ -489,6 +490,11 @@ async function renderDecisionRow(file: string, decisionsDir: string): Promise<st
   return `| ${num} | ${title} | ${status} | ${date} |`;
 }
 
+// ADR excerpts link siblings as `](0001-x.md)`; OVERVIEW lives in .grimoire/docs/.
+function relinkDecisionRefs(excerpt: string): string {
+  return excerpt.replace(/\]\((\d+[^)]*\.md)\)/g, "](../decisions/$1)");
+}
+
 async function renderDecisionDetail(file: string, decisionsDir: string): Promise<string[] | null> {
   const content = await safeRead(join(decisionsDir, file));
   if (!content) return null;
@@ -498,8 +504,8 @@ async function renderDecisionDetail(file: string, decisionsDir: string): Promise
   const contextMatch = content.match(/^## Context and Problem Statement\s*\n([\s\S]*?)(?=^## )/m);
   const outcomeMatch = content.match(/^## Decision Outcome\s*\n([\s\S]*?)(?=^## |^### Consequences)/m);
   const lines: string[] = [`### ${title}\n`];
-  if (contextMatch) { lines.push(contextMatch[1].trim()); lines.push(""); }
-  if (outcomeMatch) { lines.push(`**Outcome:** ${outcomeMatch[1].trim()}`); lines.push(""); }
+  if (contextMatch) { lines.push(relinkDecisionRefs(contextMatch[1].trim())); lines.push(""); }
+  if (outcomeMatch) { lines.push(`**Outcome:** ${relinkDecisionRefs(outcomeMatch[1].trim())}`); lines.push(""); }
   return lines;
 }
 

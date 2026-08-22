@@ -187,6 +187,62 @@ Only accessed through the API layer.
     expect(content).toContain("Core business logic");
   });
 
+  it("links area docs relative to the docs directory", async () => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("package.json")) return '{"name": "test-project"}' as any;
+      if (p.includes("index.yml")) {
+        return `areas:
+  - name: Core
+    path: .grimoire/docs/core.md
+    directory: src/core
+    description: Core business logic
+` as any;
+      }
+      throw new Error("ENOENT");
+    });
+
+    await generateDocs({});
+
+    const content = String(mockWriteFile.mock.calls[0][1]);
+    expect(content).toContain("[Core](core.md)");
+    expect(content).not.toContain("](.grimoire/docs/");
+  });
+
+  it("rewrites bare decision links to the decisions directory", async () => {
+    mockReaddir.mockImplementation(async (path: any) => {
+      if (String(path).includes("decisions")) {
+        return ["0002-use-redis.md"] as any;
+      }
+      throw new Error("ENOENT");
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const p = String(path);
+      if (p.includes("package.json")) return '{"name": "test-project"}' as any;
+      if (p.includes("0002-use-redis")) {
+        return `---
+status: accepted
+date: 2026-02-01
+---
+# Use Redis for caching
+
+## Context and Problem Statement
+Supersedes [0001](0001-use-memcached.md); we need faster reads.
+
+## Decision Outcome
+Chosen Redis. See also [0001](0001-use-memcached.md).
+` as any;
+      }
+      throw new Error("ENOENT");
+    });
+
+    await generateDocs({});
+
+    const content = String(mockWriteFile.mock.calls[0][1]);
+    expect(content).toContain("](../decisions/0001-use-memcached.md)");
+    expect(content).not.toContain("](0001-use-memcached.md)");
+  });
+
   it("includes a constraints section when constraints.md has real rows", async () => {
     mockReadFile.mockImplementation(async (path: any) => {
       const p = String(path);
