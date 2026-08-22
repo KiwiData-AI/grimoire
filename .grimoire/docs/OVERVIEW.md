@@ -173,10 +173,8 @@ Invariants that must always hold (security, NFRs, observability). Each is verifi
 | Change IDs never contain path separators or `..` | A change ID is used to build filesystem paths; it must not traverse | `src/utils/paths.test.ts` (`resolveChangePath`) | — |
 | Config serialization refuses to persist literal secrets | A real token/key/password value must never be written to `.grimoire/config.yaml`; only `${ENV}` references are allowed | `src/core/init.test.ts` — "secret scan on serialized config" (`scanForSecrets` throws) | — |
 | Subprocesses are invoked with an explicit argv, never a shell string | No `shell: true`; git/gh/linter args are passed as array elements so external/file input cannot inject shell syntax | `src/utils/spawn.test.ts` (args passed positionally); `execFile` usage in `check.ts`, `pr.ts`, `branch-check.ts` | — |
-| Diffs and filenames sent to an LLM CLI are fenced/sanitized | Untrusted repo content piped to a configured LLM must not break out of its prompt context (prompt-injection hardening in `buildLlmPrompt`) | TODO: unit-invariant test for `buildLlmPrompt` fencing (`src/core/check.ts`) | — |
+| Diffs and filenames sent to an LLM CLI are fenced/sanitized | Untrusted repo content piped to a configured LLM must not break out of its prompt context (prompt-injection hardening in `buildLlmPrompt`) | `src/core/check-llm.test.ts` — `buildLlmPrompt` fencing invariants | — |
 | `.grimoire/config.yaml` is trusted code | `grimoire check`/`health` execute config-defined shell commands by design — same trust model as npm scripts / Makefiles; documented as a user-facing warning, not sandboxed | README "Security" note in the Pre-Commit Pipeline section | — |
-| Autonomous apply halts at a configured ceiling (sections-without-checkpoint, cost, wall-clock, consecutive-BLOCKED) before exhausting the token budget | Prevents loop death-spirals — unbounded retry and cost blowup — in autonomous mode | TODO: unit-invariant once the breaker is enforced in code; v1 is instruction-only in `grimoire-apply` | 0035 |
-| During apply, a test is never weakened or deleted to make the red-green gate pass | The gate is the convergence signal; gaming it (reward-hacking) defeats verification | TODO: unit-invariant / guard check once enforced; v1 is instruction-only in `grimoire-apply` | 0035 |
 
 ## System Architecture
 
@@ -184,13 +182,13 @@ How the codebase is organized. Each area has a detailed doc in `.grimoire/docs/`
 
 | Area | Directory | Description |
 |------|-----------|-------------|
-| [core](.grimoire/docs/core.md) | `src/core` | Business logic — init, update, validation, checks, health, tracing, PR generation, branch-guard, hooks |
-| [commands](.grimoire/docs/commands.md) | `src/commands` | CLI command wrappers — thin delegators from commander.js to core functions |
-| [utils](.grimoire/docs/utils.md) | `src/utils` | Shared utilities — config loading, path resolution, filesystem helpers, process spawning |
-| [skills](.grimoire/docs/skills.md) | `skills` | Claude Code skill definitions — workflow, onboarding, and bug SKILL.md files |
-| [references](.grimoire/docs/references.md) | `skills/references` | Shared knowledge documents (personas, rubrics, formats) loaded on demand by skills |
-| [features](.grimoire/docs/features.md) | `features` | Baseline Gherkin specs for grimoire's own behavior — grouped by area (cli, workflow, design, review, etc.) |
-| [templates](.grimoire/docs/templates.md) | `templates` | Static files copied into target projects during grimoire init — decision, constraints, accepted-risks, brand examples, context scaffold |
+| [core](core.md) | `src/core` | Business logic — init, update, validation, checks, health, tracing, PR generation, branch-guard, hooks |
+| [commands](commands.md) | `src/commands` | CLI command wrappers — thin delegators from commander.js to core functions |
+| [utils](utils.md) | `src/utils` | Shared utilities — config loading, path resolution, filesystem helpers, process spawning |
+| [skills](skills.md) | `skills` | Claude Code skill definitions — workflow, onboarding, and bug SKILL.md files |
+| [references](references.md) | `skills/references` | Shared knowledge documents (personas, rubrics, formats) loaded on demand by skills |
+| [features](features.md) | `features` | Baseline Gherkin specs for grimoire's own behavior — grouped by area (cli, workflow, design, review, etc.) |
+| [templates](templates.md) | `templates` | Static files copied into target projects during grimoire init — decision, constraints, accepted-risks, brand examples, context scaffold |
 
 ### core
 
@@ -286,10 +284,10 @@ Key decisions recorded as MADR (Markdown Any Decision Records).
 | 0036 | Capability-surface selection: where a new capability belongs | accepted | 2026-06-26 |
 | 0037 | Shared named-methodology references for cross-skill guidance | proposed | 2026-06-27 |
 | 0038 | Living `draft.md` as the single design surface, projected into homes after agreement | proposed | 2026-06-17 |
-| 0038 | MkDocs Material for the Generated Spec Site | accepted | 2026-08-21 |
-| 0039 | PR Gate Enforces Finalization with a Shared Health Check | accepted | 2026-08-21 |
 | 0039 | Delegate docstring-format enforcement to pydoclint; make comment policy reach every session | accepted | 2026-07-03 |
 | 0040 | STE response style replaces caveman mode | accepted | 2026-08-10 |
+| 0041 | MkDocs Material for the Generated Spec Site | accepted | 2026-08-21 |
+| 0042 | PR Gate Enforces Finalization with a Shared Health Check | accepted | 2026-08-21 |
 
 ### Use Gherkin instead of custom WHEN/THEN format
 
@@ -635,11 +633,11 @@ Sub-decisions embedded in `design-spine.md`:
 - **Simplicity bias governs the whole walk** — surface broadly, build narrowly; every surfaced item defaults to non-goal; lean simple when the call is balanced (under-build is cheap to add, over-build is expensive to remove).
 - **Reading altitude** (in `artifact-map.md`) — design reads contracts/signatures, not internal source/tests; reading internals is a debugging activity.
 
-**Related decision, same change (separate home):** this change also **relocated projection** from `grimoire-draft` to `grimoire-plan`'s first step (draft designs; plan projects). That is a draft/plan division-of-labor decision, whose home is [0038](0038-living-draft-doc-as-design-surface.md) — recorded there as a dated amendment, not duplicated here.
+**Related decision, same change (separate home):** this change also **relocated projection** from `grimoire-draft` to `grimoire-plan`'s first step (draft designs; plan projects). That is a draft/plan division-of-labor decision, whose home is [0038](../decisions/0038-living-draft-doc-as-design-surface.md) — recorded there as a dated amendment, not duplicated here.
 
 ### Living `draft.md` as the single design surface, projected into homes after agreement
 
-`grimoire-draft` (post-[0031](0031-artifact-model-redesign-one-home-per-fact.md)) routes
+`grimoire-draft` (post-[0031](../decisions/0031-artifact-model-redesign-one-home-per-fact.md)) routes
 each fact to exactly one home — feature, constraint, or MADR — and writes it there
 immediately. One-home-per-fact is right for the artifacts **at rest**, but enforcing it
 *during* design fragments the thinking: the moment you start, a change is scattered across
@@ -694,22 +692,6 @@ Concrete changes shipped together:
   at projection each novel decision becomes a sequential MADR (novelty gate unchanged),
   obvious picks fold into the baseline ADR. The at-rest decision model from [0031] is intact.
 
-### MkDocs Material for the Generated Spec Site
-
-Consumer repos accumulate specs as flat files (`features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`). Reviewing them means reading raw markdown in an editor. Grimoire should generate a browsable, searchable, statically built site over those artifacts in any consumer repo. Which site generator, and how does grimoire drive it without owning a Python toolchain?
-
-**Outcome:** Chosen option: "MkDocs Material", because it ships client-side search, tokenized theming, and Pygments Gherkin highlighting out of the box, so grimoire only pre-generates markdown pages and runs a user-configured build command.
-
-Mechanics: `grimoire docs` (existing overview command) additionally regenerates `.grimoire/site/` — mkdocs config, markdown pages (features in Gherkin fences, decisions with status, constraints, overview as index), and a dark-only "Midnight Kiwi" stylesheet derived from the grimoire logo (ground `#141a24`, primary `#a8c94e`, accent `#6fd3f2`) — then runs the build command from `tools.spec_site.command` in `.grimoire/config.yaml` (e.g. `uvx --with mkdocs-material mkdocs build …`). No `spec_site` tool configured → site step skipped. The finalize step runs the same command, so the committed static HTML in `.grimoire/site/html/` is current when a change lands. Only the built `html/` is committed; the markdown intermediates and generated mkdocs config are gitignored via a generated `.grimoire/site/.gitignore` — they serve only the build.
-
-### PR Gate Enforces Finalization with a Shared Health Check
-
-An audit of a consumer repo (bake, 2026-08-21) showed finalization never runs in practice: stale change folders, trivial ADRs, constraint rows citing nonexistent tests, and most commits missing the `Change:` trailer. The package's own artifacts cause this: the `grimoire-pr` skill's prerequisites demand the change folder be already removed while its workflow reads that folder (it can literally never run), `AGENTS.md` points the PR stage at the bare CLI, and nothing stops `gh pr create` from bypassing the workflow entirely. Where should finalization be enforced, and where does health checking live?
-
-**Outcome:** Chosen option: "Keep finalize in `grimoire-apply`; `/grimoire:pr` is the enforcing gate", because it preserves one definition home while adding enforcement at the moment drift enters — the PR — and hardening apply's own finalize language covers the other entry point (sessions ending at "tests green").
-
-Mechanics: `grimoire-pr`'s prerequisites invert (change folder must exist; tasks complete or explicitly deferred; work committed). Its workflow: gather artifacts → run the per-change health check (`skills/references/health-check.md` §A — blockers stop the PR, warnings go into the description) → if the folder still exists, execute finalization exactly per `grimoire-apply` §7 (statuses, deferred tasks to the debt register in the existing refactor-register format, docs refresh, folder removal, `Change:`-trailer commit) → generate the description by shelling out to the existing `grimoire pr` CLI (one generator; the skill stops hand-composing a duplicate) → create the PR. Repo-wide drift checking integrates into the existing `grimoire health` command — one command, one report: the mechanical checks (stale change folders, unproven register rows, terminal/referenced ADRs, broken doc links, archive trees, trailer coverage) become a spec-drift metric in `src/core/health.ts` alongside the code metrics; judgment checks (ADR non-obvious bar, exemption justification) stay agent-run per `health-check.md`, which marks every row `mechanical` or `judgment`. `grimoire-discover` gains a Health phase that runs `grimoire health` plus the judgment rows and reports — report-only, no separate report file, no auto-fix. `AGENTS.md` states the workflow invariant — never `gh pr create` while `.grimoire/changes/` has an active change — plus the ADR bar and the proven-only constraints rule; health-check rows cite those rules rather than restating them. All checks are expressed against configured tools (`config.tools.bdd_test`, configured `checks:`), never a specific ecosystem.
-
 ### Delegate docstring-format enforcement to pydoclint; make comment policy reach every session
 
 Projects declare `comment_style` (sphinx/google/numpy) in `.grimoire/config.yaml`, but agents kept writing docstrings in the wrong format and littering redundant comments. Three gaps: (1) the style never reached agents — it lived only in config.yaml and OVERVIEW.md, neither loaded in a normal coding session; (2) the built-in `doc_style` check emits only `warning` severities and the step fails only on `critical`, so the commit gate could never block format drift; (3) grimoire's hand-rolled regex checks only detect cross-style markers (`Args:` vs `:param`), not whether sections match the function signature. Amends the scope of 0034 (see its amendment note).
@@ -728,9 +710,18 @@ Caveman mode (0013) cut tokens by dropping grammar: no articles, sentence fragme
 
 **Outcome:** Chosen option: "STE levels", because ASD-STE100 cuts the same filler while keeping articles, complete sentences, and one name per thing — brevity without the comprehension tax. Config key `project.ste` (`off` | `ste` | `caveman`) replaces `project.caveman`; a v3 config migration maps old levels (none→off, lite→ste, full/ultra→caveman). The `ste@grimoire` plugin (`plugins/ste`, forked from JuliusBrussee/caveman) enforces the ruleset in Claude Code with a session-start injection plus per-turn reinforcement; the AGENTS.md directive covers agents without plugin support. `grimoire init`/`update` print the plugin install commands when `integrations.ste_plugin` is set, and the init prompt for it defaults to yes — unlike the old opt-in caveman prompt — because the plugin is grimoire's own recommended style enforcement, not a third-party add-on.
 
+### MkDocs Material for the Generated Spec Site
 
-## Active Work
+Consumer repos accumulate specs as flat files (`features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`). Reviewing them means reading raw markdown in an editor. Grimoire should generate a browsable, searchable, statically built site over those artifacts in any consumer repo. Which site generator, and how does grimoire drive it without owning a Python toolchain?
 
-Changes currently in progress.
+**Outcome:** Chosen option: "MkDocs Material", because it ships client-side search, tokenized theming, and Pygments Gherkin highlighting out of the box, so grimoire only pre-generates markdown pages and runs a user-configured build command.
 
-- **consolidate-skill-guidance**: Consolidate skill guidance into named-methodology shared references (draft)
+Mechanics: `grimoire docs` (existing overview command) additionally regenerates `.grimoire/site/` — mkdocs config, markdown pages (features in Gherkin fences, decisions with status, constraints, overview as index), and a dark-only "Midnight Kiwi" stylesheet derived from the grimoire logo (ground `#141a24`, primary `#a8c94e`, accent `#6fd3f2`) — then runs the build command from `tools.spec_site.command` in `.grimoire/config.yaml` (e.g. `uvx --with mkdocs-material mkdocs build …`). No `spec_site` tool configured → site step skipped. The finalize step runs the same command, so the committed static HTML in `.grimoire/site/html/` is current when a change lands. Only the built `html/` is committed; the markdown intermediates and generated mkdocs config are gitignored via a generated `.grimoire/site/.gitignore` — they serve only the build.
+
+### PR Gate Enforces Finalization with a Shared Health Check
+
+An audit of a consumer repo (bake, 2026-08-21) showed finalization never runs in practice: stale change folders, trivial ADRs, constraint rows citing nonexistent tests, and most commits missing the `Change:` trailer. The package's own artifacts cause this: the `grimoire-pr` skill's prerequisites demand the change folder be already removed while its workflow reads that folder (it can literally never run), `AGENTS.md` points the PR stage at the bare CLI, and nothing stops `gh pr create` from bypassing the workflow entirely. Where should finalization be enforced, and where does health checking live?
+
+**Outcome:** Chosen option: "Keep finalize in `grimoire-apply`; `/grimoire:pr` is the enforcing gate", because it preserves one definition home while adding enforcement at the moment drift enters — the PR — and hardening apply's own finalize language covers the other entry point (sessions ending at "tests green").
+
+Mechanics: `grimoire-pr`'s prerequisites invert (change folder must exist; tasks complete or explicitly deferred; work committed). Its workflow: gather artifacts → run the per-change health check (`skills/references/health-check.md` §A — blockers stop the PR, warnings go into the description) → if the folder still exists, execute finalization exactly per `grimoire-apply` §7 (statuses, deferred tasks to the debt register in the existing refactor-register format, docs refresh, folder removal, `Change:`-trailer commit) → generate the description by shelling out to the existing `grimoire pr` CLI (one generator; the skill stops hand-composing a duplicate) → create the PR. Repo-wide drift checking integrates into the existing `grimoire health` command — one command, one report: the mechanical checks (stale change folders, unproven register rows, terminal/referenced ADRs, broken doc links, archive trees, trailer coverage) become a spec-drift metric in `src/core/health.ts` alongside the code metrics; judgment checks (ADR non-obvious bar, exemption justification) stay agent-run per `health-check.md`, which marks every row `mechanical` or `judgment`. `grimoire-discover` gains a Health phase that runs `grimoire health` plus the judgment rows and reports — report-only, no separate report file, no auto-fix. `AGENTS.md` states the workflow invariant — never `gh pr create` while `.grimoire/changes/` has an active change — plus the ADR bar and the proven-only constraints rule; health-check rows cite those rules rather than restating them. All checks are expressed against configured tools (`config.tools.bdd_test`, configured `checks:`), never a specific ecosystem.
