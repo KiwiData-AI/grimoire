@@ -166,7 +166,7 @@ Skills also have a **Done** section that signals when the workflow is complete. 
 
 The end-to-end flow for adding or modifying behavior is six stages, each owned by a skill:
 
-**Draft** (`/grimoire:draft`) → **Plan** (`/grimoire:plan`) → **Review** (`/grimoire:review`, optional) → **Apply** (`/grimoire:apply`) → **Verify** (`/grimoire:verify`) → **PR** (`grimoire pr`).
+**Draft** (`/grimoire:draft`) → **Plan** (`/grimoire:plan`) → **Review** (`/grimoire:review`, optional) → **Apply** (`/grimoire:apply`) → **Verify** (`/grimoire:verify`) → **PR** (`/grimoire:pr`).
 
 Draft's single job is to design the change on `draft.md`. **Projection** — turning that agreed design into features, constraints, MADRs, `data.yml`, and the manifest — is the **first step of Plan**, not the end of Draft.
 
@@ -175,6 +175,7 @@ Each skill's SKILL.md is the authoritative home for that stage's mechanics; the 
 - **Manifest status tracks progress:** the manifest is created at plan's projection step; `approved` once the design is agreed and projected, `implementing` during apply, `accepted` at PR.
 - **Live on the branch.** Features, decisions, constraints, and schema are edited directly on the feature branch — no copy-into-change-folder, no promote step.
 - **No archive step.** The PR diff *is* the change; git history plus the `Change: <id>` commit trailer are the record. PR finalize just flips decision status to `accepted` and removes the ephemeral change folder.
+- **Never create a PR with `gh pr create` directly** while `.grimoire/changes/` contains an active change — route through `/grimoire:pr` so finalization happens.
 - **The user drives the pace.** Review mode (default) approves every file change before writing; autonomous mode works the full task list, stopping only on blockers.
 
 ### IMPORTANT: tasks.md Is the Plan
@@ -271,6 +272,12 @@ Status moves `proposed → accepted → (deprecated | superseded by NNNN)`:
 - `superseded by NNNN` — replaced by a newer decision.
 
 Supersession is **two-way and explicit**: the superseding ADR back-links the one it replaces (in Context or Decision Drivers), and the superseded ADR keeps its number with status set to `superseded by NNNN`. This is the only home for the link — don't restate it elsewhere.
+
+### ADR Bar
+An ADR records a **non-obvious** decision and its rejected alternatives. Trivial or feature-description ADRs are deleted, not landed.
+
+### Constraints Register
+**Proven-only:** a register row may not exist without a passing test or gate named in its verification cell. The register legend states this rule.
 
 ### Step Definitions
 Organize by **domain concept**, NOT by feature file. Check the project's existing test setup and match its BDD framework conventions. See the active skill's testing reference for ecosystem-specific patterns.

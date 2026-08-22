@@ -43,6 +43,9 @@ vi.mock("node:child_process", async () => {
 });
 
 import { readFile, readdir, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import { readFileOrNull, findFiles } from "../utils/fs.js";
 
 const mockReadFile = vi.mocked(readFile);
@@ -50,6 +53,7 @@ const mockReaddir = vi.mocked(readdir);
 const mockWriteFile = vi.mocked(writeFile);
 const mockReadFileOrNull = vi.mocked(readFileOrNull);
 const mockFindFiles = vi.mocked(findFiles);
+const mockExec = (execFile as any)[promisify.custom] as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -57,6 +61,7 @@ beforeEach(() => {
   mockReaddir.mockRejectedValue(new Error("ENOENT"));
   mockReadFileOrNull.mockResolvedValue(null);
   mockFindFiles.mockResolvedValue([]);
+  mockExec.mockImplementation(async () => ({ stdout: "", stderr: "" }));
 });
 
 function captureJson(fn: () => Promise<void>): Promise<any> {
@@ -274,6 +279,186 @@ describe("runHealth", () => {
     const badgeIdx = content.indexOf("GRIMOIRE:HEALTH:START");
     const contentIdx = content.indexOf("# My Project");
     expect(badgeIdx).toBeLessThan(contentIdx);
+  });
+
+  describe("spec drift", () => {
+    async function driftMetric(): Promise<any> {
+      const result = await captureJson(() => runHealth({ json: true }));
+      const drift = result.metrics.find((m: any) => m.name === "spec_drift");
+      expect(drift).toBeDefined();
+      return drift;
+    }
+
+    it("flags a change folder untouched for over 30 days with no tasks done", async () => {
+      mockReaddir.mockImplementation(async (path: any) => {
+        if (String(path).endsWith(join(".grimoire", "changes"))) return ["old-change"] as any;
+        throw new Error("ENOENT");
+      });
+      mockReadFileOrNull.mockImplementation(async (path: string) => {
+        if (path.includes("old-change") && path.endsWith("manifest.md")) {
+          return "---\nstatus: implementing\n---\n# Change: Old";
+        }
+        if (path.includes("old-change") && path.endsWith("tasks.md")) {
+          return "# Tasks\n\n- [ ] First task\n";
+        }
+        return null;
+      });
+      mockExec.mockImplementation(async (_file: string, args: string[]) => {
+        if (args.includes("-1")) return { stdout: "1700000000\n", stderr: "" };
+        return { stdout: "", stderr: "" };
+      });
+
+      const drift = await driftMetric();
+      const item = drift.items.find((i: any) => i.message.includes("old-change"));
+      expect(item).toBeDefined();
+      expect(item.severity).toBe("review");
+    });
+
+    it("treats a change folder with no commits as fresh", async () => {
+      mockReaddir.mockImplementation(async (path: any) => {
+        if (String(path).endsWith(join(".grimoire", "changes"))) return ["new-change"] as any;
+        throw new Error("ENOENT");
+      });
+      mockReadFileOrNull.mockImplementation(async (path: string) => {
+        if (path.includes("new-change") && path.endsWith("manifest.md")) {
+          return "---\nstatus: implementing\n---\n# Change: New";
+        }
+        return null;
+      });
+
+      const drift = await driftMetric();
+      expect(drift.items.some((i: any) => i.message.includes("new-change"))).toBe(false);
+    });
+
+    it("accepts a register citation whose file exists by basename", async () => {
+      mockReadFileOrNull.mockImplementation(async (path: string) => {
+        if (path.endsWith("constraints.md")) {
+          return [
+            "| Constraint (assertion) | Rationale | How verified | Links |",
+            "|---|---|---|---|",
+            "| Subprocesses use explicit argv | safety | `pr.ts` (args passed positionally) | — |",
+          ].join("\n");
+        }
+        return null;
+      });
+      mockExec.mockImplementation(async (_file: string, args: string[]) => {
+        if (args.includes("ls-files")) return { stdout: "src/core/pr.ts\n", stderr: "" };
+        if (args.includes("grep")) throw Object.assign(new Error("no match"), { code: 1 });
+        return { stdout: "", stderr: "" };
+      });
+
+      const drift = await driftMetric();
+      expect(drift.items.some((i: any) => i.message.includes("pr.ts"))).toBe(false);
+    });
+
+    it("flags a terminal decision that is still present", async () => {
+      mockReaddir.mockImplementation(async (path: any) => {
+        if (String(path).includes("decisions")) return ["0002-use-pg.md"] as any;
+        throw new Error("ENOENT");
+      });
+      mockReadFileOrNull.mockImplementation(async (path: string) => {
+        if (path.includes("0002")) {
+          return "---\nstatus: superseded by 0005\n---\n# Use PG";
+        }
+        return null;
+      });
+
+      const drift = await driftMetric();
+      const item = drift.items.find((i: any) => i.message.includes("0002-use-pg.md"));
+      expect(item).toBeDefined();
+      expect(item.severity).toBe("review");
+    });
+
+    it("flags decision references in source comments", async () => {
+      mockExec.mockImplementation(async (_file: string, args: string[]) => {
+        if (args.includes("grep")) {
+          return { stdout: "src/auth.ts:12:decided in ADR-0007\n", stderr: "" };
+        }
+        return { stdout: "", stderr: "" };
+      });
+
+      const drift = await driftMetric();
+      const item = drift.items.find((i: any) => i.message.includes("src/auth.ts"));
+      expect(item).toBeDefined();
+      expect(item.severity).toBe("review");
+    });
+
+    it("does not flag decision references in test files", async () => {
+      mockExec.mockImplementation(async (_file: string, args: string[]) => {
+        if (args.includes("grep")) {
+          return {
+            stdout:
+              "src/core/foo.test.ts:5:see ADR-0001\n" +
+              "src/core/foo.ts:5:see ADR-0001\n",
+            stderr: "",
+          };
+        }
+        return { stdout: "", stderr: "" };
+      });
+
+      const drift = await driftMetric();
+      expect(drift.items.some((i: any) => i.message.includes("foo.test.ts"))).toBe(false);
+      expect(drift.items.some((i: any) => i.message.includes("src/core/foo.ts"))).toBe(true);
+    });
+
+    it("keeps grimoire doc hits but drops meta-doc hits in the decision sweep", async () => {
+      mockExec.mockImplementation(async (_file: string, args: string[]) => {
+        if (args.includes("grep")) {
+          return {
+            stdout:
+              "README.md:3:see ADR-0001\n" +
+              ".grimoire/archive/old-change/tasks.md:9:see ADR-0001\n" +
+              "plugins/ste/skills/ste/SKILL.md:35:see ADR-0001\n" +
+              ".grimoire/docs/auth.md:5:see ADR-0001\n",
+            stderr: "",
+          };
+        }
+        return { stdout: "", stderr: "" };
+      });
+
+      const drift = await driftMetric();
+      expect(drift.items.some((i: any) => i.message.includes("README.md"))).toBe(false);
+      expect(drift.items.some((i: any) => i.message.includes("archive/old-change"))).toBe(false);
+      expect(drift.items.some((i: any) => i.message.includes("SKILL.md"))).toBe(false);
+      expect(drift.items.some((i: any) => i.message.includes(".grimoire/docs/auth.md"))).toBe(true);
+    });
+
+    it("flags broken relative links in docs", async () => {
+      mockReaddir.mockImplementation(async (path: any) => {
+        if (String(path).endsWith(join(".grimoire", "docs"))) return ["OVERVIEW.md"] as any;
+        throw new Error("ENOENT");
+      });
+      mockReadFileOrNull.mockImplementation(async (path: string) => {
+        if (path.includes("OVERVIEW.md")) {
+          return "# Overview\n\nSee [core](core.md) for details.\n";
+        }
+        return null;
+      });
+
+      const drift = await driftMetric();
+      const item = drift.items.find((i: any) => i.message.includes("core.md"));
+      expect(item).toBeDefined();
+      expect(item.message).toContain("OVERVIEW.md");
+      expect(item.severity).toBe("review");
+    });
+
+    it("flags archive trees under .grimoire", async () => {
+      mockReaddir.mockImplementation(async (path: any) => {
+        if (String(path).endsWith(".grimoire")) return ["archive", "decisions", "docs"] as any;
+        throw new Error("ENOENT");
+      });
+
+      const drift = await driftMetric();
+      const item = drift.items.find((i: any) => i.message.includes("archive"));
+      expect(item).toBeDefined();
+      expect(item.severity).toBe("review");
+    });
+
+    it("passes with no items on a clean project", async () => {
+      const drift = await driftMetric();
+      expect(drift.items).toEqual([]);
+      expect(drift.score).toBeNull();
+    });
   });
 
   it("test_coverage reports step definition matches", async () => {

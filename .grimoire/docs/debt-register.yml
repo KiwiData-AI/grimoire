@@ -714,3 +714,15 @@ items:
     status: open
     first_detected: 2026-05-22
     last_detected: 2026-05-22
+
+  - id: debt-046
+    category: test_debt
+    severity: low
+    location: src/core/check-llm.ts:14
+    title: best_practices check passes vacuously on a clean working tree
+    detail: >
+      resolveChangedFiles diffs the working tree against HEAD, so on a fully
+      committed branch the LLM review receives an empty diff and reports PASS
+      without reviewing anything. Skip with "no changes to review" when the
+      resolved diff is empty, or accept a base ref to review a branch diff.
+      Found while reviewing the fix-pr-finalize-add-health-check branch.

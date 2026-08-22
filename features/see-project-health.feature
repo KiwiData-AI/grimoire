@@ -8,3 +8,9 @@ Feature: See how well a project uses grimoire
     When I check the project's health
     Then I see how well specs and decisions are covered
     And I am given an overall health score
+
+  Scenario: Health reports spec-process drift
+    Given a grimoire project with a stale change and an unproven constraint
+    When I check the project's health
+    Then the report flags the stale change
+    And the report flags the constraint that lacks a proving test

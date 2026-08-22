@@ -41,8 +41,12 @@ export class GrimoireWorld extends World {
     return this.result;
   }
 
-  git(args: string[]): void {
-    spawnSync("git", args, { cwd: this.dir, encoding: "utf-8" });
+  git(args: string[], env?: NodeJS.ProcessEnv): void {
+    spawnSync("git", args, {
+      cwd: this.dir,
+      encoding: "utf-8",
+      env: env ? { ...process.env, ...env } : undefined,
+    });
   }
 
   /** A repo with git configured so commits work in CI. */

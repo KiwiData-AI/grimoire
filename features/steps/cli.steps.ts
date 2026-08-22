@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Given, When, Then, After } from "@cucumber/cucumber";
 import { GrimoireWorld } from "./world.js";
@@ -30,6 +30,35 @@ We needed an example.
 ## Decision Outcome
 Chosen option: "example", because it is illustrative.
 `;
+
+const STALE_MANIFEST = `---
+status: implementing
+branch: feat/stale-change
+---
+
+# Change: Stale change
+
+## Why
+It went stale.
+`;
+
+const UNPROVEN_CONSTRAINTS = `# Constraints
+
+| Constraint (assertion) | Rationale | How verified | Links |
+|------------------------|-----------|--------------|-------|
+| Sessions expire after 15 minutes | Limits token replay | TODO: unit-invariant test | — |
+`;
+
+const CONSTRAINTS = `# Constraints
+| Constraint (assertion) | Rationale | How verified | Links |
+|---|---|---|---|
+| Logs never contain PII | confidential data | tests/test_logs.py | ADR-0008 |
+`;
+
+const SPEC_SITE_TOOL = `tools:
+  spec_site:
+    name: stub
+    command: mkdir -p .grimoire/site/html && touch .grimoire/site/html/index.html`;
 
 function manifest(status: string): string {
   return `---
@@ -75,6 +104,24 @@ Given("a grimoire project with a documented feature and a decision", function (t
   this.write(".grimoire/decisions/0001-use-example.md", DECISION);
 });
 
+function scaffoldSpecs(world: GrimoireWorld): void {
+  world.initProject();
+  world.write("features/example.feature", VALID_FEATURE);
+  world.write(".grimoire/decisions/0001-use-example.md", DECISION);
+  world.write(".grimoire/docs/constraints.md", CONSTRAINTS);
+}
+
+Given("a grimoire project with a spec site build configured", function (this: GrimoireWorld) {
+  scaffoldSpecs(this);
+  const configPath = join(this.dir, ".grimoire", "config.yaml");
+  const config = readFileSync(configPath, "utf-8").replace("tools: {}", SPEC_SITE_TOOL);
+  this.write(".grimoire/config.yaml", config);
+});
+
+Given("a grimoire project with no spec site build configured", function (this: GrimoireWorld) {
+  scaffoldSpecs(this);
+});
+
 Given(
   "a grimoire project with a file committed under a change {string}",
   function (this: GrimoireWorld, change: string) {
@@ -117,6 +164,24 @@ Given(
     this.write("features/login.feature", VALID_FEATURE);
     this.git(["add", "."]);
     this.git(["commit", "-q", "-m", `feat: add login\n\nChange: ${change}`]);
+  }
+);
+
+Given(
+  "a grimoire project with a stale change and an unproven constraint",
+  function (this: GrimoireWorld) {
+    this.initProject();
+    this.write(".grimoire/changes/stale-change/manifest.md", STALE_MANIFEST);
+    this.write(
+      ".grimoire/changes/stale-change/tasks.md",
+      "# Tasks\n\n- [ ] First task\n- [ ] Second task\n"
+    );
+    this.write(".grimoire/docs/constraints.md", UNPROVEN_CONSTRAINTS);
+    this.git(["add", "."]);
+    this.git(["commit", "-q", "-m", "chore: scaffold stale change"], {
+      GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z",
+      GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z",
+    });
   }
 );
 
@@ -256,11 +321,63 @@ Then("I am given an overall health score", function (this: GrimoireWorld) {
   assert.ok(overall >= 0 && overall <= 100, `overall score out of range: ${overall}`);
 });
 
+interface DriftMetric {
+  name: string;
+  items?: Array<{ severity: string; message: string }>;
+}
+
+function driftMetric(world: GrimoireWorld): DriftMetric {
+  const { metrics } = world.json<{ metrics: DriftMetric[] }>();
+  const drift = metrics.find((m) => m.name === "spec_drift");
+  assert.ok(drift, `no spec_drift metric; got ${metrics.map((m) => m.name).join(", ")}`);
+  return drift;
+}
+
+Then("the report flags the stale change", function (this: GrimoireWorld) {
+  assert.equal(this.result.code, 0, `health failed:\n${this.out}`);
+  const drift = driftMetric(this);
+  assert.ok(
+    drift.items?.some((i) => i.message.includes("stale-change")),
+    `stale change not flagged; items: ${JSON.stringify(drift.items)}`
+  );
+});
+
+Then("the report flags the constraint that lacks a proving test", function (this: GrimoireWorld) {
+  const drift = driftMetric(this);
+  assert.ok(
+    drift.items?.some((i) => /TODO/.test(i.message)),
+    `unproven constraint not flagged; items: ${JSON.stringify(drift.items)}`
+  );
+});
+
 Then("a browsable overview of the project is produced", function (this: GrimoireWorld) {
   assert.equal(this.result.code, 0, `docs failed:\n${this.out}`);
   assert.ok(
     existsSync(join(this.dir, ".grimoire", "docs", "OVERVIEW.md")),
     "OVERVIEW.md was not created"
+  );
+});
+
+Then(
+  "a static spec site is produced containing the features, decisions, and constraints",
+  function (this: GrimoireWorld) {
+    assert.equal(this.result.code, 0, `docs failed:\n${this.out}`);
+    const site = join(this.dir, ".grimoire", "site");
+    assert.ok(existsSync(join(site, "mkdocs.yml")), "mkdocs.yml was not generated");
+    const featuresPage = readFileSync(join(site, "docs", "features.md"), "utf-8");
+    assert.ok(featuresPage.includes("```gherkin"), "features page has no gherkin fence");
+    const decisionsPage = readFileSync(join(site, "docs", "decisions.md"), "utf-8");
+    assert.ok(decisionsPage.includes("accepted"), "decisions page does not show the status");
+    assert.ok(existsSync(join(site, "docs", "constraints.md")), "constraints page missing");
+    assert.ok(existsSync(join(site, "html", "index.html")), "configured build command did not run");
+  }
+);
+
+Then("no spec site is produced", function (this: GrimoireWorld) {
+  assert.equal(this.result.code, 0, `docs failed:\n${this.out}`);
+  assert.ok(
+    !existsSync(join(this.dir, ".grimoire", "site")),
+    ".grimoire/site/ should not exist when no build is configured"
   );
 });
 

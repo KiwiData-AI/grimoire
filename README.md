@@ -518,6 +518,25 @@ Area docs deliberately do **not** list key files or a reusable-code inventory �
 
 The source artifacts stay tool-agnostic, so the AI workflow doesn't depend on any renderer. Regenerate `OVERVIEW.md` whenever artifacts change (`grimoire-apply` does this at finalize).
 
+#### Spec site
+
+Optionally, `grimoire docs` can build a self-contained static spec site. Configure a `tools.spec_site` entry:
+
+```yaml
+tools:
+  spec_site:
+    name: mkdocs
+    command: uvx --with mkdocs-material mkdocs build -f .grimoire/site/mkdocs.yml
+```
+
+When configured, `grimoire docs` regenerates `.grimoire/site/` — one page per feature, decision, and constraint, plus an overview index, styled with the Midnight Kiwi dark theme — then runs the configured build command. Only the built `.grimoire/site/html/` is committed; the intermediates (`docs/`, `mkdocs.yml`) are gitignored by a generated `.grimoire/site/.gitignore`. To keep the built site out of diffs and language stats, add to `.gitattributes`:
+
+```
+.grimoire/site/** linguist-generated=true
+```
+
+The index embeds the overview's Configured Tools table, so publishing the built site publishes your config/tooling summary — review before hosting publicly.
+
 ### Pre-Commit Pipeline
 
 ```
