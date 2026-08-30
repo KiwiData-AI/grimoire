@@ -70,8 +70,12 @@ export async function validateChange(
       for (const change of changes) {
         await validateSingleChange(join(changesDir, change.name), change.name, results, options);
       }
-    } catch {
-      console.log("No .grimoire/changes/ directory found. Run grimoire init first.");
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        console.log("No active changes to validate.");
+      } else {
+        console.log("No .grimoire/changes/ directory found. Run grimoire init first.");
+      }
       return { results, errorCount: 0, warnCount: 0 };
     }
   }
