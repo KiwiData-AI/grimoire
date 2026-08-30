@@ -17,6 +17,7 @@ export interface RunResult {
 export class GrimoireWorld extends World {
   dir = mkdtempSync(join(tmpdir(), "grimoire-bdd-"));
   result: RunResult = { stdout: "", stderr: "", code: 0 };
+  changeId?: string;
 
   /** Run the built grimoire CLI in the temp project. When `input` is given it is
    *  fed on stdin (for hook commands); otherwise stdin is closed so any prompt

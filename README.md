@@ -140,6 +140,10 @@ Issues flagged as **blocker** or **suggestion**. Security findings tagged with O
 
 Red-green discipline stays; the test *vehicle* matches the task's `verify:` tag — a Gherkin step definition for `scenario` tasks, a unit/integration test for `unit-invariant` and `characterization` tasks. (No `.feature` is forced onto a constraint or an internal change — that's what filled feature files with slop.)
 
+Each approved task section uses paired or autonomous execution. Paired sections review the proposed structure and coherent production slices. Autonomous sections continue directly with red-green work and existing safeguards. `tasks.md` records the approved strategy and any runtime checkpoint state.
+
+This is an upstream, provider-neutral workflow. Source skills install for Claude, OpenCode, and Codex through `src/core/shared-setup.ts`.
+
 For each task:
 1. Write the failing test at the task's level
 2. Run it — **must fail** (red). A test that passes immediately is broken.

@@ -2,8 +2,10 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { simpleGit } from "simple-git";
 import { spawnWithStdin } from "../utils/spawn.js";
-import type { ToolConfig } from "../utils/config.js";
+import { getLlmArgs, type ToolConfig } from "../utils/config.js";
 import type { StepResult } from "./check.js";
+
+export { getLlmArgs } from "../utils/config.js";
 
 const execFileAsync = promisify(execFile);
 const MAX_DIFF_CHARS = 40_000;
@@ -31,8 +33,11 @@ export function buildLlmPrompt(prompt: string, files: string[], diff: string): s
   const safeFiles = files.map((f) => `\`${f.replace(/[\n\r`]/g, "")}\``).filter((f) => f.length > 2);
   const fileList = safeFiles.length > 0 ? `\n\nFiles changed:\n${safeFiles.join("\n")}` : "";
   const safeDiff = diff.replace(/`{3,}/g, "```");
-  const diffSection = safeDiff
-    ? `\n\nDiff:\n\`\`\`diff\n${safeDiff.slice(0, MAX_DIFF_CHARS)}\n\`\`\``
+  const visibleDiff = safeDiff.length > MAX_DIFF_CHARS
+    ? `${safeDiff.slice(0, MAX_DIFF_CHARS).replace(/\n[^\n]*$/, "")}\n... [diff truncated]`
+    : safeDiff;
+  const diffSection = visibleDiff
+    ? `\n\nDiff:\n\`\`\`diff\n${visibleDiff}\n\`\`\``
     : "";
   return `${prompt}${fileList}${diffSection}\n\nOnly flag issues directly observable in the diff above. Do not infer issues from filenames or speculate about code not shown.\n\nRespond with PASS or FAIL as the very first word on the very first line (no markdown, no asterisks, no extra words on that line). Then explain any issues on subsequent lines.`;
 }
@@ -64,7 +69,7 @@ export async function runLlmStep(
   }
 
   try {
-    const output = await spawnWithStdin(llmCommand, ["--print"], buildLlmPrompt(prompt, files, diff), root);
+    const output = await spawnWithStdin(llmCommand, getLlmArgs(llmCommand), buildLlmPrompt(prompt, files, diff), root);
     return { step, status: parseLlmVerdict(output) ? "pass" : "fail", duration: Date.now() - start, output };
   } catch (err) {
     return {

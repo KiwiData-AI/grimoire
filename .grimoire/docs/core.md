@@ -1,5 +1,5 @@
 # Core
-> Last updated: 2026-06-07
+> Last updated: 2026-08-29
 
 ## Purpose
 All business logic for grimoire lives here. Most modules back one CLI command; the rest are supporting capabilities (tool detection, shared setup, hook generation, risk register). The commands layer just parses CLI options and calls into core.

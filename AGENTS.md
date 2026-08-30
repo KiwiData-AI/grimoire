@@ -176,7 +176,7 @@ Each skill's SKILL.md is the authoritative home for that stage's mechanics; the 
 - **Live on the branch.** Features, decisions, constraints, and schema are edited directly on the feature branch — no copy-into-change-folder, no promote step.
 - **No archive step.** The PR diff *is* the change; git history plus the `Change: <id>` commit trailer are the record. PR finalize just flips decision status to `accepted` and removes the ephemeral change folder.
 - **Never create a PR with `gh pr create` directly** while `.grimoire/changes/` contains an active change — route through `/grimoire:pr` so finalization happens.
-- **The user drives the pace.** Review mode (default) approves every file change before writing; autonomous mode works the full task list, stopping only on blockers.
+- **The user drives the pace.** Review mode uses per-section paired execution and approves coherent production increments at declared checkpoints, not individual files. Autonomous mode works the full task list, stopping only on blockers.
 
 ### IMPORTANT: tasks.md Is the Plan
 

@@ -5,9 +5,10 @@ vi.mock("../utils/paths.js", () => ({
   findProjectRoot: vi.fn().mockResolvedValue("/fake/root"),
 }));
 
-vi.mock("../utils/config.js", () => ({
-  loadConfig: vi.fn(),
-}));
+vi.mock("../utils/config.js", async () => {
+  const actual = await vi.importActual<typeof import("../utils/config.js")>("../utils/config.js");
+  return { ...actual, loadConfig: vi.fn() };
+});
 
 vi.mock("fast-glob", () => ({
   default: vi.fn().mockResolvedValue([]),
@@ -412,5 +413,22 @@ describe("runCheck", () => {
     const result = await runCheck({ continueOnFail: false, changed: false, json: true });
     // Should use the configured tool (which our mock makes succeed)
     expect(result.passed).toBe(1);
+  });
+
+  it("uses the project ESLint configuration for built-in TypeScript complexity", async () => {
+    mockLoadConfig.mockResolvedValue({
+      ...baseConfig,
+      project: { ...baseConfig.project, language: "typescript" },
+      tools: {},
+      checks: ["complexity"],
+    } as any);
+
+    await runCheck({ continueOnFail: false, changed: false, json: true });
+
+    expect(mockExecFileAsync()).toHaveBeenCalledWith(
+      "sh",
+      ["-c", "npx eslint --rule 'complexity: [warn, 10]' src/ 2>&1 || true"],
+      { cwd: "/fake/root", timeout: 60_000 }
+    );
   });
 });

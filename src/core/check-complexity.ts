@@ -25,7 +25,7 @@ async function tryEslintComplexity(root: string): Promise<{ output: string; hasW
     await execFileAsync("which", ["npx"]);
     const { stdout, stderr } = await execFileAsync("sh", [
       "-c",
-      "npx eslint --rule 'complexity: [warn, 10]' --ext .ts,.tsx,.js,.jsx src/ 2>&1 || true",
+      "npx eslint --rule 'complexity: [warn, 10]' src/ 2>&1 || true",
     ], { cwd: root, timeout: 60_000 });
     const output = (stdout + stderr).trim();
     // Match ESLint complexity rule output ("  complexity" at end of warning line).

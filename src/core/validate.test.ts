@@ -438,4 +438,22 @@ describe("manifest validation", () => {
     const result = await validateChange(undefined, { strict: false, json: true });
     expect(result.errorCount).toBe(0);
   });
+
+  it("reports no active changes when the changes directory is absent", async () => {
+    const { readdir } = await import("node:fs/promises");
+    const mockReaddir = vi.mocked(readdir);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    mockReaddir.mockResolvedValue([]);
+    const emptyResult = await validateChange(undefined, { strict: false, json: true });
+    const emptyOutput = log.mock.calls[0][0];
+
+    log.mockClear();
+    mockReaddir.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    const absentResult = await validateChange(undefined, { strict: false, json: true });
+
+    expect(absentResult).toEqual(emptyResult);
+    expect(log).toHaveBeenCalledWith(emptyOutput);
+    expect(emptyOutput).toBe("No active changes to validate.");
+  });
 });

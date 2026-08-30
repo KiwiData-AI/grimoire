@@ -120,6 +120,10 @@ export interface GrimoireConfig {
   testing_tools?: TestingToolConfig[];
 }
 
+export function getLlmArgs(llmCommand: string): string[] {
+  return /(^|[\\/])codex$/i.test(llmCommand) ? ["exec", "-"] : ["--print"];
+}
+
 const DEFAULT_CHECKS = [
   "lint",
   "format",

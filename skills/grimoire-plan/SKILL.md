@@ -208,7 +208,72 @@ Level 1-2 changes with minor gaps may proceed; level 3-4 with multiple gaps shou
 ### 4. Generate Tasks
 Create `.grimoire/changes/<change-id>/tasks.md`. **Every task produces both production code AND a test — but the test level matches the artifact the task derives from.** Tasks are structured as pairs: the failing test first, then the production code.
 
-**Order tasks by the technical spine** (`../references/design-spine.md`): dependencies → data/schema → API/contract → business logic → UI by component → verification, **test-first within each layer**. This is the same order the change was designed on, so the plan's shape mirrors the design and stays predictable across changes.
+**Build an executable section order before task approval.** Draft coherent
+sections. Derive the actual section dependency graph from referenced
+symbols, imports, schema and migration prerequisites, generated artifacts,
+fixtures, routes, and context files. Do not infer order from section titles or
+the technical spine.
+
+Topologically sort the sections. Use the technical spine only as a tie-breaker
+among independent sections. The spine order is dependencies → data/schema →
+API/contract → business logic → UI by component → verification. Assign section
+IDs after sorting, then represent every implementation section with exactly one
+dependency comment:
+
+```markdown
+<!-- depends-on: none | <earlier section IDs> -->
+```
+
+Use `none` only when the section has no prerequisites. A dependency may reference
+only an earlier section ID. Within each section, order tasks so no task requires
+a later task. Keep test-first order inside each dependency layer.
+
+Validate the complete graph before presenting the plan. Collect missing
+dependency metadata, unknown section IDs, forward dependencies, and cycles.
+Report all dependency errors together and block plan approval. Do not silently
+drop, rewrite, or reorder an invalid dependency declaration.
+
+**Define the section execution strategy before task approval.** Every implementation section declares both metadata comments:
+
+```markdown
+<!-- execution: paired -->
+<!-- checkpoints: none | structure-before | slice-after | structure-before,slice-after -->
+
+<!-- execution: autonomous -->
+<!-- checkpoints: none -->
+```
+
+- `none` is exclusive. Do not combine it with another checkpoint.
+- Only paired sections may declare `structure-before` or `slice-after`.
+- Autonomous sections always declare `checkpoints: none`.
+- Checkpoints occur only in this order: `structure-before`, then `slice-after`.
+- Select `structure-before` for pattern-establishing or structural work with high downstream leverage.
+- Select `slice-after` when one representative verified increment should establish the pattern for remaining work.
+- Group each section around one coherent outcome. Do not group unrelated layers or outcomes merely because they modify nearby files.
+- Separate the first section that establishes a pattern from later mechanical repetition. Default the pattern-establishing section to `paired`; use `autonomous` for approved repetition when no new design decision remains.
+- Verification-only sections default to `<!-- execution: autonomous -->` and `<!-- checkpoints: none -->`.
+- The metadata is the approved strategy. Do not place runtime overrides or checkpoint state in it. `grimoire-apply` records effective execution and `pending`, `approved`, or `waived` checkpoint state separately in `tasks.md`.
+
+**Keep autonomous implementation uninterrupted.** Autonomous sections contain
+no human approval, manual inspection, ask-the-user, or wait tasks. Convert
+verification to deterministic commands or agent-executable tools. A command or
+tool must state its exact success condition.
+
+If required external acceptance cannot be automated or executed by an agent,
+consolidate every such gate into one terminal `External acceptance` section
+after all implementation and verification sections. Do not mark that section
+as autonomous implementation. Its `depends-on` comment names every implementation
+and verification prerequisite. No human gate may interrupt implementation. In
+the approval presentation, state that the plan is not autonomous end-to-end and
+obtain agreement during plan approval.
+
+Before presenting tasks for approval, include a complete strategy table before the first task:
+
+| Section | Depends on | Execution | Checkpoints | Reason |
+|---------|------------|-----------|-------------|--------|
+| <section title> | `none` or earlier section IDs | `paired` or `autonomous` | `none`, `structure-before`, `slice-after`, or both in order | <why this review boundary fits the outcome> |
+
+The user reviews and approves this complete table with the task list. Do not begin implementation from a plan without approved section strategy metadata.
 
 **Tag every implementation task with a `verify:` level** — this tells `grimoire-apply` which test vehicle to use. Match the artifact:
 
@@ -369,7 +434,16 @@ The tasks file starts with a context block so any LLM can orient without re-read
 > **Test command**: `<exact command to run feature tests, e.g., pytest tests/ -k "auth">`
 > **Status**: X/Y tasks complete
 
+## Approved strategy
+
+| Section | Depends on | Execution | Checkpoints | Reason |
+|---------|------------|-----------|-------------|--------|
+| <Capability/Area> | `none` | `paired` | `structure-before,slice-after` | Establishes the pattern used by later sections. |
+
 ## 1. <Capability/Area>
+<!-- execution: paired -->
+<!-- checkpoints: structure-before,slice-after -->
+<!-- depends-on: none -->
 <!-- context:
   - features/<name>.feature
   - .grimoire/docs/<area>.md
@@ -386,6 +460,9 @@ The tasks file starts with a context block so any LLM can orient without re-read
       - <edge cases to handle>
 
 ## 2. Constraints
+<!-- execution: autonomous -->
+<!-- checkpoints: none -->
+<!-- depends-on: <earlier section IDs> -->
 <!-- context:
   - .grimoire/docs/constraints.md
   - src/<area>/<file-to-edit>.ts
@@ -398,6 +475,9 @@ The tasks file starts with a context block so any LLM can orient without re-read
       - <specific change that satisfies the invariant>
 
 ## 3. Shared Steps
+<!-- execution: autonomous -->
+<!-- checkpoints: none -->
+<!-- depends-on: <earlier section IDs> -->
 <!-- context:
   - tests/step_defs/common.py
   - features/<all relevant .feature files>
@@ -407,6 +487,9 @@ The tasks file starts with a context block so any LLM can orient without re-read
       - Given "<step text>": <what it does>
 
 ## 4. Architecture
+<!-- execution: paired -->
+<!-- checkpoints: structure-before,slice-after -->
+<!-- depends-on: <earlier section IDs> -->
 <!-- context:
   - .grimoire/decisions/<nnnn-title>.md
   - src/<files affected by decision>
@@ -421,6 +504,7 @@ The tasks file starts with a context block so any LLM can orient without re-read
 ```
 
 **Context blocks are mandatory.** Every task section (except Verification) must have a `<!-- context: ... -->` listing the files needed. This serves two purposes:
+Every implementation section must also have valid `execution` and `checkpoints` metadata.
 1. **Fresh sessions:** An agent starting a new session loads only the context block for its current section, avoiding accumulated noise from prior work
 2. **Subagent delegation:** In Claude Code, the parent agent passes the context list when spawning a subagent for a task group
 
@@ -431,7 +515,15 @@ Before presenting to the user, verify the plan:
 - [ ] Every test task describes what to assert (no "write a test")
 - [ ] Every implementation task describes what to create/modify (no "add the code")
 - [ ] The verification section has the exact commands to run
-- [ ] Tasks follow the technical-spine order (`../references/design-spine.md`): dependencies → data/schema → API/contract → logic → UI → verification, test-first within each layer
+- [ ] The technical spine orders only independent sections: dependencies → data/schema → API/contract → logic → UI → verification.
+- [ ] Actual section dependencies were derived from referenced code and artifacts; sections are topologically sorted, with the technical spine used only to break ties.
+- [ ] Every implementation section has one `depends-on` comment; each dependency exists, points backward, and creates no cycle.
+- [ ] Tasks within each section are ordered so no task requires a later task.
+- [ ] Every implementation section has valid `execution` and `checkpoints` metadata; only paired sections declare checkpoints, `none` is exclusive, and checkpoints use the fixed order.
+- [ ] The complete section strategy table appears before the first task and is ready for user approval.
+- [ ] Autonomous sections contain only deterministic commands or agent-executable work and contain no human gate.
+- [ ] Any unavoidable external acceptance is consolidated into one terminal section; plan approval explicitly agrees that execution is not autonomous end-to-end.
+- [ ] Each section has one coherent outcome; pattern establishment is separate from mechanical repetition.
 - [ ] No task requires the LLM to make architectural decisions — those should already be in the ADR
 - [ ] **Principles gate** (`../references/principles.md`): no task introduces a duplicate home for an existing fact (DRY), a second way to do an existing thing (one right way), a reinvented wheel where a tool/library/proven pattern exists (don't reinvent), or an abstraction/dependency justified only by a hypothetical (KISS). Any that does has a stated reason.
 
@@ -439,7 +531,8 @@ If any task is too vague, make it more specific before presenting. Read more cod
 
 ### 7. Present to User
 - Present tasks to user
-- Confirm order and scope
+- Confirm dependency order, scope, and section strategy
+- If an `External acceptance` section exists, obtain explicit agreement that the plan is not autonomous end-to-end
 - Adjust based on feedback
 
 ### 8. Design Review

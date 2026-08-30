@@ -11,7 +11,7 @@ metadata:
 
 Review your own uncommitted diff before you commit. Applies the shared persona engine in `../references/review-personas.md` to the staged diff (or, on request, all unstaged changes), cross-referenced with the active grimoire change.
 
-This is the dev-loop counterpart to `grimoire-pr-review`. Run it before `grimoire-commit`. If it returns blockers, fix them; if only suggestions, decide which to address. Designed to be fast — default scope is the senior engineer + security quick scan + code style, with the full persona stack opt-in.
+This is the dev-loop counterpart to `grimoire-pr-review`. Run it before `grimoire-commit`. Apply the single-pass convergence policy in `../references/review-personas.md` §2e. Designed to be fast — default scope is the senior engineer + security quick scan + code style, with the full persona stack opt-in.
 
 ## Triggers
 - User asks to review their own change before committing
@@ -165,7 +165,7 @@ Compile into the standard report layout (§5 of the personas reference). If docu
 - **N blockers** — fix before commit
 - **M suggestions** — consider addressing
 
-Recommendation: <fix blockers, then proceed to grimoire-commit / approve, ready to commit>
+Recommendation: <classify findings, fix accepted blockers once, run deterministic gates, then proceed to grimoire-commit>
 
 ## Documentation Gaps
 <Only present if coverage gaps were found in step 3. Otherwise omit this section entirely.>
@@ -176,7 +176,7 @@ Recommendation: <fix blockers, then proceed to grimoire-commit / approve, ready 
 
 Read `precommit_review.block_on` from `.grimoire/config.yaml` if set (`blocker` | `none`). Default: `blocker`.
 
-- **Blockers exist + `block_on: blocker`**: tell the user to fix and re-run; do NOT call `grimoire-commit` automatically. Offer to walk through the blockers one by one.
+- **Blockers exist + `block_on: blocker`**: classify each finding with the user, fix all accepted blockers in one correction batch, then run deterministic gates. Do not rerun this review unless §2e's material-change trigger applies.
 - **Only suggestions**: present them; ask whether to address before committing or proceed.
 - **Clean**: confirm "Ready to commit." and suggest `grimoire-commit`.
 
@@ -200,6 +200,7 @@ This skill does not currently ship a CLI command; hook mode is provided as a con
 - Never `git commit`, `git add`, or `git stash` from this skill.
 - The Code Style persona MUST cite a project anchor for every finding (config rule, `AGENTS.md` / `CLAUDE.md` line, area doc, or visible neighbor convention). General taste is dropped.
 - All persona evaluation criteria, the materiality gate, the briefing structure, and the complexity-depth table live in `../references/review-personas.md`. Don't duplicate them here — read that file when running a persona.
+- A corrected finding does not trigger another review. Deterministic gates decide readiness after the one correction batch unless §2e requires a new review.
 
 ## Done
-When the report is presented, the workflow is complete. If clean, suggest `grimoire-commit`. If blockers exist, suggest the user fix them and re-run.
+When the report is presented, findings are classified, and accepted blockers have one correction batch, the review workflow is complete. Run deterministic gates and proceed to `grimoire-commit`; do not request a repeat review without a §2e material change.

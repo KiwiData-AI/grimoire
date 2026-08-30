@@ -1,6 +1,6 @@
 ---
 name: grimoire-pr
-description: Finalize a grimoire change and create its PR — health check, decision statuses, deferral logging, change-folder removal, then description + `gh pr create`. Use whenever the user asks to create a PR and `.grimoire/changes/` is non-empty.
+description: Finalize a grimoire change when needed, then create its PR from Git history and changed live artifacts. Use whenever the user asks to create a PR for a grimoire change.
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
@@ -9,7 +9,10 @@ metadata:
 
 # grimoire-pr
 
-Finalize a grimoire change and create its pull request. This skill is the finalization gate: it runs the per-change health check, executes finalize if it has not happened yet, generates the PR description from the change artifacts, and creates the PR.
+Finalize a grimoire change and create its pull request. This skill is the
+finalization gate: it executes apply finalization when needed, runs the
+post-cleanup health gate, generates the description from Git and live artifacts,
+and creates the PR.
 
 ## Triggers
 - User wants to create a PR for a completed grimoire change
@@ -18,41 +21,45 @@ Finalize a grimoire change and create its pull request. This skill is the finali
 
 ## Routing
 - Open tasks without an explicit deferral note → `grimoire-apply` first. The health check blocks the PR until every task is checked or explicitly deferred.
-- Haven't committed yet → `grimoire-commit` first
 - Want a pre-merge design review → this skill includes optional post-implementation review
 
 ## Prerequisites
-- The change folder `.grimoire/changes/<change-id>/` exists
-- `tasks.md` is complete, or every open task carries an explicit deferral note
-- The work is committed on a feature branch; its diff vs. `main` is the change
+- The work is on a feature branch.
+- The change is identifiable from an active change folder or branch `Change:`
+  trailers.
 
 ## Workflow
 
 ### 1. Select Change
-- List active changes in `.grimoire/changes/`
-- If multiple, ask user which one to create a PR for
-- If only one, confirm it
+- List active change folders and change IDs in branch commit trailers.
+- Accept branches containing multiple related change IDs when every branch commit
+  has at least one `Change:` line. If multiple IDs are candidates, require the
+  user to select the PR change ID explicitly.
+- Retain the selected change ID after cleanup.
 
-### 2. Gather Artifacts
-Read all change artifacts:
-- `manifest.md` — change summary, scope, and why
-- `tasks.md` — implementation checklist (completion status + deferral notes)
-- All `.feature` files touched by the change — scenario names for the test plan
-- All decision records — ADR titles for the description
-- Read `.grimoire/config.yaml` for commit style
+### 2. Ensure Finalized
+Finalization is defined only by `grimoire-apply` §7.
+
+If the selected change folder exists, execute `grimoire-apply` §7. Apply owns
+health checks, durable updates, cleanup, documentation regeneration, staging,
+the one final staged review, and the immediate final commit.
+
+If the folder is already gone, inspect the selected change's final commit. It
+must contain both `Change: <change-id>` and
+`Final-production-review: approved`. Stop if either trailer is absent. Do not
+route to another production review.
 
 ### 3. Run the Health Check
-Run the per-change checks in `../references/health-check.md` §A.
+After cleanup and the final commit, run the post-cleanup and finalized-change
+checks in `../references/health-check.md` §A from Git history and changed live
+artifacts.
 - **Blockers** → stop. Present them as a fix list; no PR until they pass.
 - **Warnings** (e.g. `@not-implemented` tags) → collect them for the PR description.
 
-### 4. Ensure Finalized
-If the change folder is still present, the change is not finalized. Execute `grimoire-apply` §7 (Finalize) — that section is the definition of finalize; do not re-derive its steps here. One addition at PR time: open tasks carrying deferral notes are logged to the debt register (`.grimoire/docs/debt-register.yml`, format per `../references/refactor-register-format.md`) with `category: deferred_task` and the source change-id in `detail`, so deferred work survives the folder removal.
-
-If the folder is already gone, finalize already ran — continue.
-
-### 5. Generate PR Description
-Run the CLI: `grimoire pr <change-id>` (add `--json` for structured output). It composes the title and body from the change artifacts — Summary, Changes, Scenarios, Decisions, Test Plan, task progress, and the `Change:` trailer. The CLI reads the change folder — capture its output before step 4's folder removal, then assemble the final body.
+### 4. Generate PR Description
+Run `grimoire pr <change-id>` after cleanup. It derives the title, summary,
+scenarios, decisions, test plan, and trace footer from branch commits, trailers,
+and changed live features and decisions.
 
 Append conditional sections the CLI does not generate:
 
@@ -66,7 +73,10 @@ Append conditional sections the CLI does not generate:
 <if any security findings from review/verify exist, summarize the resolution>
 ```
 
-**Deployment impact** — scan the change's `data.yml` and the migration in the diff for a table-locking ALTER, a NOT NULL on a large table, a rename/retype, or any backward-incompatible schema change. If present, include this section and lead the PR summary with the `⚠️` line — this is the merge-time visibility the Data Engineer review requires; surfacing it only in review is not enough. No such migration → omit the section entirely.
+**Deployment impact** — scan the schema and migration diff for a table-locking
+ALTER, a NOT NULL on a large table, a rename/retype, or another
+backward-incompatible schema change. If present, include this section and lead
+the PR summary with the `⚠️` line. No such migration means omit the section.
 
 ```markdown
 ## Deployment impact
@@ -86,7 +96,7 @@ If the user wants a pre-merge review, **do NOT hand-roll a checklist** — apply
 
 One review engine, one set of rubrics — design and code alike. This skill no longer keeps a separate, lighter review prompt (DRY).
 
-### 6. Create PR
+### 5. Create PR
 Check that the branch is pushed to the remote before creating. If not, offer to push first.
 
 - **Preview only** (default): output the PR title + assembled body for the user to copy
@@ -103,9 +113,13 @@ Check that the branch is pushed to the remote before creating. If not, offer to 
 Return the PR URL.
 
 ## Important
-- Finalize has one definition — `grimoire-apply` §7. This skill executes it; it never redefines it.
+- Finalize has one definition: `grimoire-apply` §7. This skill executes it and
+  never redefines it.
 - Open tasks block the PR unless each carries a deferral note; deferred tasks land in the debt register, never silently dropped.
-- The PR description must trace back to grimoire artifacts — this is what makes the audit trail work.
+- Generate the PR description only after cleanup from Git history and changed
+  live artifacts.
+- Multiple related change IDs may share a branch. Explicit change selection
+  determines PR identity and description content.
 - The `Change: <change-id>` line at the bottom lets `grimoire trace` find the PR; the CLI includes it.
 - Don't pad the description with boilerplate. Keep it factual: what changed, why, how to verify.
 - A downtime-incurring or backward-incompatible schema migration MUST carry a `⚠️` flag in the PR body (Deployment impact section) — never let it merge silently. Zero-downtime is not forced; *visibility* of the cost is.

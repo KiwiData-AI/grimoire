@@ -54,6 +54,15 @@ Read all artifacts for the change — see `../references/artifact-map.md` for wh
 - Relevant `.grimoire/docs/` area docs if they exist
 - Skim the areas of the codebase the tasks reference
 
+Before persona evaluation, validate the plan's executable shape as part of the
+same initial review. In the initial single pass, check dependency completeness,
+backward-only order, cycle freedom, and autonomous compatibility. Confirm task
+order within each section and verify that declared dependencies match referenced
+symbols, imports, schema or migration prerequisites, generated artifacts,
+fixtures, routes, and context files. Treat an invalid dependency graph or an
+intermediate human gate in autonomous work as a blocker. Report all such plan
+blockers with the other initial findings; do not silently edit `tasks.md`.
+
 ### 3. Build Project Briefing
 Follow `../references/review-personas.md` §1 (Project Briefing). README fallback: if missing or <200 chars, prompt user once: "README thin — add 3 lines on product / users / stage, or proceed with what exists?" If user proceeds, mark `Product framing: unknown`.
 
@@ -165,13 +174,15 @@ Compile into the standard report layout (§5 of the personas reference):
 - **N blockers** — must be addressed before coding
 - **M suggestions** — consider addressing
 
-Recommendation: Fix blockers, then proceed to apply.
+Recommendation: Classify findings, fix accepted blockers once, run deterministic gates, then proceed to apply.
 ```
 
-### 7. Iterate
-- If there are **blockers**, tell the user which artifacts need updating (features, decisions, or tasks) and offer to help fix them
+### 7. Resolve Once
+- Apply `../references/review-personas.md` §2e. Run one persona review and one accepted correction batch.
+- If there are **blockers**, tell the user which artifacts need updating, classify every finding, and fix all accepted blockers together.
 - If only **suggestions**, present them and let the user decide which to address
 - If **no issues**, confirm the design is ready and suggest proceeding to `grimoire-apply`
+- After corrections, run deterministic artifact validation. Do not rerun personas unless scope, architecture, trust boundaries, schema, public APIs, acceptance criteria, or production entry points materially changed.
 - Do NOT proceed to apply without user approval
 
 ## Important
@@ -183,6 +194,7 @@ Recommendation: Fix blockers, then proceed to apply.
 - If the change is trivial (e.g., rename a field, fix a typo in a feature), say so and don't manufacture issues.
 - **Don't self-exempt by feel.** "It looks fine" / "I reviewed as I wrote it" are the *Skipping review* rationalization in `../references/red-flags.md`. Trivial-exempt is the skill's call, not a vibe.
 - All persona evaluation criteria, the materiality gate, the briefing structure, and the complexity-depth table live in `../references/review-personas.md`. Don't duplicate them here — read that file when running a persona.
+- Correcting accepted findings does not itself justify another LLM review. Deterministic gates are the final readiness authority after the correction batch.
 
 ## Done
-When findings are presented and blockers resolved (or accepted), the review is complete. Suggest proceeding to `grimoire-apply`.
+When findings are classified and accepted blockers receive one correction batch, run deterministic validation. If it passes and no §2e material-change trigger occurred, the review is complete. Suggest proceeding to `grimoire-apply`.
