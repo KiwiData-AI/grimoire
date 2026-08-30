@@ -21,7 +21,7 @@ Implement tasks from a planned grimoire change using **test-first discipline at 
 
 Do NOT write a `.feature` scenario for a `unit-invariant` or `characterization` task — forcing Gherkin where a unit test is correct is the antipattern that fills feature files with slop. One right way: behavior → scenario, everything else → unit test.
 
-**Artifacts are edited live on the feature branch.** Features, decisions, constraints, and schema are real files in `features/`, `.grimoire/decisions/`, `.grimoire/docs/`. There is no copy-into-change-folder and no promote step — `git diff` is the staging area. The change folder holds only ephemeral process scaffolding (`manifest.md`, `tasks.md`, and the apply-maintained `learnings.md`).
+**Artifacts are edited live on the feature branch.** Features, decisions, constraints, and schema are real files in `features/`, `.grimoire/decisions/`, `.grimoire/docs/`. There is no copy-into-change-folder and no promote step. The ordinary Git index is the staging area. The change folder holds ephemeral process scaffolding such as `draft.md`, `manifest.md`, `tasks.md`, `baseline.md`, and `learnings.md`.
 
 ## CRITICAL: Two Rules That Must Not Be Broken
 
@@ -65,24 +65,146 @@ This applies to all LLMs: Claude, Codex, Cursor, Copilot, etc. The task list is 
 - Read `tasks.md` and find the first unchecked `- [ ]` task — that's where you start
 - Skip any tasks already marked `- [x]` (resume from where a previous session left off)
 
-### 2. Choose Execution Mode
-Ask the user how they want to work through the task list:
+### 2. Set Up Change
 
-**Review mode (default):** Before each task, present what you plan to implement and which files you'll touch. Then for each file change:
-1. Show the proposed change (what you plan to write/edit and why)
-2. Wait for user approval before writing to that file
-3. If the user requests modifications, revise and re-present before writing
+Before dispatching any section, ensure the change is on its feature branch:
 
-After all file changes for a task are approved and written, run the tests and show results. Wait for user approval before moving to the next task. The user can request changes, ask questions, reorder, or skip tasks at any point.
+```
+git checkout -b <type>/<change-id>
+```
 
-**Autonomous mode:** Work through the entire task list without pausing between tasks. Only stop if:
-- A test won't go green after reasonable attempts (you're stuck)
-- Implementation reveals the spec is wrong (needs to go back to draft)
-- You hit an external blocker (missing dependency, permissions, etc.)
+Where `<type>` is `feat`, `fix`, `refactor`, or `chore` based on the change. If a branch already exists (`grimoire-branch-guard` or `grimoire-draft` usually created it), switch to it. Update the manifest's `branch:` field with the branch name.
 
-If the user doesn't specify, default to review mode.
+The branch links Git history to the change through the `Change: <change-id>` commit trailer. The branch provides isolation, and the ordinary Git index provides staging.
 
-**Both modes:** Update `tasks.md` in real time as work progresses. Mark tasks `- [x]` the moment they pass. If a task is split, reordered, or new tasks are discovered during implementation, update `tasks.md` immediately so it always reflects the current state. The task list is the source of truth for progress — if the session is interrupted, the next agent should be able to read `tasks.md` and know exactly where to resume.
+Before dispatching any section, run the configured suites once to record the starting state. Present any pre-existing failures to the user and get acceptance before proceeding. Write the result to `.grimoire/changes/<change-id>/baseline.md`. Skippable when no test command is configured or the user opts out. Record the skip. Full protocol: `../references/test-baseline.md`.
+
+The point: a failure is "pre-existing" only if it is in `baseline.md`. This replaces end-of-run "that's a pre-existing failure" surprises with a start-of-run acceptance.
+
+> **No promote.** Feature files, decisions, and constraints were drafted directly into their live locations (`features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`) on this branch. BDD runners already discover the scenarios from `features/`. Do not copy anything out of `.grimoire/changes/` — that folder holds only ephemeral scaffolding such as `draft.md`, `manifest.md`, `tasks.md`, `baseline.md`, and `learnings.md`.
+
+### 3. Dispatch Each Section
+
+Before dispatching any section, validate the complete plan. Require exactly one
+`depends-on` comment on every implementation section. Validate that dependencies
+name existing earlier sections, form no cycle, and match the section order.
+Validate that autonomous sections contain no human approval, manual inspection,
+ask-the-user, or wait tasks. An approved terminal `External acceptance` section
+is not an autonomous implementation section and runs only after implementation
+and verification complete.
+
+For the next section, confirm every declared dependency section is complete;
+every task in a complete dependency section is checked. Only then dispatch the
+section. Treat missing dependency metadata, unknown or
+forward dependencies, cycles, incomplete dependencies, or human-gate tasks in
+autonomous sections as an invalid approved plan. Report every plan error together
+and stop without editing, reordering, or repairing `tasks.md`. Await user
+direction on the invalid plan; never silently make it dispatchable.
+
+Each implementation section declares its approved execution strategy:
+
+```markdown
+<!-- execution: paired -->
+<!-- checkpoints: structure-before,slice-after -->
+```
+
+Read the section's approved metadata before dispatching work. `execution` is
+either `paired` or `autonomous`. `checkpoints` is `none`,
+`structure-before`, `slice-after`, or
+`structure-before,slice-after`. `none` is exclusive. Checkpoints always occur
+in the declared order. Only a section whose approved execution is `paired` may
+declare checkpoints. An approved autonomous section must declare
+`checkpoints: none`; stop, report invalid approved metadata, and await user
+direction before changing `tasks.md` or dispatching.
+
+Persist effective execution state directly below the approved metadata:
+
+```markdown
+<!-- runtime-execution: paired -->
+<!-- checkpoint-state: structure-before=pending,slice-after=pending -->
+```
+
+Create `runtime-execution` when the section begins if it is absent. Create
+`checkpoint-state` only when the section declares one or more checkpoints.
+Include only declared checkpoints. Each declared checkpoint is `pending`,
+`approved`, or `waived`. Never modify approved `execution` or `checkpoints`
+metadata to record runtime state.
+
+Use `runtime-execution` when present. Otherwise, use approved `execution`.
+Resume pending checkpoints from `checkpoint-state`. A completed checkpoint
+stays approved or waived across sessions.
+
+**Paired execution:** Dispatch one section agent for support edits and the
+failing test. The agent establishes red, then returns an exact unapplied unified
+production patch for one coherent production increment. Present that patch for
+approval before applying it. One approval may cover multiple production files. A
+rejected patch leaves production files unchanged and retains the failing test as
+revision evidence. Give the rejection feedback to a fresh section agent and
+redispatch the same increment. The orchestrator applies an approved patch and
+runs focused verification to establish green.
+
+The orchestrator may apply one approved paired production patch and run focused
+verification. If `slice-after` is pending, keep every covered support and
+production task unchecked until the user approves the verified slice. Without a
+pending `slice-after`, mark the covered tasks `[x]` after focused verification.
+The orchestrator may not otherwise edit production code.
+
+**Autonomous execution:** Dispatch one section agent for direct red-green work.
+The agent may edit production and support files. An approved autonomous section
+has no checkpoints. A paired section switched to autonomous at runtime still
+honors or explicitly waives its approved pending checkpoints. The agent stops at
+those pending checkpoints and at all existing blockers, specification conflicts,
+retry limits, and circuit breakers.
+
+**`structure-before`:** Before tests or production implementation, present the
+proposed production shape:
+- Production ownership and intended files.
+- Model fields, relationships, constraints, indexes, and nullability.
+- Function, class, protocol, and payload signatures.
+- Dependencies and transaction, queue, retry, or external-boundary behavior.
+- Existing patterns to reuse.
+- Material alternatives and the selected trade-off.
+
+Wait for approval before continuing. Approval records
+`structure-before=approved`. Keep it pending when rejected or when the user
+requests revision.
+
+**`slice-after`:** Once, after the first representative production increment
+passes focused verification, present:
+- The production-only multi-file diff.
+- Implemented behavior and its entry point.
+- Relevant persistence, task, or external-service boundaries.
+- Focused verification results.
+- Divergence from approved structure.
+- The pattern proposed for remaining work.
+
+Wait for approval before completing covered tasks or continuing. Approval
+records `slice-after=approved`, marks the covered tasks `[x]`, and prevents this
+checkpoint from recurring. Rejection keeps the provisional production slice
+applied and keeps its tasks unchecked. Do not roll back the slice or require the
+paired agent to edit production files. Give the feedback and current slice to a
+fresh paired section agent. The agent may revise support files. Run revised or
+retained support evidence against the current provisional production slice and
+confirm it fails before returning an unapplied corrective production patch.
+Present that patch for approval, apply an approved patch, rerun focused
+verification, and present the corrected slice at the same pending checkpoint. A
+prior explicit waiver records
+`slice-after=waived` and prevents the checkpoint from recurring.
+
+Apply user directives at the next safe production boundary after an active
+section agent returns:
+- `Finish this section on your own` sets `runtime-execution` to `autonomous`
+  and retains pending checkpoints.
+- `Finish without further review` sets `runtime-execution` to `autonomous`
+  and marks each declared pending checkpoint `waived`.
+- `Pair with me from here` sets `runtime-execution` to `paired`.
+- `Show me the next slice` continues until the next declared pending checkpoint.
+
+Do not rewrite completed work when applying an override. Do not use an override
+to bypass red-green discipline, retry limits, blocker handling, circuit
+breakers, branch rules, or `tasks.md` authority. Mark tasks `- [x]` as they
+become eligible so `tasks.md` remains the resume record. A covered paired task
+with pending `slice-after` is not eligible until slice approval.
 
 ### Working Memory: `learnings.md`
 
@@ -154,12 +276,36 @@ Each task section in `tasks.md` has a `<!-- context: ... -->` block listing the 
 
 The parent agent is the **orchestrator only** — it does NOT implement tasks itself. The workflow is:
 
-1. Parent reads `tasks.md`, finds the first unchecked section
-2. Parent spawns a **subagent** (Agent tool) with this prompt:
+1. Parent reads `tasks.md`, finds the first unchecked section.
+2. Parent reads the section's approved metadata and runtime state, then selects
+   the dispatch prompt below.
+
+   **Paired dispatch prompt:**
    ```
-   You are implementing grimoire tasks. Read `.grimoire/changes/<change-id>/tasks.md`,
-   find section <N>, and implement all unchecked tasks in that section.
-   Follow the red-green BDD cycle for each task. Mark tasks [x] when done.
+    You are implementing grimoire tasks in paired execution. Read
+    `.grimoire/changes/<change-id>/tasks.md`, find section <N>, and prepare the
+    next coherent production increment from its unchecked tasks.
+
+   Section metadata: execution=<execution>; checkpoints=<checkpoints>.
+   Runtime state: runtime-execution=<runtime-execution>;
+   checkpoint-state=<checkpoint-state or none>.
+
+   The agent may edit support files only. The agent must not edit production
+   files. Support files include tests, Gherkin, and `.grimoire/changes/`
+   coordination files.
+   Establish red by writing and running the failing test. Return an exact unified
+   production patch for one coherent production increment. Do not apply that
+   patch. The orchestrator applies the approved patch and runs focused
+   verification to establish green. Do not mark any task [x] until that
+   verification passes. When `slice-after` is pending, keep covered tasks
+   unchecked until the user approves the verified slice.
+
+   When revising a rejected provisional `slice-after`, read the rejection
+   feedback and current applied slice. Keep covered tasks unchecked. Revise
+   support files when needed. Run revised or retained support evidence against
+   the current provisional production slice and confirm it fails before returning
+   an unapplied corrective production patch. Do not roll back or directly edit
+   the provisional production slice.
 
    Use `.grimoire/changes/<change-id>/learnings.md` as working memory: read a
    task's failure-mode notes before retrying it and don't repeat a recorded dead
@@ -167,29 +313,59 @@ The parent agent is the **orchestrator only** — it does NOT implement tasks it
    task goes green; append durable project facts to Discovered facts with their
    home (never to AGENTS.md). Never weaken or delete a test to force green.
 
-   Before writing any production code, read `../references/code-quality.md`,
+   When the section is complete, write a <!-- SESSION: ... --> handoff note
+   under the last task and exit.
+   ```
+
+   **Autonomous dispatch prompt:**
+   ```
+   You are implementing grimoire tasks in autonomous execution. Read
+   `.grimoire/changes/<change-id>/tasks.md`, find section <N>, and implement all
+   unchecked tasks in that section.
+
+   Section metadata: execution=<execution>; checkpoints=<checkpoints>.
+   Runtime state: runtime-execution=<runtime-execution>;
+   checkpoint-state=<checkpoint-state or none>.
+
+   You may edit production and support files. Follow the red-green cycle for
+   each task. Mark tasks [x] only after focused verification passes. Stop at a
+   declared pending checkpoint and at all existing blockers, specification
+   conflicts, retry limits, and circuit breakers.
+
+   Use `.grimoire/changes/<change-id>/learnings.md` as working memory: read a
+   task's failure-mode notes before retrying it and don't repeat a recorded dead
+   end; append a failure-mode note after any failed attempt; prune them when the
+   task goes green; append durable project facts to Discovered facts with their
+   home (never to AGENTS.md). Never weaken or delete a test to force green.
+
+   Before writing production code, read `../references/code-quality.md`,
    `../references/testing-contracts.md`, and `../references/pattern-guard.md`.
-   Apply the code-quality rules WHILE you write (not after) — reuse before write,
-   trust callers (no defensive guards inside the trust boundary), specific names
-   (no `data`/`result`/`temp`), branching budget ~7, function size ~30 lines,
-   no premature abstraction, comments only for non-obvious WHY.
-   Before writing the test for each task, run the pattern-guard brief (Steps 1–1b–2–4):
-   classify the code type (Step 1), run reuse discovery — two search_graph calls
-   by concept and by name to find existing code to call instead of writing (Step 1b),
-   find 3–5 peers via search_graph (Step 2), extract the modal pattern, write a brief.
-   Write code that matches the brief. After writing production code, run the
-   hallucination check (Step 6): verify every called external function exists in
-   the graph before running tests.
+   Before writing each test, run the pattern-guard brief. After writing
+   production code, run the hallucination check before running tests.
 
    When the section is complete, write a <!-- SESSION: ... --> handoff note
    under the last task and exit.
    ```
-3. Subagent reads `tasks.md` and the context files for that section
-4. Subagent implements, marks tasks `[x]`, writes handoff note, exits
-5. Parent reads updated `tasks.md`, spawns next subagent for next section
-6. Repeat until all sections complete
+3. Section agent reads `tasks.md` and the context files for that section.
+4. Section agent implements, marks tasks `[x]` when eligible, writes a handoff
+   note, and exits.
+5. For paired execution, the parent presents one patch. Rejection retains the
+   red test and redispatches the same increment with revision feedback.
+6. After patch approval, the parent applies it and runs focused verification.
+7. If `slice-after` is pending, the parent presents the verified representative
+   increment. It keeps covered tasks unchecked until approval. Approval marks
+   the checkpoint approved and the covered tasks complete. Rejection keeps the
+   provisional slice applied and both the checkpoint and tasks pending. The
+   parent sends the feedback and current slice to a fresh paired agent, which
+   returns an unapplied corrective production patch. The parent repeats patch
+   approval, focused verification, and the same slice checkpoint.
+8. Without a pending `slice-after`, the parent marks covered tasks complete after
+   focused verification.
+9. If paired-section tasks remain unchecked, the parent redispatches the same
+   section. Otherwise, it spawns the next section agent.
+10. Repeat until all sections complete.
 
-**The parent agent MUST NOT write production code or test code.** Its only jobs are: read `tasks.md`, spawn subagents, and check completion between sections. If the parent starts implementing tasks directly, context will degrade by section 3-4 and output quality will drop.
+**The parent agent MUST NOT write production code or test code.** It may apply an approved paired production patch. Its other jobs are reading `tasks.md`, spawning subagents, and checking completion between sections. If the parent starts implementing tasks directly, context will degrade by section 3-4 and output quality will drop.
 
 #### Other Agents (Codex, Cursor, Windsurf, etc.)
 
@@ -224,24 +400,6 @@ Even within a section, break early if:
 Write a handoff note at the break point and start fresh.
 
 **Check `.grimoire/config.yaml`** for the configured coding agent — use `llm.coding.command` and `llm.coding.model` for implementation work.
-
-### 3. Create Feature Branch
-Before writing any code, ensure you're on a feature branch for this change:
-
-```
-git checkout -b <type>/<change-id>
-```
-
-Where `<type>` is `feat`, `fix`, `refactor`, or `chore` based on the change. If a branch already exists (`grimoire-branch-guard` or `grimoire-draft` usually created it), switch to it. Update the manifest's `branch:` field with the branch name.
-
-The branch links the git history to the change via the `Change: <change-id>` commit trailer. The branch IS the isolation and `git diff` IS the staging — there is no separate promote step.
-
-### 3b. Capture Test Baseline
-Before writing the first test, run the configured suites once to record the starting state, then **present any pre-existing failures to the user and get acceptance before proceeding**. This is the run you'd do anyway to understand where you're starting — just save the result. Write it to `.grimoire/changes/<change-id>/baseline.md` so `grimoire-verify` can tell a regression you introduced from a failure that was already red. Skippable when no test command is configured or the user opts out (record the skip — don't leave it silent). Full protocol: `../references/test-baseline.md`.
-
-The point: a failure is "pre-existing" only if it's in `baseline.md`. This replaces end-of-run "that's a pre-existing failure" surprises with a start-of-run acceptance the user signed off on.
-
-> **No promote.** Feature files, decisions, and constraints were drafted directly into their live locations (`features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`) on this branch. BDD runners already discover the scenarios from `features/`. Do not copy anything out of `.grimoire/changes/` — that folder holds only `manifest.md` and `tasks.md`.
 
 ### 4. Load Context
 
@@ -322,51 +480,106 @@ When all implementation tasks are complete:
 
 **The verify step is not optional. Do not proceed to finalize with failing tests.**
 
+### 6a. Final Staged Review
+
+Run this procedure after finalization has removed the change folder, regenerated
+documentation, and staged the complete durable final state. It is an aggregate
+safety net and does not replace paired checkpoints.
+
+1. Identify the target branch and its merge base.
+2. Confirm the ordinary Git index contains every intended durable change,
+   including any tracked change-folder deletion. Resolve every missing or
+   unrelated staged path before presenting the review.
+3. Present the complete merge-base-to-index path list:
+   ```
+   git diff --cached --name-status "$(git merge-base <target-branch> HEAD)"
+   ```
+   Group every listed path under `Production` or `Support`. Production paths
+   implement runtime behavior. Support paths include tests, Gherkin, decisions,
+   documentation, and tracked coordination-file deletions. Treat an unknown path
+   as production until classified. Exclude nothing from approval.
+4. Present the full merge-base-to-index diff without a pathspec:
+   ```
+   git diff --cached "$(git merge-base <target-branch> HEAD)"
+   ```
+5. Require explicit user approval of the complete staged path list and full
+   merge-base-to-index diff. Approval covers both production and support paths.
+6. On approval, immediately create one final commit from the reviewed index. Do
+   not edit or restage between approval and commit. Include `Change: <change-id>`
+   and `Final-production-review: approved` trailers.
+
 ### 7. Finalize
-When all tests are green. Finalize is part of apply, not optional — a session that ends at "tests green" without finalizing leaves the change unfinished; `/grimoire:pr` executes this section before any PR. Features, decisions, and constraints were edited live on the branch — finalize flips states, applies the schema delta, and clears the ephemeral scaffolding:
-1. Decision records already live in `.grimoire/decisions/` (drafted there, numbered at draft time). Flip MADR status from `proposed` to `accepted` and set the date.
-2. Constraints (`.grimoire/docs/constraints.md`) were edited in place — nothing to move.
-3. If the change has a `data.yml` (schema delta), apply its `add`/`modify`/`remove` entries to the live `.grimoire/docs/data/schema.yml` so the baseline schema stays current. `data.yml` is a migration-delta spec (ephemeral scaffolding carrying nullability/safety/ordering intent a raw diff wouldn't), not a copy of the schema — `schema.yml` is the live target; the delta is discarded with the change folder.
-4. Refresh the project overview: run `grimoire docs`. It regenerates `.grimoire/docs/OVERVIEW.md` (the human entry point) from the now-current features, constraints, decisions, and schema — superseded decisions drop out automatically. This is the existing `docs` command, not a new one.
+When all tests are green. Finalize is part of apply, not optional. A session that
+ends at "tests green" without finalizing leaves the change unfinished;
+`/grimoire:pr` executes this section before any PR.
 
-   When `tools.spec_site` is configured, the same command also regenerates and builds the committed spec site in `.grimoire/site/html/`. A failing site build blocks finalize — fix the build or unconfigure `tools.spec_site`; never skip silently.
-5. Reconcile `learnings.md`: for each entry under **Discovered facts**, write it into the home it names — an area doc (`.grimoire/docs/<area>.md`), a decision, a constraint, or `schema.yml`. Confirm the routing with the user (it's correctable) and drop stale ones. Failure-mode notes are discarded, not promoted. This is the one place facts learned during apply enter the durable record — `AGENTS.md` is never the destination.
-6. Remove the change directory `.grimoire/changes/<change-id>/`. Its `manifest.md` + `tasks.md` + `learnings.md` (+ any `data.yml`) and the `draft.md` design doc are ephemeral process scaffolding. `draft.md` was retained read-only through the pipeline as the agreed-design reference; this is its closing deletion.
+1. Run the applicable active-change health checks from
+   `../references/health-check.md` §A. Resolve blockers before changing durable
+   finalization state.
+2. Verify branch history contains at least one ordinary commit whose body has
+   `Change: <change-id>`. The qualifying commit must contain durable verified
+   work only and must contain no path under `.grimoire/changes/<change-id>/`. If
+   no commit qualifies, stage a coherent durable verified increment without the
+   change folder and create an ordinary commit through `grimoire-commit`. Stop if
+   no durable verified work is available for that commit. Run the pre-cleanup
+   identity check from `../references/health-check.md` §A before continuing.
+3. Flip this change's proposed decisions to `accepted` and set the date.
+4. Apply `data.yml` entries to `.grimoire/docs/data/schema.yml` when present.
+5. Reconcile each durable fact in `learnings.md` into its named durable home.
+   Discard failure-mode notes.
+6. Record every deferred task in `.grimoire/docs/debt-register.yml`. Each open
+   task requires an explicit deferral note and a `category: deferred_task` entry
+   containing the change-id. An unexplained open task blocks finalization.
+7. Remove `.grimoire/changes/<change-id>/`, including its design, manifest,
+   tasks, baseline, data delta, and working-memory files.
+8. Run `grimoire docs` after removal. It regenerates
+   `.grimoire/docs/OVERVIEW.md` from the durable live state. When
+   `tools.spec_site` is configured, the same command must regenerate and build
+   the committed site successfully.
+9. Stage the complete intended durable final state in the ordinary Git index.
+   Include live implementation, tests, features, accepted decisions, schema,
+   reconciled docs, debt register, regenerated documentation, and the
+   change-folder deletion. Before staging, inspect the existing index. Every
+   staged path must belong to an approved task or durable finalization step.
+   Unrelated pre-staged work blocks finalization; stop and ask the user instead
+   of committing, unstaging, or modifying it.
+10. Run the applicable post-cleanup health checks from
+   `../references/health-check.md` §A against the staged durable state. Resolve
+   blockers before review.
+11. Run §6a once. Present the complete staged path list and full
+    merge-base-to-index diff, then obtain explicit approval of the entire index.
+12. Immediately create one final commit from the reviewed index with
+    `Change: <change-id>` and `Final-production-review: approved` trailers.
 
-   **Guard — never delete uncommitted scaffolding.** `git log` only preserves what was committed. If `draft.md`/`tasks.md`/`manifest.md`/`learnings.md` were never committed (e.g. draft and plan ran without intermediate commits), deleting them now loses them permanently — there is no recovering an untracked file. Before removing the folder, verify it is in history:
-   ```
-   git ls-files --error-unmatch .grimoire/changes/<change-id>/draft.md
-   ```
-   If that errors (untracked), or `git status` shows uncommitted edits under the change folder, **commit the scaffolding first** (see step 8 — this becomes the first of two commits), then delete. If you cannot commit, STOP and tell the user rather than deleting.
+Use no review snapshot, digest, synthetic ref, synthetic index, review worktree,
+or cleanup-only commit. The final commit contains the reviewed remaining durable
+state and any tracked cleanup; it is never a separate cleanup commit.
 
-   The durable record is the branch, the PR, and `git log` — linked by the `Change: <change-id>` trailer; once committed, git history preserves `draft.md` if ever needed. **There is no archive tree** (don't reinvent git history).
+If finalization resumes after step 6, reconstruct the intended durable state
+from Git history and changed live artifacts. Continue with documentation,
+staging, one review, and one final commit.
 
 ### 8. Commit
 
-The commit captures the finished state — accepted decisions, live artifacts, cleared scaffolding — not mid-flight change artefacts.
+Ordinary mid-process commits are allowed whenever verified work forms a useful
+unit. Each requires `Change: <change-id>` and does not require final production
+review or its trailer.
 
-**Order depends on whether the scaffolding is already in history (see step 6's guard):**
-
-- **Scaffolding already committed** (draft/plan committed earlier, the normal case): finalize fully — including the folder removal — then make one commit capturing the accepted state and the deletion.
-- **Scaffolding NOT yet committed** (this is the change's first commit): you cannot delete-then-commit, or the scaffolding is lost forever. Make **two commits**: (1) commit the implementation, live artifacts, and the still-present change folder so history preserves `draft.md`/`tasks.md`; (2) remove the folder and commit the deletion. Both carry the `Change: <change-id>` trailer.
-
-Stage the live artifacts (and, in the single-commit case, the scaffolding removal):
-```
-git add features/ .grimoire/decisions/ .grimoire/docs/ src/ tests/
-git add -u  # picks up the removed change directory (single-commit case)
-```
-
-Then commit using `/grimoire:commit` (reads change context for the message) or write a manual message following `AGENTS.md` commit trailer conventions:
+Finalization creates exactly one final commit after cleanup and §6a approval.
+Use `/grimoire:commit` or a manual message following `AGENTS.md` conventions:
 ```
 feat(<change-id>): <short description>
 
 <body if needed>
 
 Change: <change-id>
+Final-production-review: approved
 Scenarios: "<scenario 1>", "<scenario 2>"
 ```
 
-Mid-task commits are fine — commit whenever it makes sense during implementation. **Do not open a PR before finalize is complete.** The PR should represent the finished, archived state of the change.
+The required pre-cleanup ordinary commit contains durable verified work and no
+ephemeral scaffolding. Do not create another commit only for change-folder
+removal. Do not open a PR before finalization completes.
 
 ### 9. Summary
 Present a brief summary:

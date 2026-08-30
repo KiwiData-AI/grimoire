@@ -143,6 +143,33 @@ Closing test for any code-level finding: **would a senior engineer on this team 
 
 ---
 
+## 2e. Single-Pass Convergence
+
+An LLM review is advisory and nondeterministic. Repeating the same review after
+each correction encourages new low-value findings and does not prove
+convergence.
+
+Every design, pre-commit, and PR review follows one review cycle:
+
+1. Run the selected personas once against one complete candidate.
+2. Present the complete deduplicated finding set.
+3. Classify each finding as accepted, rejected with reason, or deferred.
+4. Apply all accepted blockers in one correction batch.
+5. Run deterministic tests, lint, validation, build, and other configured gates.
+6. Do not rerun the persona review merely because its findings were corrected.
+
+Run a new persona review only when the correction batch materially changes at
+least one reviewed boundary: scope, architecture, trust boundary, data schema,
+public API, user-visible acceptance criteria, or production entry point. Wording,
+formatting, test-fixture, and direct finding corrections do not trigger another
+review. An explicit user request always permits a new review.
+
+After the correction batch, deterministic gates are the final readiness
+authority. Fix a failing deterministic gate and rerun that gate. Do not convert
+that retry into another open-ended LLM review.
+
+---
+
 ## 3. Complexity Gating
 
 Read `complexity` from the linked manifest if available; otherwise infer from the change.

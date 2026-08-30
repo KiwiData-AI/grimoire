@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import chalk from "chalk";
 import { simpleGit } from "simple-git";
-import { loadConfig } from "../utils/config.js";
+import { getLlmArgs, loadConfig } from "../utils/config.js";
 import { findProjectRoot, resolveChangePath } from "../utils/paths.js";
 import { spawnWithStdin } from "../utils/spawn.js";
 
@@ -12,6 +12,7 @@ const execFileAsync = promisify(execFile);
 
 interface PrOptions {
   changeId?: string;
+  base?: string;
   create: boolean;
   review: boolean;
   json: boolean;
@@ -24,32 +25,85 @@ interface PrOutput {
   review?: string;
 }
 
+interface ChangeCommit {
+  hash: string;
+  subject: string;
+  body: string;
+  changeIds: string[];
+}
+
 export async function generatePr(options: PrOptions): Promise<void> {
+  const context = await preparePr(options);
+
+  let reviewOutput: string | undefined;
+  if (options.review) {
+    reviewOutput = await runPostImplReview(
+      context.root,
+      context.base,
+      context.llmCommand,
+      context.body
+    );
+  }
+
+  const output: PrOutput = {
+    title: context.title,
+    body: context.body,
+    changeId: context.changeId,
+    review: reviewOutput,
+  };
+
+  if (options.json) {
+    console.log(JSON.stringify(output, null, 2));
+    return;
+  }
+
+  printPrPreview(output, context.taskProgress);
+
+  if (options.create) {
+    await createPr(context.root, context.base, context.title, context.body);
+  } else {
+    console.log(
+      chalk.dim("\nRun with --create to create the PR via gh/glab.")
+    );
+  }
+}
+
+async function preparePr(options: PrOptions) {
   const root = await findProjectRoot();
   const config = await loadConfig(root);
   const changesDir = join(root, ".grimoire", "changes");
+  const base = await resolveBaseBranch(root, options.base);
+  const commits = await readBranchCommits(root, base);
 
-  const changeId = options.changeId ?? (await detectActiveChange(changesDir));
-  if (!changeId) {
-    throw new Error("No active change found. Specify a change ID.");
-  }
-
+  const changeId = await resolveChangeId(changesDir, options.changeId, commits);
   const changeDir = resolveChangePath(root, changeId);
-
   const manifest = await readFileOrEmpty(join(changeDir, "manifest.md"));
   const tasks = await readFileOrEmpty(join(changeDir, "tasks.md"));
-  const features = await readArtifactFiles(changeDir, "features", ".feature");
-  const decisions = await readArtifactFiles(changeDir, "decisions", ".md");
+  const changeCommits = commits.filter((commit) => commit.changeIds.includes(changeId));
+  if (!manifest && changeCommits.length === 0) {
+    throw new Error(`No commits found for change "${changeId}".`);
+  }
 
-  const whySection = extractSection(manifest, "Why");
-  const featureChanges = extractSection(manifest, "Feature Changes");
+  const changedPaths = await readChangedPaths(root, base, commits);
+  const { features, decisions } = await readPrArtifacts(
+    root,
+    changeDir,
+    changedPaths,
+    config.features_dir,
+    config.decisions_dir
+  );
+
+  const whySection = extractSection(manifest, "Why") || extractCommitSummary(changeCommits);
+  const featureChanges = extractSection(manifest, "Feature Changes") || formatCommitChanges(commits);
   const scenarios = extractScenarios(features);
   const decisionTitles = extractDecisionTitles(decisions);
-  const taskProgress = countTasks(tasks);
+  const taskProgress = tasks ? countTasks(tasks) : undefined;
 
   const manifestTitle = extractTitle(manifest);
   const commitStyle = config.project.commit_style ?? "conventional";
-  const title = formatTitle(manifestTitle, changeId, commitStyle);
+  const title = manifest
+    ? formatTitle(manifestTitle, changeId, commitStyle)
+    : formatCommitTitle(selectTitleCommit(changeCommits).subject, changeId, commitStyle);
 
   const body = composePrBody({
     why: whySection,
@@ -60,44 +114,164 @@ export async function generatePr(options: PrOptions): Promise<void> {
     changeId,
   });
 
-  let reviewOutput: string | undefined;
-  if (options.review) {
-    reviewOutput = await runPostImplReview(root, config.llm.coding.command, body);
+  return {
+    root,
+    base,
+    title,
+    body,
+    changeId,
+    taskProgress,
+    llmCommand: config.llm.coding.command,
+  };
+}
+
+async function resolveChangeId(
+  changesDir: string,
+  explicitChange: string | undefined,
+  commits: ChangeCommit[]
+): Promise<string> {
+  const activeChange = explicitChange ? null : await detectActiveChange(changesDir);
+  const changeId = selectChange(explicitChange, activeChange, commits);
+  if (!changeId) {
+    throw new Error("No active change found. Specify a change ID.");
   }
+  return changeId;
+}
 
-  const output: PrOutput = { title, body, changeId, review: reviewOutput };
+async function readPrArtifacts(
+  root: string,
+  changeDir: string,
+  changedPaths: string[],
+  featuresDir: string,
+  decisionsDir: string
+): Promise<{ features: string[]; decisions: string[] }> {
+  const liveFeatures = await readChangedArtifactFiles(root, changedPaths, featuresDir, ".feature");
+  const liveDecisions = await readChangedArtifactFiles(root, changedPaths, decisionsDir, ".md");
+  const features = liveFeatures.length > 0
+    ? liveFeatures
+    : await readArtifactFiles(changeDir, "features", ".feature");
+  const decisions = liveDecisions.length > 0
+    ? liveDecisions
+    : await readArtifactFiles(changeDir, "decisions", ".md");
+  return { features, decisions };
+}
 
-  if (options.json) {
-    console.log(JSON.stringify(output, null, 2));
-    return;
-  }
-
+function printPrPreview(
+  output: PrOutput,
+  taskProgress?: { complete: number; incomplete: number }
+): void {
   console.log(chalk.bold("\nPR Preview\n"));
-  console.log(chalk.bold("Title: ") + title);
+  console.log(chalk.bold("Title: ") + output.title);
   console.log(chalk.dim("─".repeat(60)));
-  console.log(body);
+  console.log(output.body);
 
-  if (taskProgress.incomplete > 0) {
-    console.log(
-      chalk.yellow(
-        `\n⚠ ${taskProgress.incomplete} task(s) still incomplete — consider finishing before creating PR.`
-      )
-    );
+  if (taskProgress && taskProgress.incomplete > 0) {
+    console.log(chalk.yellow(
+      `\n⚠ ${taskProgress.incomplete} task(s) still incomplete — consider finishing before creating PR.`
+    ));
   }
 
-  if (reviewOutput) {
+  if (output.review) {
     console.log(chalk.dim("─".repeat(60)));
     console.log(chalk.bold("\nPost-Implementation Review:\n"));
-    console.log(reviewOutput);
+    console.log(output.review);
   }
+}
 
-  if (options.create) {
-    await createPr(root, title, body);
-  } else {
-    console.log(
-      chalk.dim("\nRun with --create to create the PR via gh/glab.")
-    );
+async function resolveBaseBranch(root: string, explicitBase?: string): Promise<string> {
+  if (explicitBase) return explicitBase;
+
+  try {
+    const remoteHead = await simpleGit(root).raw([
+      "symbolic-ref",
+      "--quiet",
+      "--short",
+      "refs/remotes/origin/HEAD",
+    ]);
+    return remoteHead.trim().replace(/^[^/]+\//, "") || "main";
+  } catch {
+    return "main";
   }
+}
+
+async function readBranchCommits(root: string, base: string): Promise<ChangeCommit[]> {
+  try {
+    const output = await simpleGit(root).raw([
+      "log",
+      `${base}..HEAD`,
+      "--reverse",
+      "--format=%H%x1f%s%x1f%b%x1e",
+    ]);
+    return output.split("\x1e").flatMap((record) => {
+      const [hash, subject, body] = record.trim().split("\x1f");
+      const changeIds = body?.match(/^Change:\s*(.+)$/gim)
+        ?.map((line) => line.replace(/^Change:\s*/i, "").trim()) ?? [];
+      if (!hash || !subject || changeIds.length === 0) return [];
+      return [{
+        hash: hash.trim(),
+        subject: subject.trim(),
+        body: body.trim(),
+        changeIds,
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function selectChange(
+  explicitChange: string | undefined,
+  activeChange: string | null,
+  commits: ChangeCommit[]
+): string | null {
+  if (explicitChange) return explicitChange;
+
+  const changeIds = new Set(commits.flatMap((commit) => commit.changeIds));
+  if (changeIds.size > 1) {
+    throw new Error("Multiple changes found in branch history. Specify one: grimoire pr <change-id>");
+  }
+  const branchChange = changeIds.values().next().value ?? null;
+  if (activeChange && branchChange && activeChange !== branchChange) {
+    throw new Error("Multiple changes found in branch history. Specify one: grimoire pr <change-id>");
+  }
+  return branchChange ?? activeChange;
+}
+
+async function readChangedPaths(
+  root: string,
+  base: string,
+  commits: ChangeCommit[]
+): Promise<string[]> {
+  try {
+    const git = simpleGit(root);
+    const output = await git.diff(["--name-only", `${base}...HEAD`]);
+    const branchPaths = output.trim().split("\n").filter(Boolean);
+    if (commits.length === 0) return branchPaths;
+
+    const selectedPaths = new Set<string>();
+    for (const commit of commits) {
+      const paths = await git.raw(["show", "--format=", "--name-only", commit.hash]);
+      for (const path of paths.trim().split("\n").filter(Boolean)) selectedPaths.add(path);
+    }
+    return branchPaths.filter((path) => selectedPaths.has(path));
+  } catch {
+    return [];
+  }
+}
+
+async function readChangedArtifactFiles(
+  root: string,
+  paths: string[],
+  artifactDir: string,
+  extension: string
+): Promise<string[]> {
+  const prefix = `${artifactDir.replace(/\/$/, "")}/`;
+  const contents: string[] = [];
+  for (const path of paths.filter((path) => path.startsWith(prefix) && path.endsWith(extension))) {
+    const content = await readFileOrEmpty(join(root, path));
+    if (content) contents.push(content);
+  }
+  return contents;
 }
 
 async function detectActiveChange(changesDir: string): Promise<string | null> {
@@ -159,6 +333,21 @@ function extractTitle(manifest: string): string {
   return match ? match[1].trim() : "Untitled change";
 }
 
+function extractCommitSummary(commits: ChangeCommit[]): string {
+  return commits.map((commit) => {
+    const body = commit.body
+      .split("\n")
+      .filter((line) => !/^(Change|Scenarios|Decisions|Final-production-review):/i.test(line.trim()))
+      .join("\n")
+      .trim();
+    return body || commit.subject;
+  }).filter(Boolean).join("\n\n");
+}
+
+function formatCommitChanges(commits: ChangeCommit[]): string {
+  return commits.map((commit) => `- ${commit.subject}`).join("\n");
+}
+
 function extractSection(content: string, heading: string): string {
   const regex = new RegExp(
     `^##\\s+${heading}\\s*\n([\\s\\S]*?)(?=^##\\s|$)`,
@@ -213,12 +402,23 @@ function formatTitle(
   return `${type}: ${cleanTitle}`;
 }
 
+function formatCommitTitle(subject: string, changeId: string, style: string): string {
+  return /^[a-z]+(?:\([^)]+\))?!?:\s/i.test(subject)
+    ? subject
+    : formatTitle(subject, changeId, style);
+}
+
+function selectTitleCommit(commits: ChangeCommit[]): ChangeCommit {
+  return [...commits].reverse().find((commit) => /^(feat|fix)(?:\([^)]+\))?!?:\s/i.test(commit.subject))
+    ?? commits.at(-1)!;
+}
+
 function composePrBody(data: {
   why: string;
   featureChanges: string;
   scenarios: string[];
   decisionTitles: string[];
-  taskProgress: { complete: number; incomplete: number };
+  taskProgress?: { complete: number; incomplete: number };
   changeId: string;
 }): string {
   const sections: string[] = [];
@@ -257,11 +457,11 @@ function composePrBody(data: {
   }
   sections.push("");
 
-  const total = data.taskProgress.complete + data.taskProgress.incomplete;
-  sections.push(
-    `Tasks: ${data.taskProgress.complete}/${total} complete`
-  );
-  sections.push("");
+  if (data.taskProgress) {
+    const total = data.taskProgress.complete + data.taskProgress.incomplete;
+    sections.push(`Tasks: ${data.taskProgress.complete}/${total} complete`);
+    sections.push("");
+  }
   sections.push(`Change: ${data.changeId}`);
 
   return sections.join("\n");
@@ -269,15 +469,16 @@ function composePrBody(data: {
 
 async function runPostImplReview(
   root: string,
+  base: string,
   llmCommand: string,
   prBody: string
 ): Promise<string> {
   try {
     const git = simpleGit(root);
-    const diff = await git.diff(["main...HEAD"]);
+    const diff = await git.diff([`${base}...HEAD`]);
 
     if (!diff.trim()) {
-      return "No diff found against main. Skipping review.";
+      return `No diff found against ${base}. Skipping review.`;
     }
 
     // Truncate diff if very large
@@ -305,7 +506,7 @@ Focus on:
 
 Flag issues as **blocker** or **suggestion**. Be concise.`;
 
-    const output = await spawnWithStdin(llmCommand, ["--print"], prompt, root);
+    const output = await spawnWithStdin(llmCommand, getLlmArgs(llmCommand), prompt, root);
     return output;
   } catch (err) {
     return `Review failed: ${err instanceof Error ? err.message : "unknown error"}`;
@@ -314,6 +515,7 @@ Flag issues as **blocker** or **suggestion**. Be concise.`;
 
 async function createPr(
   root: string,
+  base: string,
   title: string,
   body: string
 ): Promise<void> {
@@ -327,8 +529,8 @@ async function createPr(
 
     const createCmd =
       tool === "gh"
-        ? ["pr", "create", "--title", title, "--body", body]
-        : ["mr", "create", "--title", title, "--description", body];
+        ? ["pr", "create", "--base", base, "--title", title, "--body", body]
+        : ["mr", "create", "--target-branch", base, "--title", title, "--description", body];
 
     try {
       const { stdout } = await execFileAsync(tool, createCmd, {
@@ -353,4 +555,3 @@ async function createPr(
     )
   );
 }
-

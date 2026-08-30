@@ -1,12 +1,12 @@
 # Skills
-> Last updated: 2026-06-07
+> Last updated: 2026-08-29
 
 ## Purpose
-Claude Code skill definitions that provide grimoire's AI-driven workflow. Each skill is a `SKILL.md` file loaded as a slash command (e.g. `/grimoire:draft`). Skills are the primary interface between users and the grimoire workflow.
+Markdown skill definitions that provide Grimoire's AI-driven workflow. Skills are the primary interface between users and the Grimoire workflow.
 
 ## Boundaries
 - Skills are markdown instruction files, not code. They describe workflow steps for AI assistants and reference CLI commands (`grimoire validate`, `grimoire check`) without containing executable code.
-- Skills are copied into a target project's `.claude/skills/` during `grimoire init` and `grimoire update` via `installSkillFiles()` in `src/core/shared-setup.ts` — the list there is authoritative. Register a new skill there.
+- Skills are copied into the configured Claude, OpenCode, or Codex skill directory during `grimoire init` and `grimoire update` via `installSkillFiles()` in `src/core/shared-setup.ts` — the agent and skill lists there are authoritative.
 - Long persona lists, rubrics, and format specs live in `skills/references/` (see `references.md`), not inline in each SKILL.md.
 
 ## Conventions

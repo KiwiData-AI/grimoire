@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { Given, When, Then, After } from "@cucumber/cucumber";
 import { GrimoireWorld } from "./world.js";
@@ -59,6 +60,13 @@ const SPEC_SITE_TOOL = `tools:
   spec_site:
     name: stub
     command: mkdir -p .grimoire/site/html && touch .grimoire/site/html/index.html`;
+
+const FINALIZED_LOGIN_FEATURE = `Feature: Login
+  Scenario: User signs in after change cleanup
+    Given valid credentials
+    When the user signs in
+    Then access is granted
+`;
 
 function manifest(status: string): string {
   return `---
@@ -168,6 +176,40 @@ Given(
 );
 
 Given(
+  "a finalized change {string} whose ephemeral change folder has been removed",
+  function (this: GrimoireWorld, change: string) {
+    this.changeId = change;
+    this.initProject();
+    this.git(["checkout", "-q", "-B", "main"]);
+    this.write("README.md", "# Demo\n");
+    this.git(["add", "."]);
+    this.git(["commit", "-q", "-m", "chore: baseline"]);
+    this.git(["checkout", "-q", "-b", `feat/${change}`]);
+    this.write(`.grimoire/changes/${change}/manifest.md`, manifest("implementing"));
+    rmSync(join(this.dir, ".grimoire", "changes", change), { recursive: true });
+    assert.ok(
+      !existsSync(join(this.dir, ".grimoire", "changes", change)),
+      "ephemeral change folder still exists"
+    );
+  }
+);
+
+Given(
+  "its Git history and changed live artifacts identify the change",
+  function (this: GrimoireWorld) {
+    assert.ok(this.changeId, "finalized change id is missing");
+    this.write("features/login.feature", FINALIZED_LOGIN_FEATURE);
+    this.git(["add", "."]);
+    this.git([
+      "commit",
+      "-q",
+      "-m",
+      `feat(auth): add login after cleanup\n\nUsers can sign in after finalized cleanup.\n\nChange: ${this.changeId}\nFinal-production-review: approved`,
+    ]);
+  }
+);
+
+Given(
   "a grimoire project with a stale change and an unproven constraint",
   function (this: GrimoireWorld) {
     this.initProject();
@@ -243,10 +285,35 @@ When("I assess test quality", function (this: GrimoireWorld) {
 });
 
 When("I prepare a pull request", function (this: GrimoireWorld) {
-  this.run(["pr", "add-login", "--json"]);
+  this.run(["pr", "--json"]);
 });
 
-// ── Then: assertions (loose — domain outcomes, not exact output) ────────
+Given(
+  "every branch commit body contains at least one {string} line",
+  function (this: GrimoireWorld, trailer: string) {
+    assert.equal(trailer, "Change", "unexpected required trailer");
+    this.initProject();
+    this.git(["checkout", "-q", "-B", "main"]);
+    this.write("README.md", "# Demo\n");
+    this.git(["add", "."]);
+    this.git(["commit", "-q", "-m", "chore: baseline\n\nChange: baseline"]);
+    this.git(["checkout", "-q", "-b", "feat/related-changes"]);
+  }
+);
+
+Given("the branch contains multiple related change IDs", function (this: GrimoireWorld) {
+  this.write("features/login.feature", FINALIZED_LOGIN_FEATURE);
+  this.git(["add", "."]);
+  this.git(["commit", "-q", "-m", "feat(auth): add login\n\nChange: add-login"]);
+  this.write("features/profile.feature", VALID_FEATURE.replace("Valid feature", "Profile"));
+  this.git(["add", "."]);
+  this.git(["commit", "-q", "-m", "feat(profile): add profile\n\nChange: add-profile"]);
+});
+
+When("I explicitly select one change for the pull request", function (this: GrimoireWorld) {
+  this.changeId = "add-login";
+  this.run(["pr", this.changeId, "--json"]);
+});
 
 function ran(world: GrimoireWorld, label: string): void {
   assert.ok(world.result.code !== undefined, `${label}: command did not run`);
@@ -437,6 +504,43 @@ Then("a pull request description summarising the change is produced", function (
   assert.ok(title.trim().length > 0, "PR has no title");
   assert.match(body, /login/i, "PR body does not mention the change");
 });
+
+Then(
+  "a pull request description summarising the change is produced from Git history and live artifacts",
+  function (this: GrimoireWorld) {
+    assert.ok(this.changeId, "finalized change id is missing");
+    assert.equal(this.result.code, 0, `pr failed:\n${this.out}`);
+    const { title, body, changeId } = this.json<{ title: string; body: string; changeId: string }>();
+    assert.equal(changeId, this.changeId, "wrong change id on the PR");
+    assert.equal(title, "feat(auth): add login after cleanup", "PR title did not come from Git history");
+    assert.match(body, /Users can sign in after finalized cleanup\./, "PR summary did not come from Git history");
+    assert.match(body, /"User signs in after change cleanup"/, "PR scenarios did not come from live artifacts");
+    assert.ok(
+      !existsSync(join(this.dir, ".grimoire", "changes", this.changeId)),
+      "ephemeral change folder still exists"
+    );
+    const commitBody = execFileSync("git", ["log", "-1", "--format=%B"], {
+      cwd: this.dir,
+      encoding: "utf-8",
+    });
+    assert.match(
+      commitBody,
+      new RegExp(`^Change: ${this.changeId}\\nFinal-production-review: approved$`, "m"),
+      "final commit trailers are missing or non-contiguous"
+    );
+  }
+);
+
+Then(
+  "grimoire uses the selected change identity and accepts the related branch history",
+  function (this: GrimoireWorld) {
+    assert.equal(this.result.code, 0, `pr failed:\n${this.out}`);
+    const { body, changeId } = this.json<{ body: string; changeId: string }>();
+    assert.equal(changeId, this.changeId, "wrong selected change id");
+    assert.match(body, /login/i, "selected change is missing");
+    assert.match(body, /profile/i, "related branch change is hidden from the PR");
+  }
+);
 
 After(function (this: GrimoireWorld) {
   this.cleanup();

@@ -1,5 +1,5 @@
 # Features
-> Last updated: 2026-06-07
+> Last updated: 2026-08-29
 
 ## Purpose
 Gherkin specifications for grimoire's own behavior. Each `.feature` file describes how grimoire works — these are the contracts the CLI, skills, and workflows must honor.

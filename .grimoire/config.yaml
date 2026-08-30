@@ -6,7 +6,7 @@ project:
   doc_tool: vitepress
   comment_style: tsdoc
   agents:
-    - claude
+    - codex
   integrations:
     codebase_memory_mcp: true
     ste_plugin: true
@@ -58,9 +58,9 @@ checks:
   - doc_style
 llm:
   thinking:
-    command: claude
+    command: codex
   coding:
-    command: claude
+    command: codex
 bug_trackers:
   - name: none
 testing_tools: []

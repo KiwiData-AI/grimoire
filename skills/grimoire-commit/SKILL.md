@@ -9,7 +9,9 @@ metadata:
 
 # grimoire-commit
 
-Write a commit message from staged changes and active grimoire context. Never auto-commit — always present for approval.
+Write a commit message from staged changes and grimoire context. Present ordinary
+commits for approval. During apply finalization, approval of the final production
+diff authorizes the immediate final commit.
 
 ## Triggers
 - User asks to commit, write a commit message, or prepare a commit
@@ -29,6 +31,8 @@ Write a commit message from staged changes and active grimoire context. Never au
 - Read `.grimoire/config.yaml` to get `commit_style` setting
 - Find active grimoire change: scan `.grimoire/changes/*/manifest.md`
 - Read `tasks.md` from the active change if it exists — note which tasks are being completed
+- If finalization removed the change folder, derive the change ID from branch
+  `Change:` trailers and read changed live features and decisions.
 - Note any modified `.feature` files or decision records
 
 ### 2. Analyze Changes
@@ -79,6 +83,18 @@ Decisions: 0003-totp-library
 - These are standard git trailers (parsed by `git log --format="%(trailers)"`)
 - The bug skill should also include `Change:` if a scenario was added to cover a spec gap
 - Commits outside grimoire changes (config, deps, formatting) don't need trailers
+- Ordinary mid-process commits require only `Change:` among review-related
+  trailers.
+- Before apply deletes ephemeral state, branch history must contain an ordinary
+  commit with the current `Change:` identity. That commit contains durable
+  verified work only and no active change-folder scaffolding.
+- The one final commit occurs after apply removes the change folder, regenerates
+  documentation, and stages the complete durable final state.
+- Explicit approval of the complete staged path list and full
+  merge-base-to-index diff must be followed immediately by that final commit.
+- Final approval includes production and support paths without exclusions.
+- The final commit also requires `Final-production-review: approved`.
+- Do not create a separate cleanup-only commit.
 
 ### 6. Branch Naming
 If no branch exists for the change yet, suggest creating one before committing:
@@ -141,7 +157,9 @@ Decisions: 0005-adopt-sqlalchemy
 ```
 
 ## Important
-- **Never auto-commit.** Always present the message for approval first.
+- Never create an ordinary commit without presenting its message for approval.
+- Apply finalization creates the final commit immediately after complete-index
+  approval; do not add a second approval boundary.
 - If no grimoire change is active, still write a good commit message from the diff alone.
 - If the diff is too large to summarize meaningfully, suggest the user split it into smaller commits.
 - The grimoire footer (Change/Scenarios/Decisions) is only included when an active grimoire change exists and is relevant to the staged changes.

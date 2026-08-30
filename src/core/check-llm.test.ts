@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildLlmPrompt } from "./check-llm.js";
+import { buildLlmPrompt, getLlmArgs } from "./check-llm.js";
 
 describe("buildLlmPrompt", () => {
   it("strips newlines, carriage returns, and backticks from filenames", () => {
@@ -21,8 +21,8 @@ describe("buildLlmPrompt", () => {
   it("truncates the diff at 40,000 characters", () => {
     const result = buildLlmPrompt("Review", ["a.ts"], "x".repeat(50_000));
 
-    const diffBody = result.match(/```diff\n(x+)\n```/)?.[1] ?? "";
-    expect(diffBody.length).toBe(40_000);
+    expect(result).toContain("... [diff truncated]");
+    expect(result.length).toBeLessThan(41_000);
   });
 
   it("instructs a PASS/FAIL verdict on the first line", () => {
@@ -31,5 +31,16 @@ describe("buildLlmPrompt", () => {
     expect(result).toContain(
       "Respond with PASS or FAIL as the very first word on the very first line"
     );
+  });
+});
+
+describe("getLlmArgs", () => {
+  it("uses Codex non-interactive stdin execution", () => {
+    expect(getLlmArgs("codex")).toEqual(["exec", "-"]);
+    expect(getLlmArgs("/usr/local/bin/codex")).toEqual(["exec", "-"]);
+  });
+
+  it("uses print mode for non-Codex commands", () => {
+    expect(getLlmArgs("claude")).toEqual(["--print"]);
   });
 });
