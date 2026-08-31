@@ -6,7 +6,7 @@
   of the scaffolding — nothing here persists to the repo. Re-read it at the start
   of every task section and before every retry.
 
-  Two sections, two lifecycles. Keep them separate; never write either into
+  Three sections, three lifecycles. Keep them separate; never write them into
   `AGENTS.md`.
 -->
 
@@ -22,6 +22,17 @@
 Format: `- <task-id> · tried <approach> · failed: <observed error / why>`
 
 - 2.2 · tried mocking the client wrapper · failed: mock satisfied an assertion prod code never reaches — mock at the HTTP boundary instead
+
+## Active-section drift notes
+
+<!--
+  Short-lived. Record only a user-directed implementation correction needed to
+  reconcile the completed section or affected later sections. Agents do not
+  create implementation drift autonomously. Clear these notes after post-section
+  reconciliation.
+-->
+
+Format: `- <task-id> · user directed <correction> · affects <later task or section>`
 
 ## Discovered facts
 

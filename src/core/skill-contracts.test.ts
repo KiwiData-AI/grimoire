@@ -8,6 +8,8 @@ const skill = (name: string) =>
 const reference = (name: string) =>
   readFile(resolve("skills", "references", name), "utf-8");
 
+const rootFile = (name: string) => readFile(resolve(name), "utf-8");
+
 const normalize = (content: string) => content.replace(/\s+/g, " ").trim();
 
 function expectOrdered(content: string, clauses: string[]): void {
@@ -65,14 +67,40 @@ describe("skill contracts", () => {
     }
   });
 
-  it("keeps slice tasks incomplete until approval", async () => {
-    const applySkill = normalize(await skill("grimoire-apply"));
-
-    expectOrdered(applySkill, [
-      "If `slice-after` is pending, keep every covered support and production task unchecked until the user approves the verified slice.",
-      "Approval records `slice-after=approved`, marks the covered tasks `[x]`, and prevents this checkpoint from recurring.",
-      "A covered paired task with pending `slice-after` is not eligible until slice approval.",
+  it("records eligible task progress before section reconciliation", async () => {
+    const [agents, applySkill, planSkill, design, decision] = await Promise.all([
+      rootFile("AGENTS.md").then(normalize),
+      skill("grimoire-apply").then(normalize),
+      skill("grimoire-plan").then(normalize),
+      rootFile("docs/design/adaptive-pair-programming.md").then(normalize),
+      rootFile(".grimoire/decisions/0043-adaptive-pair-programming.md").then(normalize),
     ]);
+
+    for (const policy of [agents, applySkill, planSkill, design, decision]) {
+      expect(policy).toContain(
+        "Mark each task `[x]` as soon as focused verification passes and every pending checkpoint requirement for that task is approved or waived.",
+      );
+      expect(policy).toContain(
+        "Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.",
+      );
+    }
+
+    for (const staleGuidance of [
+      "keep the section tasks unchecked until section reconciliation",
+      "Keep every task in the active section unchecked until all tasks are verified",
+      "keeps section tasks unchecked until reconciliation",
+      "mark every section task complete",
+      "keep the task unchecked until section reconciliation",
+      "mark the section tasks complete",
+      "mark the section's tasks complete",
+    ]) {
+      expect(applySkill).not.toContain(staleGuidance);
+    }
+    expect(applySkill).toContain("Size one section to one context.");
+    expect(applySkill).not.toContain("Size one task to one context.");
+    expect(applySkill).toContain(
+      "Mark each task [x] only after focused verification passes and every pending checkpoint requirement for that task is approved or waived.",
+    );
   });
 
   it("revises rejected paired work at the correct boundary", async () => {
@@ -229,6 +257,131 @@ describe("skill contracts", () => {
     expect(reviewPolicy).toContain("deterministic gates are the final readiness authority");
     expect(reviewPolicy).toContain("Fix a failing deterministic gate and rerun that gate.");
     expect(reviewPolicy).toContain("Do not convert that retry into another open-ended LLM review.");
+  });
+
+  it("applies only user-directed drift and reconciles it after the section", async () => {
+    const [agents, applySkill, planSkill] = await Promise.all([
+      rootFile("AGENTS.md").then(normalize),
+      skill("grimoire-apply").then(normalize),
+      skill("grimoire-plan").then(normalize),
+    ]);
+
+    for (const policy of [agents, applySkill, planSkill]) {
+      expect(policy).toContain(
+        "The approved section outcome and source artifacts remain authoritative; implementation mechanics are correctable details.",
+      );
+      expect(policy).toContain(
+        "Apply user-directed active-section corrections without evaluating the guidance or updating planning artifacts after each correction.",
+      );
+      expect(policy).toContain(
+        "An agent must ask for user direction before changing implementation direction; agents never create active-section drift autonomously.",
+      );
+    }
+
+    expectOrdered(applySkill, [
+      "Keep only short drift notes needed by later work.",
+      "Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.",
+      "After the whole section is final",
+      "update the completed section's task descriptions and every affected later section once",
+      "identify remaining planning gaps without relitigating applied user guidance",
+      "clear the section's drift notes",
+      "continue to the next section",
+    ]);
+  });
+
+  it("gives paired and autonomous dispatch the same drift rule", async () => {
+    const applySkill = normalize(await skill("grimoire-apply"));
+    const dispatchRule =
+      "Only user direction may create active-section implementation drift. Apply that direction without evaluating it or maintaining planning artifacts mid-section; otherwise ask the user before changing implementation direction.";
+
+    expect(applySkill.match(new RegExp(dispatchRule.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))).toHaveLength(
+      2,
+    );
+    expect(applySkill).toContain(
+      "Do not stop merely because user-directed implementation mechanics differ from the task details.",
+    );
+  });
+
+  it("keeps drift reconciliation lightweight and persistence corrections ordinary", async () => {
+    const [applySkill, learnings, reviewSkill, reviewPolicy, design] = await Promise.all([
+      skill("grimoire-apply").then(normalize),
+      rootFile("templates/learnings.md").then(normalize),
+      skill("grimoire-review").then(normalize),
+      reference("review-personas.md").then(normalize),
+      rootFile("docs/design/adaptive-pair-programming.md").then(normalize),
+    ]);
+
+    expect(learnings).toContain("## Active-section drift notes");
+    expect(learnings).toContain("Clear these notes after post-section reconciliation.");
+    expect(applySkill).toContain(
+      "User-directed model, persistence, and migration mechanics are ordinary implementation corrections.",
+    );
+    expect(reviewSkill).toContain(
+      "User-directed data-schema, model, persistence, or migration implementation mechanics alone do not trigger another persona review when no reviewed boundary, including the data schema, materially changes.",
+    );
+    expect(reviewPolicy).toContain(
+      "User-directed data-schema, model, persistence, or migration implementation mechanics alone do not trigger another persona review when no reviewed boundary, including the data schema, materially changes.",
+    );
+    expect(design).toContain(
+      "Reconcile once after the whole section is final.",
+    );
+    expect(design).toContain(
+      "Post-section gap review may identify remaining gaps but must not reopen applied user guidance.",
+    );
+  });
+
+  it("allows user-directed test corrections without weakening red-green", async () => {
+    const applySkill = normalize(await skill("grimoire-apply"));
+
+    expectOrdered(applySkill, [
+      "When the user corrects an implementation-specific test expectation, update the test before changing production code.",
+      "Run the corrected test against the current production code and confirm it fails.",
+      "Only then change production code to make the corrected test pass.",
+    ]);
+    expect(applySkill).toContain(
+      "An agent must never weaken or delete a test without explicit user direction.",
+    );
+    expect(applySkill).not.toContain(
+      "If a test genuinely encodes the wrong expectation, that is a spec problem — STOP and go back to draft",
+    );
+  });
+
+  it("keeps data-schema changes material with a narrow mechanics exception", async () => {
+    const [reviewSkill, reviewPolicy] = await Promise.all([
+      skill("grimoire-review").then(normalize),
+      reference("review-personas.md").then(normalize),
+    ]);
+    const mechanicsException =
+      "User-directed data-schema, model, persistence, or migration implementation mechanics alone do not trigger another persona review when no reviewed boundary, including the data schema, materially changes.";
+
+    expect(reviewSkill).toContain(
+      "Do not rerun personas unless scope, architecture, trust boundaries, data schemas, public APIs, acceptance criteria, or production entry points materially changed.",
+    );
+    expect(reviewPolicy).toContain(
+      "Run a new persona review only when the correction batch materially changes at least one reviewed boundary: scope, architecture, trust boundary, data schema, public API, user-visible acceptance criteria, or production entry point.",
+    );
+    expect(reviewSkill).toContain(mechanicsException);
+    expect(reviewPolicy).toContain(mechanicsException);
+    expect(reviewPolicy).not.toContain(
+      "User-directed data-schema, model, persistence, or migration mechanics alone are not material changes.",
+    );
+  });
+
+  it("adds no drift checkpoint, report, approval, or persona rerun", async () => {
+    const [applySkill, planSkill, reviewPolicy] = await Promise.all([
+      skill("grimoire-apply").then(normalize),
+      skill("grimoire-plan").then(normalize),
+      reference("review-personas.md").then(normalize),
+    ]);
+
+    for (const policy of [applySkill, planSkill]) {
+      expect(policy).toContain(
+        "Section reconciliation adds no drift checkpoint, report, reconciliation approval, or persona rerun.",
+      );
+    }
+    expect(reviewPolicy).toContain(
+      "Post-section drift reconciliation never requires a persona rerun or reconciliation approval.",
+    );
   });
 
   it("derives and topologically orders executable section dependencies", async () => {

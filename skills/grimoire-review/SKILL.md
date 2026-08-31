@@ -182,7 +182,8 @@ Recommendation: Classify findings, fix accepted blockers once, run deterministic
 - If there are **blockers**, tell the user which artifacts need updating, classify every finding, and fix all accepted blockers together.
 - If only **suggestions**, present them and let the user decide which to address
 - If **no issues**, confirm the design is ready and suggest proceeding to `grimoire-apply`
-- After corrections, run deterministic artifact validation. Do not rerun personas unless scope, architecture, trust boundaries, schema, public APIs, acceptance criteria, or production entry points materially changed.
+- After corrections, run deterministic artifact validation. Do not rerun personas unless scope, architecture, trust boundaries, data schemas, public APIs, acceptance criteria, or production entry points materially changed.
+- User-directed data-schema, model, persistence, or migration implementation mechanics alone do not trigger another persona review when no reviewed boundary, including the data schema, materially changes.
 - Do NOT proceed to apply without user approval
 
 ## Important

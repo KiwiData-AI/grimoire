@@ -300,6 +300,14 @@ Do not add tasks for scenarios you wish existed, edge cases you imagine, observa
 
 **THE PLAN MUST BE SPECIFIC ENOUGH TO EXECUTE WITHOUT FURTHER PLANNING.** Specific means *answered*, not *delegated*: file paths resolved (not "find the right file"), reusable utilities named with exact symbol + path (not "check if one exists"), import paths verified (not "confirm the import"). See Operating Rules §1.
 
+The approved section outcome and source artifacts remain authoritative; implementation mechanics are correctable details. Apply user-directed active-section corrections without evaluating the guidance or updating planning artifacts after each correction. An agent must ask for user direction before changing implementation direction; agents never create active-section drift autonomously.
+
+Planning details guide implementation without becoming a mid-section maintenance obligation. Mark each task `[x]` as soon as focused verification passes and every pending checkpoint requirement for that task is approved or waived. Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.
+
+Keep only short drift notes needed by later work. After the whole section is final, update the completed section's task descriptions and every affected later section once. Then identify remaining planning gaps without relitigating applied user guidance, clear the section's drift notes, and continue.
+
+User-directed model, persistence, and migration mechanics are ordinary implementation corrections. Section reconciliation adds no drift checkpoint, report, reconciliation approval, or persona rerun. Existing operation permission gates remain unchanged.
+
 **THE PLAN MUST PREFER SIMPLICITY.** For each task, choose the approach with the least code, fewest new files, and smallest surface area. If a task can be solved by adding a few lines to an existing file, don't create a new module. If a standard library function does the job, don't pull in a dependency. If three lines of inline code are clearer than a helper, keep them inline. Flag any task that introduces a new abstraction, utility, or pattern — it needs a reason.
 
 **THE PLAN MUST USE PROVEN PATTERNS, NOT INVENT NEW ONES.** When the task fits a well-known pattern, name it and follow it:
