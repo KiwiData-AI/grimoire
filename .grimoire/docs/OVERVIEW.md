@@ -108,22 +108,15 @@ What the app does, for whom. Grouped by functional story; each scenario is an ex
 **Build each task test-first** (`features/workflow/build-test-first.feature`)
 > As a developer · I want each task implemented with a failing test before the code · So that every behaviour is covered by a test that genuinely exercises it
 
-- A task is implemented only after its test fails first
+- Existing failures are baselined once
+- A feature task uses one tactical red-green command
 - Repeated failure stops the work instead of looping
-- A paired section reviews its structure before implementation
-- A paired section reviews one completed production increment once
-- A developer lets the current section finish autonomously
-- A developer waives the current section's pending checkpoints
-- A developer resumes pairing for the current section
-- A developer requests the next checkpoint
-- A developer rejects an unapplied paired production patch
-- A developer rejects a provisional slice after verification
-- A paired agent keeps production changes isolated
-- An issue is fixed without interrupting the active section
-- A completed section updates affected planning once
+- A structural activity is reviewed before implementation
+- Verification invokes one pre-commit review
+- User steering becomes an implementation lesson
 - Verified task completion is recorded immediately
-- Persistence details can be corrected during implementation
 - An agent does not create implementation drift
+- Full verification runs once after pre-commit review
 - Finalization preserves deferred tasks
 - An ordinary implementation commit records its change
 - Finalization establishes durable change identity before cleanup
@@ -164,12 +157,13 @@ What the app does, for whom. Grouped by functional story; each scenario is an ex
 
 - An approved spec becomes an ordered task list
 - Planning refuses when nothing is approved
-- Planning proposes a section execution strategy
-- Planning separates a new pattern from its repetition
-- Planning defines paired production isolation
+- Planning groups work into substantial feature sections
+- Planning assigns review timing by activity
+- Planning creates tactical red-green feature tasks
+- Planning does not manufacture Gherkin for internal work
 - Planning orders actual section dependencies
 - Planning rejects an invalid section dependency graph
-- Autonomous implementation has no intermediate human gate
+- Slice-after implementation has no intermediate human gate
 - Unavoidable external acceptance occurs after verification
 
 **Review a change before coding begins** (`features/workflow/review-a-change-before-coding.feature`)
@@ -215,9 +209,9 @@ How the codebase is organized. Each area has a detailed doc in `.grimoire/docs/`
 | [core](core.md) | `src/core` | Business logic — init, update, validation, checks, health, tracing, PR generation, branch-guard, hooks |
 | [commands](commands.md) | `src/commands` | CLI command wrappers — thin delegators from commander.js to core functions |
 | [utils](utils.md) | `src/utils` | Shared utilities — config loading, path resolution, filesystem helpers, process spawning |
-| [skills](skills.md) | `skills` | Claude Code skill definitions — workflow, onboarding, and bug SKILL.md files |
+| [skills](skills.md) | `skills` | Portable AI workflow definitions — workflow, onboarding, and bug SKILL.md files |
 | [references](references.md) | `skills/references` | Shared knowledge documents (personas, rubrics, formats) loaded on demand by skills |
-| [features](features.md) | `features` | Baseline Gherkin specs for grimoire's own behavior — grouped by area (cli, workflow, design, review, etc.) |
+| [features](features.md) | `features` | Optional actor-visible Gherkin specs for Grimoire behavior, grouped by capability area |
 | [templates](templates.md) | `templates` | Static files copied into target projects during grimoire init — decision, constraints, accepted-risks, brand examples, context scaffold |
 
 ### core
@@ -270,6 +264,10 @@ Gherkin specifications for grimoire's own behavior. Each `.feature` file describ
 - `features/` is the single home for every spec. Changes are made live on the feature branch by editing these files directly; git history is the record of what changed — there is no separate proposed/baseline copy and no archive.
 - Features are reference docs for humans and AI agents; they are not executed. `grimoire validate` parses them for structure but does not run them as tests.
 - Specs are grouped by area subdirectory — pick the directory matching the feature's primary user concern (e.g. `features/cli/` for CLI command behavior, `features/workflow/` for the skill pipeline, `features/bug/` for bug-handling skills).
+- Gherkin is optional. Use it only for clear actor-visible behavior that remains meaningful after reimplementation.
+- Prefer extending an existing feature when the actor and capability already match.
+- Implementation nuances without clear actor-visible behavior do not belong in Gherkin.
+- Internal optimizations, refactors, configuration, protocols, and implementation details use their appropriate tests, checks, constraints, or decisions.
 
 ### templates
 
@@ -318,7 +316,7 @@ Key decisions recorded as MADR (Markdown Any Decision Records).
 | 0040 | STE response style replaces caveman mode | accepted | 2026-08-10 |
 | 0041 | MkDocs Material for the Generated Spec Site | accepted | 2026-08-21 |
 | 0042 | PR Gate Enforces Finalization with a Shared Health Check | accepted | 2026-08-21 |
-| 0043 | Adapt implementation review by task section | accepted | 2026-08-29 |
+| 0044 | Plan review timing and use a change-level verification lifecycle | accepted | 2026-09-01 |
 
 ### Use Gherkin instead of custom WHEN/THEN format
 
@@ -767,20 +765,34 @@ Finalization presents the complete staged path list grouped as production or sup
 
 Repo-wide drift checking integrates into the existing `grimoire health` command. Mechanical checks become a spec-drift metric in `src/core/health.ts`; judgment checks remain agent-run per `health-check.md`. `grimoire-discover` reports both groups without mutation. All checks use configured tools rather than ecosystem-specific commands.
 
-### Adapt implementation review by task section
+### Plan review timing and use a change-level verification lifecycle
 
-Grimoire currently applies a single review or autonomous strategy to a whole change. Review mode asks for approval by file, while autonomous mode cannot reserve architecture and pattern-establishing work for collaboration. A task section already defines a coherent implementation boundary and persists across resumed sessions. Grimoire must support adaptive review without creating provider-specific workflow dependencies or new Git isolation mechanisms.
+Grimoire's per-section paired and autonomous execution model couples review timing, production-edit permissions, task completion, and patch approval. It encourages technical micro-sections and repeated verification. “Focused verification” does not require an exact narrow command, while both planned tasks and apply can run the full suites.
 
-**Outcome:** Chosen option: "Per-section execution metadata with structure and slice checkpoints", because task sections are the existing coherent, resumable unit of work. Each section declares `execution: paired | autonomous`. Only paired sections may declare checkpoints; autonomous sections declare `checkpoints: none`. Runtime state in `tasks.md` records user overrides without changing the approved strategy.
+This decision supersedes [0043]. Grimoire still needs planning-time control over review attention, but implementation should remain fast and adaptable.
 
-`structure-before` occurs before support or production implementation. `slice-after` is a one-time checkpoint for the first representative verified production increment. Tasks covered by that increment remain incomplete until the slice is approved. A rejected slice remains provisionally applied while a fresh paired agent returns an unapplied corrective patch. The workflow does not require rollback or direct production edits by that agent. Once approved or waived, `slice-after` does not recur for later increments.
+**Outcome:** Chosen option: **planned review timing with a change-level lifecycle**, because it preserves user control where structure is costly while removing routine implementation ceremony.
 
-A paired agent writes the failing support test and returns an unapplied production patch. Rejection leaves production unchanged, retains the red test, and redispatches the same section with revision feedback. Approval allows the orchestrator to apply the patch and run focused verification.
+Planning assigns one review timing to each substantial activity:
 
-Ordinary mid-process commits require only the `Change:` trailer. Before finalization removes ephemeral state, at least one ordinary commit carries the current change identity and durable verified work only. It excludes active change-folder scaffolding. Documentation is regenerated after removal, and all durable changes are staged in one ordinary Git index. The user reviews every staged path, classified as production or support, and the full target-branch-merge-base-to-index diff without exclusions. Approval is followed immediately by one final commit carrying `Change:` and `Final-production-review: approved`. There is no review snapshot, digest, synthetic ref, synthetic index, review worktree, or cleanup-only commit.
+- `structure-before` reviews data models, repository layout, ownership boundaries, DRY-sensitive design, performance-sensitive design, and other costly-to-reverse shapes before implementation. After approval, the agent implements autonomously.
+- `slice-after` lets the agent implement autonomously. All such work joins one consolidated pre-commit review after implementation.
 
-The workflow remains Markdown and Git based. Finalization can resume from ordinary Git state, and PR generation uses Git history and changed live artifacts after cleanup.
+Each implementation task is one vertical feature slice. It contains the test change, production change, and one exact command used to demonstrate red and green. The command selects only the new or changed tests and uses a verified runner acceleration option when available.
 
-Implementation details in `tasks.md` guide the section. When the user says a detail is wrong and directs a correction, the section fixes its code and tests and continues without evaluating that guidance against the plan. The agent never creates implementation drift on its own; it asks the user before changing direction. The section keeps only short drift notes needed by later work. User-directed model and migration corrections follow the same rule and do not become material merely because they affect persistence.
+Apply follows three change-level stages:
 
-Mark each task `[x]` as soon as focused verification passes and every pending checkpoint requirement for that task is approved or waived. Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived. Checkboxes remain the real-time resume record. After the whole section is final, Grimoire updates the completed section's task descriptions and every affected later section once, identifies any remaining planning gaps, clears the section's drift notes, and continues. Gap review occurs after the section and does not relitigate user guidance already applied. This reconciliation adds no checkpoint, report, approval cycle, or persona rerun. Existing tool permissions and genuine execution impossibility remain unchanged.
+1. Run every configured test suite once and record the accepted baseline.
+2. Implement feature slices with exact tactical red-green commands.
+3. Invoke `grimoire-verify` once. It runs deterministic and Grimoire-specific static checks, invokes `grimoire-precommit-review` once, applies tactical correction verification, then runs every configured unit and BDD suite once against the baseline.
+
+`grimoire-precommit-review` is the single general code and best-practice review. `grimoire-verify` does not also run an LLM-backed `best_practices` check.
+
+User-directed implementation corrections apply immediately. Grimoire records one terse lesson when remaining work is affected, updates only affected unchecked tasks, reruns affected tactical tests, and continues. It does not create a checkpoint, report, approval cycle, persona rerun, or plan-wide reconciliation.
+
+Optional per-file review remains a harness-level user control. Grimoire does not encode it in `tasks.md` or implement provider-specific harness behavior.
+
+
+## Active Work
+
+Changes currently in progress.
