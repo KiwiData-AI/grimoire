@@ -11,7 +11,7 @@ metadata:
 
 Review your own uncommitted diff before you commit. Applies the shared persona engine in `../references/review-personas.md` to the staged diff (or, on request, all unstaged changes), cross-referenced with the active grimoire change.
 
-This is the dev-loop counterpart to `grimoire-pr-review`. Run it before `grimoire-commit`. Apply the single-pass convergence policy in `../references/review-personas.md` §2e. Designed to be fast — default scope is the senior engineer + security quick scan + code style, with the full persona stack opt-in.
+This is the single general code and best-practice review before `grimoire-commit`. Apply the single-pass convergence policy in `../references/review-personas.md` §2e with one accepted correction batch. Designed to be fast — default scope is the senior engineer + security quick scan + code style, with the full persona stack opt-in.
 
 ## Triggers
 - User asks to review their own change before committing

@@ -22,111 +22,213 @@ function expectOrdered(content: string, clauses: string[]): void {
 }
 
 describe("skill contracts", () => {
-  it("keeps paired dispatch patch-only", async () => {
-    const applySkill = normalize(await skill("grimoire-apply"));
-
-    expect(applySkill).toContain("may edit support files only");
-    expect(applySkill).toContain("must not edit production files");
-    expect(applySkill).toContain("exact unified production patch");
-  });
-
-  it("limits checkpoints to paired sections in planning and execution", async () => {
-    const [applySkill, planSkill] = await Promise.all([
-      skill("grimoire-apply").then(normalize),
+  it("plans substantial sections with explicit review timing", async () => {
+    const [planSkill, reviewSkill] = await Promise.all([
       skill("grimoire-plan").then(normalize),
+      skill("grimoire-review").then(normalize),
     ]);
 
+    expect(planSkill).toContain("Default to one substantial implementation section.");
     expect(planSkill).toContain(
-      "Only paired sections may declare `structure-before` or `slice-after`.",
+      "Use a second section only for a distinct outcome or context boundary.",
     );
     expect(planSkill).toContain(
-      "Autonomous sections always declare `checkpoints: none`.",
+      "Every section beyond two requires a specific outcome, dependency, or context-boundary justification.",
     );
-    expect(applySkill).toContain(
-      "Only a section whose approved execution is `paired` may declare checkpoints.",
+    expect(planSkill).toContain(
+      "Extend an existing feature only for clear actor-visible behavior.",
     );
-    expect(applySkill).toContain(
-      "An approved autonomous section must declare `checkpoints: none`; stop, report invalid approved metadata, and await user direction before changing `tasks.md` or dispatching.",
+    expect(planSkill).toContain("A change may require no Gherkin edits.");
+    expect(planSkill).toContain(
+      "Internal nuances, refactors, and optimizations use unit, characterization, contract, benchmark, constraint, or ADR verification.",
     );
+    expect(planSkill).toContain(
+      "Every implementation activity checkbox declares `<!-- review: structure-before -->` or `<!-- review: slice-after -->` immediately beneath it.",
+    );
+    expect(planSkill).toContain(
+      "Each checkbox contains the test change, production change, and one exact tactical command used for red and green.",
+    );
+    expect(planSkill).toContain(
+      "The tactical command selects only new or changed tests and uses only a runner accelerator verified from project configuration or existing commands.",
+    );
+    expect(planSkill).not.toContain("## 5. Verification");
+    expect(planSkill).not.toContain("<!-- execution: paired -->");
+    expect(planSkill).not.toContain("paired patch");
+
+    expect(reviewSkill).toContain("Validate activity-level review timing");
+    expect(reviewSkill).toContain("one or two substantial implementation sections");
+    expect(reviewSkill).toContain("exact tactical red-green command");
+    expect(reviewSkill).toContain("manufactured Gherkin");
   });
 
-  it("includes valid execution metadata in every planner example", async () => {
-    const planSkill = await skill("grimoire-plan");
-
-    for (const section of [
-      "1\\. <Capability\\/Area>",
-      "2\\. Constraints",
-      "3\\. Shared Steps",
-      "4\\. Architecture",
-    ]) {
-      expect(planSkill).toMatch(
-        new RegExp(
-          `## ${section}[\\s\\S]*?<!-- execution: (paired|autonomous) -->\\s*<!-- checkpoints: (none|structure-before|slice-after|structure-before,slice-after) -->`,
-        ),
-      );
-    }
-  });
-
-  it("records eligible task progress before section reconciliation", async () => {
-    const [agents, applySkill, planSkill, design, decision] = await Promise.all([
+  it("uses tactical red-green tests and adapts user steering", async () => {
+    const [applySkill, agents, learnings] = await Promise.all([
+      skill("grimoire-apply").then(normalize),
       rootFile("AGENTS.md").then(normalize),
-      skill("grimoire-apply").then(normalize),
-      skill("grimoire-plan").then(normalize),
-      rootFile("docs/design/adaptive-pair-programming.md").then(normalize),
-      rootFile(".grimoire/decisions/0043-adaptive-pair-programming.md").then(normalize),
+      rootFile("templates/learnings.md").then(normalize),
     ]);
-
-    for (const policy of [agents, applySkill, planSkill, design, decision]) {
-      expect(policy).toContain(
-        "Mark each task `[x]` as soon as focused verification passes and every pending checkpoint requirement for that task is approved or waived.",
-      );
-      expect(policy).toContain(
-        "Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.",
-      );
-    }
-
-    for (const staleGuidance of [
-      "keep the section tasks unchecked until section reconciliation",
-      "Keep every task in the active section unchecked until all tasks are verified",
-      "keeps section tasks unchecked until reconciliation",
-      "mark every section task complete",
-      "keep the task unchecked until section reconciliation",
-      "mark the section tasks complete",
-      "mark the section's tasks complete",
-    ]) {
-      expect(applySkill).not.toContain(staleGuidance);
-    }
-    expect(applySkill).toContain("Size one section to one context.");
-    expect(applySkill).not.toContain("Size one task to one context.");
-    expect(applySkill).toContain(
-      "Mark each task [x] only after focused verification passes and every pending checkpoint requirement for that task is approved or waived.",
-    );
-  });
-
-  it("revises rejected paired work at the correct boundary", async () => {
-    const applySkill = normalize(await skill("grimoire-apply"));
 
     expectOrdered(applySkill, [
-      "A rejected patch leaves production files unchanged and retains the failing test as revision evidence.",
-      "Give the rejection feedback to a fresh section agent and redispatch the same increment.",
-      "Rejection keeps the provisional production slice applied and keeps its tasks unchecked.",
-      "Do not roll back the slice or require the paired agent to edit production files.",
-      "The agent may revise support files.",
-      "Run revised or retained support evidence against the current provisional production slice and confirm it fails before returning an unapplied corrective production patch.",
-      "present the corrected slice at the same pending checkpoint.",
+      "Run every configured test suite once before code changes and record `baseline.md`.",
+      "Read the task's exact tactical red-green command.",
+      "Run that command before production changes.",
+      "Run the same command after production changes.",
+      "Invoke `grimoire-verify` once after every implementation activity is complete.",
     ]);
-    expect(
-      applySkill.match(
-        /Run revised or retained support evidence against the current provisional production slice and confirm it fails before returning an unapplied corrective production patch\./g,
-      ),
-    ).toHaveLength(2);
+    expect(applySkill).toContain(
+      "Red is proven only when the selected test fails because the requested behavior is absent.",
+    );
+    expect(applySkill).toContain(
+      "Collection, import, fixture, syntax, and infrastructure failures do not prove red.",
+    );
+    expect(applySkill).toContain(
+      "A `structure-before` activity pauses once for production-shape approval, then proceeds with direct autonomous implementation.",
+    );
+    expect(applySkill).toContain(
+      "A `slice-after` activity proceeds with direct autonomous implementation and no intermediate gate.",
+    );
+    expect(applySkill).toContain("Start a fresh implementation context for each substantial section.");
+    expect(applySkill).toContain("Task checkboxes are the resume state.");
+    expect(applySkill).toContain(
+      "Record one implementation lesson only when the correction changes remaining work.",
+    );
+    expect(applySkill).toContain("Update only affected unchecked tasks.");
+    expect(applySkill).toContain("Rerun affected tactical tests.");
+    expect(applySkill).toContain(
+      "Do not add a checkpoint, report, approval, persona rerun, or plan-wide reconciliation.",
+    );
+    expect(applySkill).not.toContain("checkpoint-state");
+    expect(applySkill).not.toContain("exact unified production patch");
+    expect(learnings).toContain("## Implementation lessons");
+    expect(learnings).not.toContain("## Active-section drift notes");
+    expect(agents).toContain("Record one implementation lesson only when remaining work changes.");
+    expect(agents).toContain("Update only affected unchecked tasks");
   });
 
-  it("defines the structure-before lifecycle once", async () => {
-    const applySkill = normalize(await skill("grimoire-apply"));
+  it("verify invokes precommit review before final suites", async () => {
+    const [applySkill, verifySkill, precommitSkill] = await Promise.all([
+      skill("grimoire-apply").then(normalize),
+      skill("grimoire-verify").then(normalize),
+      skill("grimoire-precommit-review").then(normalize),
+    ]);
 
-    expect(applySkill.match(/Approval records `structure-before=approved`/g)).toHaveLength(1);
-    expect(applySkill.match(/Keep it pending when rejected/g)).toHaveLength(1);
+    expectOrdered(applySkill, [
+      "Run every configured test suite once before code changes and record `baseline.md`.",
+      "Read the task's exact tactical red-green command.",
+      "Invoke `grimoire-verify` once after every implementation activity is complete.",
+    ]);
+    expectOrdered(verifySkill, [
+      "Run `grimoire validate`.",
+      "Run existing Grimoire-specific static verification.",
+      "Run configured deterministic non-test checks by explicit step name.",
+      "Invoke `grimoire-precommit-review` once over the complete diff.",
+      "Rerun only affected tactical tests and applicable deterministic checks.",
+      "Run each configured unit and BDD suite once.",
+      "Compare every failure with `baseline.md`.",
+    ]);
+    expect(verifySkill).toContain(
+      "Do not run the LLM-backed `best_practices` check separately.",
+    );
+    expect(verifySkill).toContain("Select only personas relevant to the change surface.");
+    expect(precommitSkill).toContain("single general code and best-practice review");
+    expect(precommitSkill).toContain("one accepted correction batch");
+    expect(applySkill).not.toContain("Run the BDD test suite");
+  });
+
+  it("documents the streamlined implementation lifecycle", async () => {
+    const [readme, design, skillsDoc, featuresDoc, oldDecision, newDecision] =
+      await Promise.all([
+        rootFile("README.md").then(normalize),
+        rootFile("docs/design/adaptive-pair-programming.md").then(normalize),
+        rootFile(".grimoire/docs/skills.md").then(normalize),
+        rootFile(".grimoire/docs/features.md").then(normalize),
+        rootFile(".grimoire/decisions/0043-adaptive-pair-programming.md").then(normalize),
+        rootFile(".grimoire/decisions/0044-plan-review-timing-and-verification.md").then(normalize),
+      ]);
+
+    for (const doc of [readme, design, skillsDoc]) {
+      expect(doc).toContain("substantial sections");
+      expect(doc).toContain("activity-level review timing");
+      expect(doc).toContain("tactical red-green");
+      expect(doc).toContain("one `grimoire-verify` procedure");
+      expect(doc).toContain("one pre-commit review");
+      expect(doc).toContain("one final suite run");
+      expect(doc).toContain("harness-level per-file review");
+    }
+
+    expect(readme).toContain("Clear actor-visible behavior → Gherkin");
+    expect(readme).toContain("Architectural trade-off → MADR decision");
+    expect(readme).toContain(
+      "Internal optimization, refactor, configuration, or implementation detail → appropriate test or check",
+    );
+    expect(readme).not.toContain("Your request → Gherkin spec");
+    expect(readme).not.toContain("## 1. Data Layer");
+    expect(readme).not.toContain("## 3. Error Cases");
+    expect(readme).not.toContain("## 4. Verification");
+
+    expect(featuresDoc).toContain("Gherkin is optional");
+    expect(featuresDoc).toContain("Prefer extending an existing feature");
+    expect(featuresDoc).toContain(
+      "Implementation nuances without clear actor-visible behavior do not belong in Gherkin.",
+    );
+    expect(oldDecision).toContain("status: superseded by 0044");
+    expect(newDecision).toContain("This decision supersedes [0043].");
+  });
+
+  it("keeps internal changes and review state lightweight", async () => {
+    const [planSkill, reviewSkill, applySkill, agents, readme, skillsDoc] =
+      await Promise.all([
+        skill("grimoire-plan").then(normalize),
+        skill("grimoire-review").then(normalize),
+        skill("grimoire-apply").then(normalize),
+        rootFile("AGENTS.md").then(normalize),
+        rootFile("README.md").then(normalize),
+        rootFile(".grimoire/docs/skills.md").then(normalize),
+      ]);
+
+    for (const workflowSkill of [reviewSkill, applySkill]) {
+      expect(workflowSkill).toContain("`manifest.md`");
+      expect(workflowSkill).toContain("`tasks.md`");
+      expect(workflowSkill).toContain(
+        "Feature, constraint, and decision artifacts are optional.",
+      );
+    }
+    expect(reviewSkill).toContain(
+      "User has a planned Grimoire change with an approved manifest and tasks",
+    );
+
+    for (const gate of [
+      "An external actor initiates or participates in the behavior.",
+      "The outcome is observable outside the implementation.",
+      "The scenario uses domain language instead of code structure.",
+      "The behavior survives a reimplementation.",
+    ]) {
+      expect(agents).toContain(gate);
+    }
+    expect(agents).toContain(
+      "Internal optimization, refactoring, configuration, and implementation work use appropriate tests or checks and may have no Gherkin.",
+    );
+    expect(agents).not.toContain(
+      "If the request is expressible as Given/When/Then, it's a Gherkin feature.",
+    );
+    expect(agents).not.toContain("plan projects the .feature");
+
+    expect(readme).toContain(
+      "→ /grimoire:apply Implements tactically, then runs verification once",
+    );
+    expect(readme).not.toContain("→ /grimoire:verify");
+    expect(skillsDoc).not.toContain("apply → verify → precommit-review");
+    expect(skillsDoc).toContain(
+      "`grimoire-precommit-review` remains available standalone and is invoked inside `grimoire-verify` during apply.",
+    );
+
+    expect(applySkill).toContain(
+      "Record `<!-- review-status: approved -->` immediately below the activity's review marker after approval.",
+    );
+    expect(applySkill).toContain(
+      "When that approval marker already exists, skip the structure review on resume.",
+    );
+    expect(planSkill).not.toContain("review-status: approved");
   });
 
   it("requires only the Change trailer for ordinary mid-process commits", async () => {
@@ -259,77 +361,6 @@ describe("skill contracts", () => {
     expect(reviewPolicy).toContain("Do not convert that retry into another open-ended LLM review.");
   });
 
-  it("applies only user-directed drift and reconciles it after the section", async () => {
-    const [agents, applySkill, planSkill] = await Promise.all([
-      rootFile("AGENTS.md").then(normalize),
-      skill("grimoire-apply").then(normalize),
-      skill("grimoire-plan").then(normalize),
-    ]);
-
-    for (const policy of [agents, applySkill, planSkill]) {
-      expect(policy).toContain(
-        "The approved section outcome and source artifacts remain authoritative; implementation mechanics are correctable details.",
-      );
-      expect(policy).toContain(
-        "Apply user-directed active-section corrections without evaluating the guidance or updating planning artifacts after each correction.",
-      );
-      expect(policy).toContain(
-        "An agent must ask for user direction before changing implementation direction; agents never create active-section drift autonomously.",
-      );
-    }
-
-    expectOrdered(applySkill, [
-      "Keep only short drift notes needed by later work.",
-      "Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.",
-      "After the whole section is final",
-      "update the completed section's task descriptions and every affected later section once",
-      "identify remaining planning gaps without relitigating applied user guidance",
-      "clear the section's drift notes",
-      "continue to the next section",
-    ]);
-  });
-
-  it("gives paired and autonomous dispatch the same drift rule", async () => {
-    const applySkill = normalize(await skill("grimoire-apply"));
-    const dispatchRule =
-      "Only user direction may create active-section implementation drift. Apply that direction without evaluating it or maintaining planning artifacts mid-section; otherwise ask the user before changing implementation direction.";
-
-    expect(applySkill.match(new RegExp(dispatchRule.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))).toHaveLength(
-      2,
-    );
-    expect(applySkill).toContain(
-      "Do not stop merely because user-directed implementation mechanics differ from the task details.",
-    );
-  });
-
-  it("keeps drift reconciliation lightweight and persistence corrections ordinary", async () => {
-    const [applySkill, learnings, reviewSkill, reviewPolicy, design] = await Promise.all([
-      skill("grimoire-apply").then(normalize),
-      rootFile("templates/learnings.md").then(normalize),
-      skill("grimoire-review").then(normalize),
-      reference("review-personas.md").then(normalize),
-      rootFile("docs/design/adaptive-pair-programming.md").then(normalize),
-    ]);
-
-    expect(learnings).toContain("## Active-section drift notes");
-    expect(learnings).toContain("Clear these notes after post-section reconciliation.");
-    expect(applySkill).toContain(
-      "User-directed model, persistence, and migration mechanics are ordinary implementation corrections.",
-    );
-    expect(reviewSkill).toContain(
-      "User-directed data-schema, model, persistence, or migration implementation mechanics alone do not trigger another persona review when no reviewed boundary, including the data schema, materially changes.",
-    );
-    expect(reviewPolicy).toContain(
-      "User-directed data-schema, model, persistence, or migration implementation mechanics alone do not trigger another persona review when no reviewed boundary, including the data schema, materially changes.",
-    );
-    expect(design).toContain(
-      "Reconcile once after the whole section is final.",
-    );
-    expect(design).toContain(
-      "Post-section gap review may identify remaining gaps but must not reopen applied user guidance.",
-    );
-  });
-
   it("allows user-directed test corrections without weakening red-green", async () => {
     const applySkill = normalize(await skill("grimoire-apply"));
 
@@ -367,30 +398,13 @@ describe("skill contracts", () => {
     );
   });
 
-  it("adds no drift checkpoint, report, approval, or persona rerun", async () => {
-    const [applySkill, planSkill, reviewPolicy] = await Promise.all([
-      skill("grimoire-apply").then(normalize),
-      skill("grimoire-plan").then(normalize),
-      reference("review-personas.md").then(normalize),
-    ]);
-
-    for (const policy of [applySkill, planSkill]) {
-      expect(policy).toContain(
-        "Section reconciliation adds no drift checkpoint, report, reconciliation approval, or persona rerun.",
-      );
-    }
-    expect(reviewPolicy).toContain(
-      "Post-section drift reconciliation never requires a persona rerun or reconciliation approval.",
-    );
-  });
-
   it("derives and topologically orders executable section dependencies", async () => {
     const planSkill = await skill("grimoire-plan");
     const normalizedPlan = normalize(planSkill);
 
     expectOrdered(normalizedPlan, [
-      "Derive the actual section dependency graph",
-      "Topologically sort the sections",
+      "derive the actual section dependency graph",
+      "Topologically sort the sections.",
       "Use the technical spine only as a tie-breaker among independent sections.",
       "Within each section, order tasks so no task requires a later task.",
     ]);
@@ -398,18 +412,12 @@ describe("skill contracts", () => {
       "referenced symbols, imports, schema and migration prerequisites, generated artifacts, fixtures, routes, and context files",
     );
     expect(normalizedPlan).toContain("<!-- depends-on: none | <earlier section IDs> -->");
-    expect(normalizedPlan).toContain("| Section | Depends on | Execution | Checkpoints | Reason |");
-
-    for (const section of [
-      "1\\. <Capability\\/Area>",
-      "2\\. Constraints",
-      "3\\. Shared Steps",
-      "4\\. Architecture",
-    ]) {
-      expect(planSkill).toMatch(
-        new RegExp(`## ${section}[\\s\\S]*?<!-- depends-on: (none|<earlier section IDs>) -->`),
-      );
-    }
+    expect(normalizedPlan).toContain(
+      "| Section | Depends on | Activities | Review timing | Section justification |",
+    );
+    expect(planSkill).toMatch(
+      /## 1\. <Capability outcome>[\s\S]*?<!-- depends-on: none -->/,
+    );
   });
 
   it("blocks approval for invalid dependency graphs in one report", async () => {
@@ -438,30 +446,24 @@ describe("skill contracts", () => {
     expect(planSkill).toContain("No human gate may interrupt implementation.");
   });
 
-  it("validates dependencies and autonomous compatibility before dispatch", async () => {
+  it("validates dependencies before substantial-section dispatch", async () => {
     const applySkill = normalize(await skill("grimoire-apply"));
 
     expectOrdered(applySkill, [
-      "Before dispatching any section, validate the complete plan",
-      "every declared dependency section is complete",
-      "dispatch the section",
+      "Validate every section dependency before dispatch.",
+      "Confirm every dependency section is complete before starting the next section.",
+      "Report all dependency errors together and stop without rewriting the approved plan.",
     ]);
-    expect(applySkill).toContain(
-      "missing dependency metadata, unknown or forward dependencies, cycles, incomplete dependencies, or human-gate tasks in autonomous sections",
-    );
-    expect(applySkill).toContain(
-      "Report every plan error together and stop without editing, reordering, or repairing `tasks.md`.",
-    );
   });
 
   it("checks executable ordering during the initial design-review pass", async () => {
     const reviewSkill = normalize(await skill("grimoire-review"));
 
     expect(reviewSkill).toContain(
-      "In the initial single pass, check dependency completeness, backward-only order, cycle freedom, and autonomous compatibility.",
+      "When multiple sections exist, check dependency completeness, backward-only order, cycle freedom, and task order.",
     );
     expect(reviewSkill).toContain(
-      "Treat an invalid dependency graph or an intermediate human gate in autonomous work as a blocker.",
+      "Treat an invalid dependency graph or an intermediate human gate in implementation work as a blocker.",
     );
   });
 });

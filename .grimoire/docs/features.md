@@ -1,5 +1,5 @@
 # Features
-> Last updated: 2026-08-29
+> Last updated: 2026-09-01
 
 ## Purpose
 Gherkin specifications for grimoire's own behavior. Each `.feature` file describes how grimoire works — these are the contracts the CLI, skills, and workflows must honor.
@@ -8,6 +8,10 @@ Gherkin specifications for grimoire's own behavior. Each `.feature` file describ
 - `features/` is the single home for every spec. Changes are made live on the feature branch by editing these files directly; git history is the record of what changed — there is no separate proposed/baseline copy and no archive.
 - Features are reference docs for humans and AI agents; they are not executed. `grimoire validate` parses them for structure but does not run them as tests.
 - Specs are grouped by area subdirectory — pick the directory matching the feature's primary user concern (e.g. `features/cli/` for CLI command behavior, `features/workflow/` for the skill pipeline, `features/bug/` for bug-handling skills).
+- Gherkin is optional. Use it only for clear actor-visible behavior that remains meaningful after reimplementation.
+- Prefer extending an existing feature when the actor and capability already match.
+- Implementation nuances without clear actor-visible behavior do not belong in Gherkin.
+- Internal optimizations, refactors, configuration, protocols, and implementation details use their appropriate tests, checks, constraints, or decisions.
 
 ## Conventions
 
@@ -19,7 +23,8 @@ Gherkin specifications for grimoire's own behavior. Each `.feature` file describ
 - Each top-level subdirectory under `features/` is an area; create a new one only when an existing area genuinely doesn't fit.
 
 ## Where New Code Goes
-- New feature describing grimoire behavior → `features/<area>/<name>.feature`, edited directly on the feature branch.
+- New actor-visible capability with no fitting feature → `features/<area>/<name>.feature`, edited directly on the feature branch.
+- New actor-visible behavior in an existing capability → extend the owning feature file.
 - New area subdirectory → create it under `features/` only when no existing area fits.
 
 ## Structure (live)

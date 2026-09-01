@@ -58,7 +58,7 @@ This applies to all LLMs: Claude, Codex, Cursor, Copilot, etc. The task list is 
 - A change exists in `.grimoire/changes/<change-id>/` with:
   - `manifest.md`
   - `tasks.md` (from plan stage, each task carrying a `verify:` tag)
-- The change's live artifacts exist on the branch — at least one `.feature` (in `features/`), constraint (in `.grimoire/docs/constraints.md`), or decision record (in `.grimoire/decisions/`)
+- Feature, constraint, and decision artifacts are optional.
 
 ## Workflow
 
@@ -81,358 +81,50 @@ Where `<type>` is `feat`, `fix`, `refactor`, or `chore` based on the change. If 
 
 The branch links Git history to the change through the `Change: <change-id>` commit trailer. The branch provides isolation, and the ordinary Git index provides staging.
 
-Before dispatching any section, run the configured suites once to record the starting state. Present any pre-existing failures to the user and get acceptance before proceeding. Write the result to `.grimoire/changes/<change-id>/baseline.md`. Skippable when no test command is configured or the user opts out. Record the skip. Full protocol: `../references/test-baseline.md`.
+Run every configured test suite once before code changes and record `baseline.md`. Present any pre-existing failures to the user and get acceptance before proceeding. Skippable when no test command is configured or the user opts out. Record the skip. Full protocol: `../references/test-baseline.md`.
 
 The point: a failure is "pre-existing" only if it is in `baseline.md`. This replaces end-of-run "that's a pre-existing failure" surprises with a start-of-run acceptance.
 
 > **No promote.** Feature files, decisions, and constraints were drafted directly into their live locations (`features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`) on this branch. BDD runners already discover the scenarios from `features/`. Do not copy anything out of `.grimoire/changes/` — that folder holds only ephemeral scaffolding such as `draft.md`, `manifest.md`, `tasks.md`, `baseline.md`, and `learnings.md`.
 
-### 3. Dispatch Each Section
+### 3. Dispatch Each Substantial Section
 
-Before dispatching any section, validate the complete plan. Require exactly one
-`depends-on` comment on every implementation section. Validate that dependencies
-name existing earlier sections, form no cycle, and match the section order.
-Validate that autonomous sections contain no human approval, manual inspection,
-ask-the-user, or wait tasks. An approved terminal `External acceptance` section
-is not an autonomous implementation section and runs only after implementation
-and verification complete.
+Validate every section dependency before dispatch. Require one `depends-on` comment per section. Dependencies name only existing earlier sections and form no cycle. Confirm every dependency section is complete before starting the next section. Report all dependency errors together and stop without rewriting the approved plan.
 
-For the next section, confirm every declared dependency section is complete;
-every task in a complete dependency section is checked. Only then dispatch the
-section. Treat missing dependency metadata, unknown or
-forward dependencies, cycles, incomplete dependencies, or human-gate tasks in
-autonomous sections as an invalid approved plan. Report every plan error together
-and stop without editing, reordering, or repairing `tasks.md`. Await user
-direction on the invalid plan; never silently make it dispatchable.
+Start a fresh implementation context for each substantial section. The section agent loads its context block and implements every unchecked task directly. Task checkboxes are the resume state. Write one `<!-- SESSION: ... -->` handoff under the last task before leaving the section.
 
-Each implementation section declares its approved execution strategy:
+Read each activity's review marker before editing:
 
-```markdown
-<!-- execution: paired -->
-<!-- checkpoints: structure-before,slice-after -->
-```
+- A `structure-before` activity pauses once for production-shape approval, then proceeds with direct autonomous implementation.
+- Without an approval marker, perform that pause before editing production code.
+- Record `<!-- review-status: approved -->` immediately below the activity's review marker after approval.
+- When that approval marker already exists, skip the structure review on resume.
+- After approval, proceed with direct autonomous implementation.
+- A `slice-after` activity proceeds with direct autonomous implementation and no intermediate gate.
 
-Read the section's approved metadata before dispatching work. `execution` is
-either `paired` or `autonomous`. `checkpoints` is `none`,
-`structure-before`, `slice-after`, or
-`structure-before,slice-after`. `none` is exclusive. Checkpoints always occur
-in the declared order. Only a section whose approved execution is `paired` may
-declare checkpoints. An approved autonomous section must declare
-`checkpoints: none`; stop, report invalid approved metadata, and await user
-direction before changing `tasks.md` or dispatching.
+The `structure-before` review covers ownership, files, data relationships, constraints, indexes, nullability, public signatures, dependencies, transactions, queues, retries, external boundaries, reused patterns, and material alternatives. Approval applies to the activity's shape, not every file edit.
 
-Persist effective execution state directly below the approved metadata:
-
-```markdown
-<!-- runtime-execution: paired -->
-<!-- checkpoint-state: structure-before=pending,slice-after=pending -->
-```
-
-Create `runtime-execution` when the section begins if it is absent. Create
-`checkpoint-state` only when the section declares one or more checkpoints.
-Include only declared checkpoints. Each declared checkpoint is `pending`,
-`approved`, or `waived`. Never modify approved `execution` or `checkpoints`
-metadata to record runtime state.
-
-Use `runtime-execution` when present. Otherwise, use approved `execution`.
-Resume pending checkpoints from `checkpoint-state`. A completed checkpoint
-stays approved or waived across sessions.
-
-**Paired execution:** Dispatch one section agent for support edits and the
-failing test. The agent establishes red, then returns an exact unapplied unified
-production patch for one coherent production increment. Present that patch for
-approval before applying it. One approval may cover multiple production files. A
-rejected patch leaves production files unchanged and retains the failing test as
-revision evidence. Give the rejection feedback to a fresh section agent and
-redispatch the same increment. The orchestrator applies an approved patch and
-runs focused verification to establish green.
-
-The orchestrator may apply one approved paired production patch and run focused
-verification. If `slice-after` is pending, keep every covered support and
-production task unchecked until the user approves the verified slice. Without a
-pending `slice-after`, mark each covered task `[x]` after focused verification.
-The orchestrator may not otherwise edit production code.
-
-**Autonomous execution:** Dispatch one section agent for direct red-green work.
-The agent may edit production and support files. An approved autonomous section
-has no checkpoints. A paired section switched to autonomous at runtime still
-honors or explicitly waives its approved pending checkpoints. The agent stops at
-those pending checkpoints and at all existing blockers, specification conflicts,
-retry limits, and circuit breakers.
-
-**`structure-before`:** Before tests or production implementation, present the
-proposed production shape:
-- Production ownership and intended files.
-- Model fields, relationships, constraints, indexes, and nullability.
-- Function, class, protocol, and payload signatures.
-- Dependencies and transaction, queue, retry, or external-boundary behavior.
-- Existing patterns to reuse.
-- Material alternatives and the selected trade-off.
-
-Wait for approval before continuing. Approval records
-`structure-before=approved`. Keep it pending when rejected or when the user
-requests revision.
-
-**`slice-after`:** Once, after the first representative production increment
-passes focused verification, present:
-- The production-only multi-file diff.
-- Implemented behavior and its entry point.
-- Relevant persistence, task, or external-service boundaries.
-- Focused verification results.
-- Divergence from approved structure.
-- The pattern proposed for remaining work.
-
-Wait for approval before continuing. Approval records `slice-after=approved` and
-prevents this checkpoint from recurring. Rejection keeps the provisional production slice
-applied and keeps its tasks unchecked. Do not roll back the slice or require the
-paired agent to edit production files. Give the feedback and current slice to a
-fresh paired section agent. The agent may revise support files. Run revised or
-retained support evidence against the current provisional production slice and
-confirm it fails before returning an unapplied corrective production patch.
-Present that patch for approval, apply an approved patch, rerun focused
-verification, and present the corrected slice at the same pending checkpoint. A
-prior explicit waiver records
-`slice-after=waived` and prevents the checkpoint from recurring.
-
-Apply user directives at the next safe production boundary after an active
-section agent returns:
-- `Finish this section on your own` sets `runtime-execution` to `autonomous`
-  and retains pending checkpoints.
-- `Finish without further review` sets `runtime-execution` to `autonomous`
-  and marks each declared pending checkpoint `waived`.
-- `Pair with me from here` sets `runtime-execution` to `paired`.
-- `Show me the next slice` continues until the next declared pending checkpoint.
-
-Do not rewrite completed work when applying an override. Do not use an override
-to bypass red-green discipline, retry limits, blocker handling, circuit
-breakers, branch rules, or `tasks.md` authority.
-
-#### Active-Section Corrections and Reconciliation
-
-Do not stop merely because user-directed implementation mechanics differ from
-the task details. Apply the direction inside the active section without
-evaluating it against the plan being corrected. An agent that suspects a detail
-is wrong asks the user before changing implementation direction.
-
-Keep only short drift notes needed by later work. User-directed model,
-persistence, and migration mechanics are ordinary implementation corrections.
-Existing operation permission gates remain unchanged, including approval before
-executing a migration against a non-test database.
-
-Mark each task `[x]` as soon as focused verification passes and every pending checkpoint requirement for that task is approved or waived. Task checkboxes are runtime progress, not task-content reconciliation. Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.
-
-After the whole section is final, update the completed section's task descriptions and every affected later section once, identify remaining planning gaps without relitigating applied user guidance, clear the section's drift notes, and continue to the next section. Section reconciliation adds no drift checkpoint, report, reconciliation approval, or persona rerun.
+Optional per-file review is harness behavior. It does not create Grimoire metadata, checkpoints, or task state.
 
 ### Working Memory: `learnings.md`
 
-Apply keeps one ephemeral file, `.grimoire/changes/<change-id>/learnings.md` (create it from `templates/learnings.md` the first time you need it). It is the loop's memory between attempts and sessions, and it is **removed at finalize** with the rest of the change folder — nothing in it reaches the repo. Three sections, three lifecycles:
+Create `.grimoire/changes/<change-id>/learnings.md` from `templates/learnings.md` when needed. It remains ephemeral and is removed at finalization.
 
-- **Failure-mode notes** — transient. After a failed attempt, append one line: what you tried and why it failed. Before any retry, read this section so you don't repeat a dead end. Prune a task's notes the moment it goes green. Never promote them.
-- **Active-section drift notes** — short-lived. Record only user-directed corrections needed to reconcile the completed section or affected later work. Clear them after post-section reconciliation.
-- **Discovered facts** — durable facts about the project learned while implementing (a build flag, a convention, an undocumented contract). Stage them here with their destination home; at finalize they are reconciled into that one home and cleared. Do **not** write them into `AGENTS.md`.
+- **Failure-mode notes:** record each failed approach before a retry. Read these notes before another attempt. Prune a task's notes when it turns green.
+- **Implementation lessons:** Record one implementation lesson only when the correction changes remaining work. Update only affected unchecked tasks. Rerun affected tactical tests. Do not add a checkpoint, report, approval, persona rerun, or plan-wide reconciliation.
+- **Discovered facts:** stage durable project facts with their authoritative destination. Reconcile them during finalization. Never write them into `AGENTS.md`.
 
-Subagents and fresh sessions read and append to this file the same way they use `tasks.md` — it is shared state on disk, not context-window memory.
+User direction may correct implementation mechanics. Apply the correction immediately without evaluating it against completed task prose. An agent that suspects a detail is wrong asks the user before changing direction. Existing operation permission gates remain unchanged.
 
-### Stuck Detection & Recovery
+### Stuck Detection and Circuit Breakers
 
-**You MUST track failed attempts per task.** If a test won't go green, count your attempts:
+Track failed attempts per task. Attempt one uses the direct planned approach. Before attempts two or three, read failure-mode notes and choose a fundamentally different approach. After three failed attempts, mark the task blocked, report all approaches and the persistent error, then stop for user direction. Never weaken or delete a test to force green.
 
-- **Before any attempt past the first:** read the task's **failure-mode notes** in `learnings.md`. Do not repeat an approach already recorded there as failed.
-- **Attempt 1:** Try the straightforward implementation from the task description.
-- **Attempt 2:** If attempt 1 failed, append a failure-mode note (`<task-id> · tried … · failed: …`), re-read the error carefully, then try a *different* approach — not the same code with minor tweaks. State what you're doing differently and why.
-- **Attempt 3 (final):** If attempt 2 failed, append the second dead end as a failure-mode note, then try one more *fundamentally different* approach. If the same error recurs, the problem is likely not in your implementation.
+Between sections, stop when two consecutive sections are blocked or the same failure class repeats across sections. Honor configured cost and wall-clock limits as soft limits. Preserve all existing branch, permission, destructive-operation, and specification-conflict gates.
 
-**After 3 failed attempts on a single task, STOP.** Do not continue. Instead:
-1. Add a comment to `tasks.md` under the task: `<!-- BLOCKED: <summary> -->` (the full trail is already in the failure-mode notes)
-2. Present to the user:
-   - What the task requires
-   - What you tried (all 3 approaches, briefly)
-   - What error/failure persisted
-   - Your best guess at the root cause
-3. Wait for the user to decide: fix the task, provide guidance, skip it, or go back to plan.
+### Session Management
 
-**What counts as a "different approach":**
-- Using a different library/API to achieve the same result
-- Restructuring the code (different function signature, different data flow)
-- Changing the test setup (different fixtures, different mocking strategy)
-
-**What does NOT count:**
-- Changing a variable name or adding a print statement
-- Adding a try/catch around the same failing code
-- Re-running the same code hoping for a different result
-
-**In autonomous mode:** This rule is especially critical. Without it, the agent will loop until the token budget is exhausted. After 3 failed attempts, switch to review mode for that task and ask the user.
-
-**Never silently retry the same approach.** If your implementation produced error X and you're about to write code that will produce error X again, stop and think about why. If you can't identify what would change the outcome, stop and ask.
-
-### Circuit Breaker & Cross-Section Thrash (Autonomous Mode)
-
-The per-task 3-attempt cap bounds a single task; it cannot see the *run* cycling. Autonomous mode adds a loop-level breaker the parent orchestrator checks **between sections**. Caps live under `llm.coding.limits` in `.grimoire/config.yaml`:
-
-| Cap | Default | Kind |
-|-----|---------|------|
-| `max_sections_without_checkpoint` | 5 | followable — halt and checkpoint with the user |
-| `consecutive_blocked` | 2 | followable — two BLOCKED sections in a row → halt |
-| `max_cost_usd` | null (opt-in) | **soft** — self-reported; not harness-enforced in v1 |
-| `max_wallclock_min` | null (opt-in) | **soft** — self-reported; not harness-enforced in v1 |
-
-**Cross-section thrash detection:** halt the whole run — don't just retry locally — when the last two sections both ended BLOCKED, **or** when a section's failure-mode error class repeats the prior section's (read the failure-mode notes in `learnings.md` to compare). A failed attempt always leaves a note, so the thrash signal accumulates across sections; the breaker is the last resort once that signal shows the loop is stuck, not the first line of defense.
-
-**On any trip:** stop, state the trip reason and a one-line diagnosis (what cycled, what was tried), and hand to the user. Do not continue past a tripped breaker.
-
-> **Enforcement honesty:** the section and BLOCKED caps are orchestrator behavior the agent follows; the cost and wall-clock caps are *soft* — the agent self-reports against them and they are not enforced by the harness in v1. A hard, code-enforced breaker is a deferred follow-up.
-
-### Session Management — MANDATORY Fresh Context Per Section
-
-**Do NOT implement all tasks in a single conversation context.** Context accumulates across tasks and degrades output quality — the LLM starts hallucinating based on stale file contents it read 5 tasks ago. This is not a suggestion. Fresh context per task section is required.
-
-**Size one section to one context.** The goal is not statelessness for its own sake. One coherent context carries the section from its first unchecked task through section reconciliation. Reset context between sections. If a section overflows its context, record current checkbox state and a handoff before starting a fresh context for the remaining section work.
-
-Each task section in `tasks.md` has a `<!-- context: ... -->` block listing the exact files needed. This is the loading list for that section's fresh context.
-
-#### Claude Code: Subagent Per Section
-
-The parent agent is the **orchestrator only** — it does NOT implement tasks itself. The workflow is:
-
-1. Parent reads `tasks.md`, finds the first unchecked section.
-2. Parent reads the section's approved metadata and runtime state, then selects
-   the dispatch prompt below.
-
-   **Paired dispatch prompt:**
-   ```
-    You are implementing grimoire tasks in paired execution. Read
-    `.grimoire/changes/<change-id>/tasks.md`, find section <N>, and prepare the
-    next coherent production increment from its unchecked tasks.
-
-   Section metadata: execution=<execution>; checkpoints=<checkpoints>.
-   Runtime state: runtime-execution=<runtime-execution>;
-   checkpoint-state=<checkpoint-state or none>.
-
-   The agent may edit support files only. The agent must not edit production
-   files. Support files include tests, Gherkin, and `.grimoire/changes/`
-   coordination files.
-   Establish red by writing and running the failing test. Return an exact unified
-   production patch for one coherent production increment. Do not apply that
-   patch. The orchestrator applies the approved patch and runs focused
-   verification to establish green. Do not mark any task [x] until that
-   verification passes. When `slice-after` is pending, keep covered tasks
-   unchecked until the user approves the verified slice.
-
-   When revising a rejected provisional `slice-after`, read the rejection
-   feedback and current applied slice. Keep covered tasks unchecked. Revise
-   support files when needed. Run revised or retained support evidence against
-   the current provisional production slice and confirm it fails before returning
-   an unapplied corrective production patch. Do not roll back or directly edit
-   the provisional production slice.
-
-   Use `.grimoire/changes/<change-id>/learnings.md` as working memory: read a
-   task's failure-mode notes before retrying it and don't repeat a recorded dead
-   end; append a failure-mode note after any failed attempt; prune them when the
-   task goes green; append durable project facts to Discovered facts with their
-   home (never to AGENTS.md). Never weaken or delete a test to force green. A
-   user-directed correction to an implementation-specific test expectation must
-   still demonstrate red against the current production code before production
-   changes.
-
-   Only user direction may create active-section implementation drift. Apply that direction without evaluating it or maintaining planning artifacts mid-section; otherwise ask the user before changing implementation direction.
-
-   When the section is complete, write a <!-- SESSION: ... --> handoff note
-   under the last task and exit.
-   ```
-
-   **Autonomous dispatch prompt:**
-   ```
-   You are implementing grimoire tasks in autonomous execution. Read
-   `.grimoire/changes/<change-id>/tasks.md`, find section <N>, and implement all
-   unchecked tasks in that section.
-
-   Section metadata: execution=<execution>; checkpoints=<checkpoints>.
-   Runtime state: runtime-execution=<runtime-execution>;
-   checkpoint-state=<checkpoint-state or none>.
-
-   You may edit production and support files. Follow the red-green cycle for
-   each task. Mark each task [x] only after focused verification passes and every
-   pending checkpoint requirement for that task is approved or waived. Stop at
-   a declared pending checkpoint and at all existing blockers, specification
-   conflicts, retry limits, and circuit breakers.
-
-   Use `.grimoire/changes/<change-id>/learnings.md` as working memory: read a
-   task's failure-mode notes before retrying it and don't repeat a recorded dead
-   end; append a failure-mode note after any failed attempt; prune them when the
-   task goes green; append durable project facts to Discovered facts with their
-   home (never to AGENTS.md). Never weaken or delete a test to force green. A
-   user-directed correction to an implementation-specific test expectation must
-   still demonstrate red against the current production code before production
-   changes.
-
-   Only user direction may create active-section implementation drift. Apply that direction without evaluating it or maintaining planning artifacts mid-section; otherwise ask the user before changing implementation direction.
-
-   Before writing production code, read `../references/code-quality.md`,
-   `../references/testing-contracts.md`, and `../references/pattern-guard.md`.
-   Before writing each test, run the pattern-guard brief. After writing
-   production code, run the hallucination check before running tests.
-
-   When the section is complete, write a <!-- SESSION: ... --> handoff note
-   under the last task and exit.
-   ```
-3. Section agent reads `tasks.md` and the context files for that section.
-4. Section agent implements tasks, marks each task complete when its focused
-   verification and pending checkpoint requirements pass, and writes a handoff
-   note with the current checkbox state.
-5. For paired execution, the parent presents one patch. Rejection retains the
-   red test and redispatches the same increment with revision feedback.
-6. After patch approval, the parent applies it and runs focused verification.
-7. If `slice-after` is pending, the parent presents the verified representative
-   increment. It keeps covered tasks unchecked until approval. Approval marks
-   the checkpoint approved. Rejection keeps the
-   provisional slice applied and both the checkpoint and tasks pending. The
-   parent sends the feedback and current slice to a fresh paired agent, which
-   returns an unapplied corrective production patch. The parent repeats patch
-   approval, focused verification, and the same slice checkpoint.
-8. Without a pending `slice-after`, the parent retains focused verification
-   evidence and continues the section.
-9. When all section tasks are complete and all checkpoints are approved or
-   waived, reconcile the completed task descriptions and affected later sections
-   once, then clear drift notes.
-10. If section work remains, redispatch the same section. Otherwise, spawn the
-    next section agent.
-11. Repeat until all sections complete.
-
-**The parent agent MUST NOT write production code or test code.** It may apply an approved paired production patch. Its other jobs are reading `tasks.md`, spawning subagents, and checking completion between sections. If the parent starts implementing tasks directly, context will degrade by section 3-4 and output quality will drop.
-
-#### Other Agents (Codex, Cursor, Windsurf, etc.)
-
-Start a **fresh session** for each task section. The resume mechanism via `tasks.md` checkboxes makes this seamless:
-
-1. Open a new session
-2. Tell the agent: "Run `/grimoire:apply` on change `<change-id>`"
-3. The agent reads `tasks.md`, finds the first `- [ ]`, reads that section's context block
-4. When the section is complete, end the session
-5. Start a new session for the next section
-
-This is the same pattern as the [Ralph Wiggum loop](https://ralph-wiggum.ai) — progress lives in files (`tasks.md` + git), not in the context window. Each session gets a clean slate and reads current file state.
-
-#### Handoff Notes
-
-Before exiting (subagent exit or session end), write a handoff note in `tasks.md`:
-
-```markdown
-- [x] 1.3 Implement TOTP verification
-<!-- SESSION: completed 1.1-1.3. auth middleware moved to middleware/auth.ts. pyotp added to requirements. Next section needs the new middleware import. -->
-```
-
-This gives the next session critical context (architectural decisions made, files created/moved, gotchas discovered) without requiring it to re-read everything.
-
-#### When to Force a Fresh Context Mid-Section
-
-Even within a section, break early if:
-- You needed 3 attempts on a task (stuck detection recovery)
-- You notice degraded output (repeating yourself, forgetting earlier context, making mistakes on things you got right earlier)
-- The section has more than 5 tasks
-
-Write a handoff note at the break point and start fresh.
-
-**Check `.grimoire/config.yaml`** for the configured coding agent — use `llm.coding.command` and `llm.coding.model` for implementation work.
+Start a fresh implementation context for each substantial section. One context carries the section through all its vertical tasks. Break early after three attempts on one task or when context quality degrades. Record completed checkboxes and a handoff before leaving.
 
 ### 4. Load Context
 
@@ -450,15 +142,15 @@ Write a handoff note at the break point and start fresh.
 3. Tell the user: "Context is getting large. I've updated tasks.md with progress. A fresh session can resume from here."
 
 ### 5. Implement Tasks
-Work through `tasks.md` sequentially. **Every task follows the same cycle: test → red → code → green → next.** The cycle is identical at every level; only the *test vehicle* changes per the task's `verify:` tag (`scenario` → step definitions; `unit-invariant` / `characterization` → unit/integration test). "Step definitions" below means *the failing test at the task's level* — for non-`scenario` tasks, write a unit test, not a `.feature`.
+Work through `tasks.md` sequentially. Read the task's exact tactical red-green command. Every task follows the same cycle: test → red → code → green → next. The test vehicle follows the task's `verify:` tag.
 
 **For each task:**
 1. Announce which task you're working on
    - Read the task's `verify:` tag — it decides the test vehicle. `scenario` → write/extend step definitions for the named scenario. `unit-invariant` → write a unit/integration test asserting the constraint. `characterization` → write a unit test pinning current/intended behavior. If a `unit-invariant` task has no matching constraint in `.grimoire/docs/constraints.md`, STOP and flag — don't invent a scenario to fill the gap.
    - **Pattern brief** (before writing anything): classify code type → `search_graph` for 3–5 peers (excluding last 60 days) → `get_code_snippet` → extract modal pattern across the four critical seams (error handling, dependency access, abstraction depth, return shape) → write a 5–8 rule brief. Skip if graph not indexed or < 3 peers. Full instructions in `../references/pattern-guard.md`.
 2. Write the test FIRST, at the task's level (step definitions for `scenario`; unit/integration test for `unit-invariant`/`characterization`). **Generate test data, don't ask for it and don't hand-invent it** — build records through the project's data factory / property-based tool (`../references/testing-contracts.md` §Test Data Generation; detect it from `config.tools` / existing test imports), overriding only the fields this case pins. AI-authored literal data is a last resort, only when the user explicitly asked for it or no factory exists and a specific crafted value is needed — and note why when you do.
-3. Run the test — **it MUST FAIL (red)**
-4. If the test passes immediately, STOP. The test is broken — it's not actually testing anything. Fix it so it makes a real assertion that fails without production code. Common causes:
+3. Run that command before production changes. Red is proven only when the selected test fails because the requested behavior is absent. Collection, import, fixture, syntax, and infrastructure failures do not prove red. Diagnose those failures before continuing.
+4. If the test passes immediately, STOP. The test is broken — it is not testing missing behavior. Fix it so a real assertion fails without production code. Common causes:
    - Empty step definition body (passes by default)
    - Assertion against a mock/fixture that already satisfies the condition
    - Step wired to wrong function or missing the actual check
@@ -472,7 +164,7 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
    - **No premature abstraction (YAGNI).** Three near-identical copies is fine. No new `BaseX` / factory / strategy / config object for a single caller.
    - **Guardrails — the floor YAGNI never cuts below.** Simplicity stops at safety. Never drop, in the name of less code: input validation at a trust boundary, error handling that prevents data loss, a security control (authn/authz, output escaping, secret handling — see `../references/security-compliance.md`), an accessibility basic, or anything the task explicitly requested. Edge validation (above) is *required* code, not defensive slop — the trust-your-callers rule governs the interior only. Non-trivial logic (a branch, loop, parser, money/security path) leaves one runnable check behind (`../references/testing-contracts.md`); a lazy version without its check is unfinished, not done.
    - **Comments: terse, self-contained, no essays** (`../references/code-quality.md` §7). Default to none; add only a one-line non-obvious *why*. Terse voice — drop "this function", filler, restated types. **Self-contained:** never name an external artifact that moves independently — no feature/scenario/`.feature`, MADR/ADR number, change-id, ticket/PR, test name, or tag code (`LOG-OBS-003`) in a comment; describe the behavior, not where it's specced. **No paragraphs:** summary is 1–2 lines, then the `comment_style` params if the project requires them — no prose block before them. No comments restating the code (`# loop over users`). If removing it wouldn't confuse a future reader, don't write it.
-6. Run the step definitions again — they should PASS (green)
+6. Run the same command after production changes. It must pass before task completion.
 7. If still red, fix the production code (not the test)
 8. **Hallucination check:** Before running tests, verify every external function/method your new code calls actually exists in the graph: `search_graph(name_pattern="<name>")` for each. If not found: find the correct function or stop and flag to user. Do not run tests against calls to non-existent functions. (Full instructions in `../references/pattern-guard.md` Step 6.)
 9. **Test quality check:** Before marking done, verify your step definitions have strong assertions:
@@ -482,8 +174,8 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
    - If you wrote a test that would pass against a null/trivial implementation, strengthen it
 10. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix code, re-run tests, re-check. Do not mark `[x]` while a check fails.
 11. **Reconcile task working memory:** prune this task's failure-mode notes from `learnings.md` — it's green, they've served their purpose. If you learned a durable project fact while implementing (a build flag, a convention, an undocumented contract, an architectural constraint), append it to the **Discovered facts** section with its destination home — don't write it into `AGENTS.md` and don't leave it only in context.
-12. Mark complete: `- [ ]` → `- [x]` as soon as focused verification and pending checkpoint requirements pass.
-13. Record the red-green result and current checkbox state in the section handoff, then move to the next task. After the whole section is final, reconcile task descriptions and affected later sections once.
+12. Mark complete: `- [ ]` → `- [x]` as soon as the tactical command passes.
+13. Record the red-green result and current checkbox state in the section handoff, then move to the next task.
 
 **This is strict red-green BDD.** A test that has never been red has never proven it can catch a failure. The red step is NOT a formality — it is the proof that the test works. If you skip it or the test passes immediately, you have a false positive that provides zero safety.
 
@@ -504,44 +196,27 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
 - If the ADR has a Confirmation section, write a test or check that validates it
 
 ### 6. Verify
-When all implementation tasks are complete:
-- Run the BDD test suite (command from `config.tools.bdd_test`) — existing behavior must not break
-- All scenarios should pass — new AND existing
-- If new scenarios fail, fix the implementation (not the feature file — the feature is the spec)
-- If existing scenarios break, you've introduced a regression — fix it before proceeding
-- Check ADR confirmation criteria if applicable
-- Run the project's full test suite (`config.tools.unit_test`) if configured — grimoire tests don't replace existing tests
-- **Diff against the baseline** (`baseline.md` from step 3b): a failure already in the baseline is pre-existing and accepted; a failure NOT in the baseline is a regression you introduced — fix it before finalize. If the baseline was skipped, say so and list all failures for the user rather than claiming "existing tests pass."
+Invoke `grimoire-verify` once after every implementation activity is complete. Review and final configured suites belong to that procedure. They are not task checkboxes or separate apply gates.
 
-**The verify step is not optional. Do not proceed to finalize with failing tests.**
+Do not proceed to finalization until `grimoire-verify` reports no new failures against `baseline.md`.
 
 ### 6a. Final Staged Review
 
-Run this procedure after finalization has removed the change folder, regenerated
-documentation, and staged the complete durable final state. It is an aggregate
-safety net and does not replace paired checkpoints.
+Run this procedure after finalization has removed the change folder, regenerated documentation, and staged the complete durable final state. This authorization gate does not repeat the pre-commit persona review.
 
 1. Identify the target branch and its merge base.
-2. Confirm the ordinary Git index contains every intended durable change,
-   including any tracked change-folder deletion. Resolve every missing or
-   unrelated staged path before presenting the review.
+2. Confirm the ordinary Git index contains every intended durable change, including any tracked change-folder deletion.
 3. Present the complete merge-base-to-index path list:
    ```
    git diff --cached --name-status "$(git merge-base <target-branch> HEAD)"
    ```
-   Group every listed path under `Production` or `Support`. Production paths
-   implement runtime behavior. Support paths include tests, Gherkin, decisions,
-   documentation, and tracked coordination-file deletions. Treat an unknown path
-   as production until classified. Exclude nothing from approval.
+   Group every listed path under `Production` or `Support`. Treat an unknown path as production until classified. Exclude nothing from approval.
 4. Present the full merge-base-to-index diff without a pathspec:
    ```
    git diff --cached "$(git merge-base <target-branch> HEAD)"
    ```
-5. Require explicit user approval of the complete staged path list and full
-   merge-base-to-index diff. Approval covers both production and support paths.
-6. On approval, immediately create one final commit from the reviewed index. Do
-   not edit or restage between approval and commit. Include `Change: <change-id>`
-   and `Final-production-review: approved` trailers.
+5. Require explicit user approval of the complete staged path list and full merge-base-to-index diff. Approval covers both production and support paths.
+6. On approval, immediately create one final commit from the reviewed index. Do not edit or restage between approval and commit. Include `Change: <change-id>` and `Final-production-review: approved` trailers.
 
 ### 7. Finalize
 When all tests are green. Finalize is part of apply, not optional. A session that
@@ -632,7 +307,7 @@ Present a brief summary:
 - `../references/test-baseline.md` — capture which tests were already failing at change start, save to `baseline.md`, get user acceptance; verify diffs against it so only new failures count as regressions.
 
 ## Important
-- **Tests are not optional.** Every task produces both production code and passing step definitions. No exceptions.
+- **Tests are not optional.** Every task produces production code and a passing test at its declared verification level.
 - **Red-green is mandatory, not aspirational.** A test must fail before it passes. If it doesn't fail, it's not a real test. Fix it before moving on.
 - **Code-before-test is the most common bypass.** "I'll add the test after" / "let me see it work first" are the *Code before the test* rationalization in `../references/red-flags.md`. If you wrote code before the test, delete the code and start from red.
 - **A test that always passes is worse than no test.** It gives false confidence. If you can't make a step definition fail, you don't understand what it's testing.
@@ -645,6 +320,5 @@ Present a brief summary:
 
 ## Done
 When all tasks are complete, tests pass, and artifacts are finalized, the workflow is complete. A session that ends at "tests green" without finalizing leaves the change unfinished — §7 is part of apply. Present the summary and suggest:
-- `grimoire-verify` to confirm implementation matches specs
 - `grimoire-commit` to commit the changes
 - `/grimoire:pr` to create the PR — it executes §7 first if the change folder is still present

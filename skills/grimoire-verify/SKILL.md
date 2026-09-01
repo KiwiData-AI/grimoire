@@ -9,7 +9,7 @@ metadata:
 
 # grimoire-verify
 
-Verify that implementation matches the feature specs and decision records. Run after apply, before commit and PR.
+Verify the complete implementation once after tactical apply work. This procedure owns Grimoire alignment, deterministic checks, pre-commit review, and final suites.
 
 ## Triggers
 - User wants to verify a grimoire change is correctly implemented
@@ -46,7 +46,23 @@ For change verification:
 For baseline verification:
 - Read all `features/**/*.feature` and `.grimoire/decisions/*.md`
 
-### 3. Verify in Three Dimensions
+### 3. Run the Ordered Verification Procedure
+
+Run these stages in order:
+
+1. Run `grimoire validate`.
+2. Run existing Grimoire-specific static verification.
+3. Run configured deterministic non-test checks by explicit step name.
+4. Invoke `grimoire-precommit-review` once over the complete diff.
+5. Apply one accepted correction batch. Rerun only affected tactical tests and applicable deterministic checks.
+6. Run each configured unit and BDD suite once.
+7. Compare every failure with `baseline.md`.
+
+Do not run the LLM-backed `best_practices` check separately. `grimoire-precommit-review` is the single general code and best-practice review. Select only personas relevant to the change surface.
+
+Do not run final suites before pre-commit review corrections. Do not run another persona review for accepted corrections unless a material boundary changes.
+
+### 4. Grimoire-Specific Static Verification
 
 **A. Completeness — are all tasks done?**
 - Parse `tasks.md` and check all items are `- [x]`
@@ -77,9 +93,9 @@ Flag issues:
 - Decision's Confirmation criteria not verifiable → WARNING
 - Decision consequences not addressed → WARNING
 
-### 3.C2 Regression vs Baseline
+### 4.C2 Regression Classification
 
-Run the configured suites (`config.tools.unit_test`, `config.tools.bdd_test`) and classify each failure against `baseline.md`:
+After the pre-commit review and correction stage, classify final suite failures against `baseline.md`:
 
 - Failing now **and** in the baseline → **pre-existing**, already accepted by the user at change start. Not a regression. Do not blame the change.
 - Failing now, **not** in the baseline → **regression** introduced by this change → CRITICAL. Must be fixed before the change finalizes.
@@ -230,7 +246,33 @@ For every production file changed in this implementation, run an independent qua
 
 If no issues: `## Code Quality — clean`.
 
-### 7. Generate Report
+### 5. Deterministic Checks
+
+Read `.grimoire/config.yaml`. Select configured non-test checks whose commands are deterministic. Pass their explicit step names to `grimoire check`; do not run unselected checks.
+
+Exclude `unit_test` and `bdd_test` until the final suite stage. Exclude any LLM-backed check, including `best_practices`; pre-commit review owns that judgment.
+
+For this repository, the configured command is:
+
+```sh
+node bin/grimoire.js check lint format duplicates complexity dead_code security dep_audit secrets doc_style --changed
+```
+
+If a deterministic check fails, diagnose and report it. Do not hide it inside the later persona review.
+
+### 6. Pre-Commit Review and Corrections
+
+Invoke `grimoire-precommit-review` once over the complete diff, including staged and unstaged change-related files. Select only personas relevant to the change surface. The review supplies the single general code and best-practice review with one accepted correction batch.
+
+After accepted corrections, rerun only affected tactical tests and applicable deterministic checks. Do not rerun the persona review unless scope, architecture, trust boundaries, data schemas, public APIs, acceptance criteria, or production entry points materially changed.
+
+### 7. Final Suites and Baseline Comparison
+
+Run each configured unit and BDD suite once. Do not run either suite when it already ran after pre-commit review corrections through another verify step; one invocation per configured suite is the limit.
+
+Compare every failure with `baseline.md`. A failure absent from the accepted baseline is new and blocks finalization. A failure present in the baseline remains pre-existing. Without an accepted baseline, list failures as unclassified.
+
+### 8. Generate Report
 Produce a structured report:
 
 ```markdown
@@ -273,7 +315,8 @@ Based on the report:
 - **Dead features found** → suggest a removal change or updating the features
 
 ## Important
-- Verify is read-only. Do NOT fix issues — only report them. The user decides what to do.
+- Static verification and review findings are reported before correction. Apply only user-accepted review corrections in one batch.
+- Correction verification stays tactical. Final configured suites run once after corrections.
 - **"Should pass" is not evidence.** Declaring done without running is the *Declaring done without verifying* rationalization in `../references/red-flags.md`. Observe state, don't predict it.
 - Be specific: reference file paths and line numbers for every issue.
 - A scenario without a step definition is always CRITICAL — the spec is not tested.

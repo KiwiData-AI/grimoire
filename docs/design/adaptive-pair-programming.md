@@ -1,559 +1,146 @@
-# Adaptive Pair Programming for Grimoire Apply
+# Planned Review Timing and Tactical Verification
 
 **Status:** Proposed
 
-**Scope:** Upstream Grimoire workflow changes, global OpenCode configuration,
-and a deferred optional Seance integration.
+**Scope:** Portable Grimoire planning, implementation, review, and verification.
 
 ## Problem
 
-Grimoire review mode currently asks for approval before each production-file
-edit. File boundaries rarely align with meaningful design or behavior
-boundaries. This produces low-value interruptions.
+File-level and section-level approval mechanics consume implementation time without matching review importance. Technical micro-sections also create excessive agent ceremony. Broad test commands inside every section repeat expensive setup and full-suite work.
 
-Grimoire autonomous mode applies to an entire change. It cannot reserve model
-design, module organization, or a new implementation pattern for collaborative
-review while allowing mechanical repetition to proceed independently.
-
-OpenCode currently exposes too many visible agent states. Switching among them
-is inconvenient. The default workflow should feel like a focused coding CLI:
-plan, pair, or build.
+Gherkin has also expanded into implementation nuances that are not actor-visible behavior. This makes feature files longer without improving behavioral truth.
 
 ## Goals
 
-- Agree review and execution strategy during planning.
-- Pair on decisions with high downstream leverage.
-- Execute established repeated work autonomously.
-- Review coherent production increments rather than individual files.
-- Keep test, Gherkin, and Grimoire coordination edits out of normal review.
-- Permit a user to change the current section's execution strategy at runtime.
-- Use the current branch or existing worktree without creating review worktrees.
-- Commit at normal logical boundaries.
-- Review a complete production-only diff before finalization or a pull request.
-- Keep Seance optional while it remains alpha.
+- Default plans to one or two substantial sections.
+- Assign activity-level review timing during planning.
+- Review costly structure before implementation.
+- Let ordinary activities implement autonomously.
+- Use exact tactical red-green commands during implementation.
+- Run one `grimoire-verify` procedure after implementation.
+- Run one pre-commit review and one final suite run inside verification.
+- Preserve optional harness-level per-file review.
+- Treat Gherkin as optional.
+- Adapt immediately to useful user steering.
 
 ## Non-Goals
 
-- Do not create a synthetic staging workflow, patch queue, or review worktree.
-- Do not require approval before a section starts.
-- Do not require approval for every production file.
-- Do not expose tests and specifications unless requested or needed to diagnose a failure.
-- Do not replace `tasks.md` as the implementation authority.
-- Do not make Seance a required dependency or workflow state machine.
-- Do not change Git commit, branch, or worktree behavior.
+- Add provider-specific patch or review state.
+- Remove strict red-green proof.
+- Remove baseline or final regression coverage.
+- Add a test runner or infer unsupported acceleration flags.
+- Encode per-file review in `tasks.md`.
 
-## Terms
+## Artifact Routing
 
-**Section**
-: A `## N. Name` task group in `tasks.md`.
+Gherkin is reserved for clear actor-visible behavior. Prefer extending an existing feature when its actor and capability already match.
 
-**Production edit**
-: An edit that affects shipped runtime behavior, a migration, build behavior,
-or deployed configuration.
-
-**Support edit**
-: A test, Gherkin feature, Grimoire coordination artifact, baseline, or
-learning record.
-
-**Production increment**
-: A coherent architectural or behavioral change that can span multiple
-production files.
-
-**Pattern establishment**
-: The first implementation that sets a convention repeated by later work.
-
-**Repetition**
-: Work that follows an approved local pattern without adding a design choice.
-
-**Paired execution**
-: A section where a production increment is reviewed before its application.
-
-**Autonomous execution**
-: A section where an implementation agent may edit production files directly.
+Internal optimizations, refactors, configuration, protocols, and implementation details use unit, characterization, contract, benchmark, constraint, or ADR verification. A valid change can have no Gherkin edits.
 
 ## Planning Contract
 
-Every implementation section receives two independent metadata fields. The
-planner presents the complete strategy table with `tasks.md` for user approval.
+Plans use one substantial implementation section by default. A second section requires a distinct outcome or context boundary. Every section beyond two requires a specific outcome, dependency, or context-boundary justification.
+
+Each implementation activity is one vertical checkbox containing:
+
+- The new or changed test and exact assertion.
+- The production change required by that test.
+- One exact tactical command used for red and green.
+- One review marker immediately below the checkbox.
 
 ```markdown
-## 2. Establish document synchronization
-
-<!-- execution: paired -->
-<!-- checkpoints: structure-before,slice-after -->
-<!-- context:
-  dais/tasks.py
-  ext_lib/typesense_search.py
--->
+- [ ] 1.1 (verify: scenario) Complete successful TOTP login.
+      <!-- review: structure-before -->
+      - Test: add exact redirect and session assertions.
+      - Implement: add the model, migration, and view behavior.
+      - Red/green: `pytest tests/auth/test_totp.py -k valid_totp --reuse-db`.
 ```
 
-```markdown
-## 3. Apply synchronization to remaining callers
+The tactical command selects only the new or changed tests. It uses an accelerator only when project configuration or existing commands prove support. Examples include Django `--keepdb` and pytest-django `--reuse-db`.
 
-<!-- execution: autonomous -->
-<!-- checkpoints: none -->
-```
+Final verification is not a task section or checkbox.
 
-### Metadata Grammar
-
-```text
-execution   = paired | autonomous
-checkpoints = none | structure-before | slice-after |
-              structure-before,slice-after
-```
-
-Rules:
-
-- Every implementation section declares `execution` and `checkpoints`.
-- `none` is exclusive.
-- Checkpoint order is `structure-before,slice-after`.
-- Verification-only sections default to `autonomous` and `none`.
-- The plan separates pattern establishment from later repetition.
-- The plan groups work by coherent outcome, never by file count.
-
-### Planner Defaults
-
-The planner proposes `paired` with `structure-before` for sections that change:
-
-- Models, migrations, relationships, constraints, nullability, or indexes.
-- Public request, response, event, or persistence structures.
-- Module ownership, public interfaces, or dependency boundaries.
-- Transaction, queue, retry, concurrency, or external-service contracts.
-
-The planner proposes `paired` with `slice-after` for the first use of a
-pattern that later sections repeat.
-
-The planner proposes `autonomous` with `none` for mechanical propagation,
-renames, import updates, and other work that follows an approved pattern.
-
-The planner can propose `autonomous` with a checkpoint when independent
-implementation remains appropriate but a high-risk design or completed slice
-still needs review.
-
-### Strategy Review
-
-The plan presents a table like this before approval:
-
-| Section | Execution | Checkpoints | Reason |
-|---|---|---|---|
-| Define the ownership model | paired | structure-before | High-leverage relationship decision |
-| Implement one sync path | paired | slice-after | Establishes the repeated pattern |
-| Update remaining callers | autonomous | none | Mechanical propagation |
-| Run verification | autonomous | none | No design choice |
-
-The user can change any proposed value before approving the plan.
-
-## Checkpoint Semantics
+## Review Timing
 
 ### Structure Before
 
-`structure-before` pauses before tests or production implementation.
+Use `structure-before` for costly-to-reverse shapes:
 
-The review presents a small, unapplied production shape proposal containing:
+- Data models, relationships, constraints, indexes, and nullability.
+- Repository layout and ownership boundaries.
+- Public interfaces, contracts, and dependency direction.
+- DRY-sensitive or performance-sensitive design.
+- Transactions, queues, retries, concurrency, and external boundaries.
 
-- Intended production files and ownership boundaries.
-- Model fields, relationships, constraints, indexes, and nullability.
-- Function, class, protocol, and payload signatures.
-- Imports that reveal dependencies.
-- Transaction, queue, retry, or external-boundary behavior.
-- Existing project patterns reused.
-- Material alternatives and the selected trade-off.
-
-The checkpoint validates implementation shape. It does not approve omitted
-implementation detail.
+The user reviews the intended production shape once. Approval allows direct autonomous tactical implementation. File boundaries create no additional gate.
 
 ### Slice After
 
-`slice-after` pauses after one representative production increment is complete
-and focused verification has run.
-
-The review presents:
-
-- One production-only multi-file diff.
-- The implemented behavior and its entry point.
-- The persistence, task, or external-service boundary when relevant.
-- Focused verification results.
-- Any divergence from the approved structure.
-- The pattern proposed for remaining sections.
-
-The user may request revision, continue paired execution, or direct the agent
-to finish the remaining section autonomously.
-
-### No Checkpoint
-
-`none` permits uninterrupted execution. Existing blocker, specification
-conflict, test-failure, and circuit-breaker rules still apply.
-
-## Runtime Overrides
-
-The user may change the current section's effective strategy without changing
-the approved plan.
-
-| User instruction | Result |
-|---|---|
-| `Finish this section on your own` | Switch to autonomous; retain pending checkpoints |
-| `Finish without further review` | Switch to autonomous; waive pending checkpoints |
-| `Pair with me from here` | Switch to paired at the next safe production boundary |
-| `Show me the next slice` | Continue until the next pending checkpoint |
-
-Apply records the effective state below the section metadata:
-
-```markdown
-<!-- runtime-execution: autonomous -->
-<!-- checkpoint-state: structure-before=approved,slice-after=pending -->
-```
-
-Allowed checkpoint states are `pending`, `approved`, and `waived`.
-
-Runtime metadata belongs to the ephemeral `tasks.md` coordination record. It
-survives session resume and is removed when the change is finalized.
-
-An execution switch takes effect at the next safe production boundary. An
-active subagent returns before replacement. Completed work is never rewritten
-by a runtime override.
-
-## Active-Section Corrections
-
-The approved section outcome and source artifacts remain authoritative;
-implementation mechanics are correctable details. Apply user-directed
-active-section corrections without evaluating the guidance or updating planning
-artifacts after each correction. An agent must ask for user direction before
-changing implementation direction; agents never create active-section drift
-autonomously.
+Use `slice-after` when the agent may implement directly. The activity has no intermediate human gate. Its complete diff joins the consolidated pre-commit review during `grimoire-verify`.
 
-User-directed model, persistence, and migration mechanics are ordinary
-implementation corrections. Keep only short drift notes needed to reconcile the
-completed section or affected later work. Writing and testing migrations remains
-ordinary section work. Existing operation permission gates remain unchanged,
-including explicit approval before executing a migration against a non-test
-database.
+Optional harness-level per-file review remains available when the user requests it. Grimoire stores no provider-specific per-file state.
 
-Mark each task `[x]` as soon as focused verification passes and every pending
-checkpoint requirement for that task is approved or waived. Keep task
-descriptions and affected later sections unchanged until every task in the
-section is complete and every declared checkpoint is approved or waived.
+## Apply Lifecycle
 
-Reconcile once after the whole section is final. Update the completed section's
-task descriptions and every affected later section once. Then identify remaining
-gaps, clear the section's drift notes, and continue. Post-section gap review may
-identify remaining gaps but must not reopen applied user guidance. This lifecycle
-adds no drift checkpoint, report, reconciliation approval, or persona rerun.
-
-## Apply Behavior
+### Baseline
 
-### Paired Section
+Apply runs every configured test suite once before code changes. It records accepted failures in `baseline.md`. A failure is pre-existing only when the baseline contains it.
 
-1. The primary agent starts the approved section automatically.
-2. It presents `structure-before` when declared.
-3. After approval, the paired section agent makes support edits and establishes
-   the failing test.
-4. The primary agent confirms the test is red.
-5. The paired section agent returns an exact production patch for one coherent
-   increment.
-6. The primary agent presents and applies that patch after user approval.
-7. The primary agent runs focused verification.
-8. The primary agent presents `slice-after` when declared.
-9. The section continues paired or switches to autonomous according to user
-   instruction and remaining metadata.
+### Tactical Red-Green
 
-One paired approval may cover multiple production files. File boundaries never
-create a checkpoint by themselves.
+For each activity:
 
-### Autonomous Section
+1. Load a fresh implementation context for the substantial section.
+2. Perform the planned `structure-before` review when required.
+3. Write or change the task's test.
+4. Run the exact tactical command.
+5. Accept red only when behavior is absent.
+6. Diagnose collection, import, fixture, syntax, or infrastructure failures.
+7. Implement the production change directly.
+8. Run the same tactical command until green.
+9. Mark the checkbox complete immediately.
 
-1. The primary agent starts the approved section automatically.
-2. The autonomous section agent performs red-green implementation directly.
-3. It stops at declared checkpoints, blockers, specification conflicts, or
-   existing circuit breakers.
-4. The primary agent verifies `tasks.md`, the relevant diff, and test output.
-5. The primary agent starts the next section automatically.
+`slice-after` adds no intermediate pause.
 
-## Git and Workspace Rules
+### User Steering
 
-- Use the branch and worktree already selected by the user.
-- Do not create a worktree to isolate a checkpoint.
-- Do not use a stash, synthetic branch, or artificial index state as a review
-  mechanism.
-- Make normal logical commits when appropriate.
-- Scope a slice review to the current section's declared production paths.
-- Include cumulative uncommitted changes when they overlap those paths.
-- Never modify unrelated user work to produce a cleaner review.
+Apply a user correction immediately. Record one terse implementation lesson only when remaining work changes. Update only affected unchecked tasks and rerun their tactical tests.
 
-### Final Production Review
+Do not add a checkpoint, report, approval, persona rerun, or plan-wide reconciliation. The agent still asks before changing direction without user guidance.
 
-Before finalization, commit, or pull-request creation:
+Retry limits, circuit breakers, destructive-operation permissions, and specification-conflict handling remain unchanged.
 
-1. Determine the target branch merge base.
-2. Identify production paths from the approved plan.
-3. Treat unknown changed non-support paths as production until classified.
-4. Stage intended outstanding production changes using normal Git behavior.
-5. Confirm no intended production change is untracked or unstaged.
-6. Present the aggregate merge-base-to-index production diff.
-7. Exclude tests, Gherkin, and ephemeral coordination files by default.
-8. Require explicit user approval before the final commit or pull request.
+## Verify Lifecycle
 
-The final review is a safety net. It includes both committed branch changes and
-the staged outstanding increment. It does not replace earlier structural or
-slice checkpoints.
+After every implementation activity is green, apply invokes one `grimoire-verify` procedure.
 
-## OpenCode Design
+Verification runs in this order:
 
-### Visible States
+1. Validate Grimoire artifacts.
+2. Run Grimoire-specific static verification.
+3. Run configured deterministic non-test checks by explicit step name.
+4. Invoke one pre-commit review over the complete diff using only relevant personas.
+5. Apply one accepted correction batch.
+6. Rerun only affected tactical tests and applicable deterministic checks.
+7. Run one final suite run covering every configured unit and BDD suite.
+8. Compare every failure with `baseline.md` and block new failures.
 
-OpenCode exposes only three primary states in the tab cycle.
+The pre-commit review is the single general code and best-practice review. Verification does not separately run an LLM-backed `best_practices` check.
 
-| State | Purpose | Normal behavior |
-|---|---|---|
-| `plan` | Read-only investigation and collaborative planning | No edits |
-| `pair` | Reviewed implementation and Grimoire orchestration | Production increments ask; support work proceeds |
-| `build` | Autonomous implementation | Edits proceed; consequential operations ask |
+## Session and Resume Rules
 
-`pair` is the default state for new sessions.
+Each substantial section uses one fresh implementation context. Task checkboxes are the resume state. A session handoff records completed task IDs, changed ownership, and facts needed by later sections.
 
-The `pair` state does not override approved Grimoire section metadata. The
-`build` state does not waive planned checkpoints. Runtime directives recorded
-in `tasks.md` remain the only way to change an active section's strategy.
-
-### Hidden Specialists
-
-Review, QA, test, investigation, design research, and section agents run only
-as hidden subagents or command targets. They do not appear in the primary tab
-cycle.
-
-Existing `reviewable-build` is retired after migration. It is replaced by the
-visible `pair` state and hidden section agents.
-
-### Pair State
-
-The `pair` state:
-
-- Runs the adaptive Grimoire apply workflow.
-- Starts approved sections automatically.
-- Dispatches the paired or autonomous section agent.
-- Presents structure and slice checkpoints.
-- Applies approved paired production patches in the primary session.
-- Runs focused verification and the final production-only review.
-- Allows support-file edits and normal local verification commands.
-- Asks before commits, pushes, publishing, deployment, destructive commands,
-  history rewriting, privilege changes, and remote access.
-
-### Build State
-
-The `build` state allows ordinary local edits, tests, linting, formatting
-checks, and Git inspection without interruption.
-
-It still asks before:
-
-- File deletion and permission changes.
-- Process termination.
-- Git reset, clean, checkout, restore, rebase, merge, and other history or
-  branch-destructive actions.
-- Commit and push.
-- Publishing, deployment, infrastructure changes, remote shells, or commands
-  that use credentials.
-
-Known local development and test commands, including suitable Docker test
-commands, should not require approval solely because they use Docker.
-
-### Paired Section Agent
-
-The hidden paired section agent:
-
-- Works on one named section only.
-- May edit support files.
-- Cannot edit production files.
-- Cannot mutate production files through Bash, scripts, redirects, or a
-  formatter.
-- Returns exact unified production patches for the primary agent to review and
-  apply.
-- Cannot invoke other agents, commit, push, or perform destructive Git work.
-
-### Autonomous Section Agent
-
-The hidden autonomous section agent:
-
-- Works on one named section only.
-- May edit production and support files.
-- Follows section checkpoints and existing failure breakers.
-- Cannot invoke other agents, commit, push, publish, deploy, or perform
-  destructive Git work.
-
-### Command Routing
-
-Interactive Grimoire commands use the visible `pair` state:
-
-- `/implement`
-- `/grimoire:apply`
-- `/grimoire:draft`
-- `/grimoire:plan`
-- `/grimoire:design`
-- `/grimoire:bug`
-- `/grimoire:remove`
-- `/grimoire:commit`
-- `/grimoire:pr`
-
-Read-only review, investigation, QA, verification, and vulnerability commands
-use hidden specialist agents.
-
-## Responsibility Matrix
-
-| Responsibility | Grimoire | OpenCode primary | Section agent | Git | Seance |
-|---|---|---|---|---|---|
-| Approve plan strategy | Defines | Presents | No | No | No |
-| Store section strategy | Yes | Updates runtime state | Reports | No | No |
-| Produce production patch | No | Applies paired patch | Proposes or applies | No | Future review only |
-| Run tests and checks | Defines | Runs and reports | Runs as delegated | No | No |
-| Create commits | Requires trailers | Requests approval | No | Records history | No |
-| Render review | Defines checkpoint intent | Presents patch | No | Supplies diff | Deferred option |
-| Own workflow state | Yes | Current runtime state | No | Branch state | No |
-
-## Grimoire Implementation Workstream
-
-The upstream Grimoire repository implements this contract first.
-
-Expected files:
-
-```text
-skills/grimoire-plan/SKILL.md
-skills/grimoire-apply/SKILL.md
-skills/grimoire-commit/SKILL.md
-skills/grimoire-remove/SKILL.md
-features/workflow/plan-the-work.feature
-features/workflow/build-test-first.feature
-AGENTS.md
-README.md
-docs/design/adaptive-pair-programming.md
-```
-
-The implementation should add an architecture decision record after design
-approval. Existing decisions remain valid:
-
-- ADR 0009: fresh subagents per task section.
-- ADR 0031: live branch edits and Git as the staging and history mechanism.
-- ADR 0035: autonomous failure limits and cross-section circuit breakers.
-
-The new decision extends these decisions. It does not supersede them.
-
-Grimoire skill changes must preserve the current red-green discipline, approved
-`tasks.md` authority, and resume behavior.
-
-## Global OpenCode Configuration Workstream
-
-After Grimoire support is implemented and tested, configure global OpenCode.
-
-Expected files:
-
-```text
-~/.config/opencode/opencode.jsonc
-~/.config/opencode/agents/pair.md
-~/.config/opencode/agents/grimoire-paired-section.md
-~/.config/opencode/agents/grimoire-autonomous-section.md
-~/.config/opencode/agents/design.md
-~/.config/opencode/agents/review.md
-~/.config/opencode/agents/test.md
-~/.config/opencode/agents/investigate.md
-~/.config/opencode/agents/qa.md
-~/.config/opencode/commands/*.md
-```
-
-The migration retires:
-
-```text
-~/.config/opencode/agents/reviewable-build.md
-```
-
-The configuration sets `default_agent` to `pair`. It makes specialist agents
-hidden subagents and limits their permissions to their stated responsibilities.
-
-Automatic formatters must not silently alter a reviewed production patch. Run
-formatters as explicit checked or reviewed operations.
-
-OpenCode must restart after configuration changes.
+Failure-mode notes prevent repeated attempts. Implementation lessons carry user corrections only while they affect unchecked work. Durable discovered facts move to their existing authoritative home during finalization.
 
 ## Acceptance Criteria
 
-### Grimoire
-
-- Every implementation section includes valid execution and checkpoint metadata.
-- Planning presents the complete strategy table before approval.
-- Planning separates pattern establishment from repetition.
-- `structure-before` occurs before tests and production implementation.
-- `slice-after` presents one production increment and focused verification.
-- Runtime overrides persist in `tasks.md` and survive resume.
-- Rejected paired patches leave production files unchanged.
-- Existing red-green, retry, and circuit-breaker behavior remains active.
-- Apply creates no review worktree or synthetic staging workflow.
-- Final review includes intended committed and staged production changes.
-- Final review excludes support edits by default.
-
-### OpenCode
-
-- Only `plan`, `pair`, and `build` appear as visible primary states.
-- New sessions start in `pair`.
-- A paired section agent cannot edit production through editor or shell tools.
-- A paired section agent can edit test, Gherkin, and coordination files.
-- An autonomous section agent can edit production but cannot commit or delegate.
-- Normal local tests and checks do not require approval in `pair` or `build`.
-- Consequential and destructive operations remain permission-gated.
-- A multi-file paired increment displays in the primary session before use.
-- Switching tabs does not silently change approved section metadata.
-
-## Rollout
-
-1. Review this document.
-2. Draft and approve the Grimoire architecture decision and implementation plan.
-3. Implement and verify upstream Grimoire support.
-4. Update installed Grimoire skills in a test project.
-5. Configure global OpenCode agents and commands.
-6. Restart OpenCode.
-7. Test paired and autonomous sections in a disposable fixture repository.
-8. Use the workflow on several real changes.
-9. Record checkpoint overrides, rejected patches, permission failures, and
-   recovery events.
-10. Revisit planning defaults after observed use.
-
-## Deferred Seance Integration
-
-Seance is excluded from the initial implementation because it remains alpha.
-
-OpenCode-native pairing must first prove the workflow without a new dependency.
-If later needed, Seance may provide a local review surface for exact patch
-bundles. It must remain stateless regarding Grimoire task progression, OpenCode
-execution mode, Git staging, commits, branches, and worktrees.
-
-A future interface may use this contract:
-
-```text
-ReviewRequest
-  kind: structure | increment | slice | final
-  section
-  unified patch
-  rationale
-  base revision
-
-ReviewOutcome
-  accept | edit | reject
-  optional revised patch
-  optional note
-```
-
-The primary OpenCode agent remains responsible for validating any Seance output
-and applying changes. Seance unavailability must not block the Grimoire or
-OpenCode workflow.
-
-## Risks and Recovery
-
-- Planning may classify routine work as paired or novel work as autonomous.
-  The user corrects the strategy table before approval.
-- A production patch can become stale before primary application. Regenerate it
-  from current files rather than applying it partially.
-- Large sections can conceal several decisions. Split the section during
-  planning rather than add file-level review.
-- Production-path classification can miss unconventional runtime files. Treat
-  unknown non-support changes as production.
-- A runtime override can arrive while a subagent is active. The subagent returns
-  before the effective strategy changes.
-- Instruction-level enforcement can be bypassed by a poorly configured agent.
-  Agent permissions and the final production review provide defense in depth.
-- Existing user changes can overlap a section. Preserve them and disclose the
-  cumulative overlap in the checkpoint review.
+- Plans use substantial sections and activity-level review timing.
+- Each vertical task has one exact tactical red-green command.
+- `structure-before` reviews shape once before autonomous implementation.
+- `slice-after` has no intermediate human gate.
+- Apply runs full suites only for baseline.
+- Apply invokes one `grimoire-verify` procedure after tactical work.
+- Verify runs one pre-commit review and one final suite run.
+- Gherkin remains optional and limited to clear actor-visible behavior.
+- Harness-level per-file review remains outside Grimoire state.

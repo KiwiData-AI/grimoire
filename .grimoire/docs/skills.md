@@ -1,5 +1,5 @@
 # Skills
-> Last updated: 2026-08-29
+> Last updated: 2026-09-01
 
 ## Purpose
 Markdown skill definitions that provide Grimoire's AI-driven workflow. Skills are the primary interface between users and the Grimoire workflow.
@@ -16,8 +16,16 @@ Markdown skill definitions that provide Grimoire's AI-driven workflow. Skills ar
 
 ### Structure
 - Every SKILL.md follows a consistent shape: title, triggers (when it activates), prerequisites (what must already exist), a numbered workflow, and an "Important"/constraints section. See `skills/grimoire-draft/SKILL.md` as an exemplar.
-- Skills form a pipeline where each trusts the previous one's output: `branch-guard → draft → design-consult → design → plan → review → apply → verify → precommit-review → commit → pr → pr-review`. Onboarding (`grimoire-discover`, `grimoire-audit`), bug-handling (`grimoire-bug*`), and dependency (`grimoire-vuln-triage`, `grimoire-vuln-remediate`) skills sit alongside the main pipeline.
+- Skills form a pipeline where each trusts the previous one's output: `branch-guard → draft → design-consult → design → plan → review → apply → commit → pr → pr-review`. Onboarding (`grimoire-discover`, `grimoire-audit`), bug-handling (`grimoire-bug*`), and dependency (`grimoire-vuln-triage`, `grimoire-vuln-remediate`) skills sit alongside the main pipeline.
+- `grimoire-precommit-review` remains available standalone and is invoked inside `grimoire-verify` during apply.
 - Reference links use a relative path, e.g. `See ../references/review-personas.md`.
+
+### Implementation lifecycle
+- Plans use one or two substantial sections with activity-level review timing.
+- Each vertical activity uses one exact tactical red-green command.
+- Apply captures the baseline, implements tactical tasks, then invokes one `grimoire-verify` procedure.
+- Verify runs deterministic checks, one pre-commit review, accepted tactical corrections, and one final suite run.
+- Optional harness-level per-file review remains outside portable Grimoire task state.
 
 ## Where New Code Goes
 - New workflow skill → `skills/grimoire-<name>/SKILL.md`, then register it in `installSkillFiles()` (`src/core/shared-setup.ts`).

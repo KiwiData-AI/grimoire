@@ -80,8 +80,8 @@ The attempt budget above is per-problem. Autonomous `grimoire-apply` adds a run-
 ## When to Use Grimoire
 
 Use grimoire when the user's request involves:
-- New user-facing functionality (→ Gherkin feature)
-- Changes to existing behavior (→ Gherkin feature)
+- New actor-visible functionality that benefits from a planned change
+- Changes to actor-visible behavior that benefit from a planned change
 - Technology or architecture decisions (→ MADR decision record)
 - Non-functional requirements like performance targets or security policies (→ MADR decision record)
 
@@ -90,7 +90,16 @@ Use grimoire when the user's request involves:
 - Pure refactoring — no behavior change means no scenario change. May warrant an ADR if architectural.
 - Config changes, dependency updates, formatting — no behavioral or architectural impact.
 
-**Routing rule:** If the request is expressible as Given/When/Then, it's a Gherkin feature. If it's a trade-off, choice, or structural decision, it's an ADR. If it's neither, it doesn't belong in grimoire.
+**Gherkin admission rule:** Add or change Gherkin only when all four gates pass:
+
+1. An external actor initiates or participates in the behavior.
+2. The outcome is observable outside the implementation.
+3. The scenario uses domain language instead of code structure.
+4. The behavior survives a reimplementation.
+
+Internal optimization, refactoring, configuration, and implementation work use appropriate tests or checks and may have no Gherkin.
+
+Trade-offs, choices, and structural decisions belong in MADR records. Security, performance, and observability invariants belong in the constraints register.
 
 ## Decision Tree: What Do I Do?
 
@@ -115,10 +124,10 @@ User has a request
 ├─ "I want to add / change / remove functionality"
 │  │
 │  ├─ Adding new behavior?
-│  │  → /grimoire:draft → design the new behavior (plan projects the .feature)
+│  │  → /grimoire:draft → design the change; plan applies the Gherkin admission rule
 │  │
 │  ├─ Changing existing behavior?
-│  │  → /grimoire:draft → design the change (plan projects it into the .feature)
+│  │  → /grimoire:draft → design the change; plan selects its authoritative artifact or test
 │  │
 │  ├─ Removing a feature?
 │  │  → /grimoire:remove → tracked removal with impact assessment
@@ -162,9 +171,9 @@ Every grimoire skill has a **Routing** section that redirects to the correct ski
 
 Skills also have a **Done** section that signals when the workflow is complete. When you reach it, present results and wait for the user's next instruction. Do not invent follow-up actions.
 
-## Workflow: Creating or Changing a Feature
+## Workflow: Creating or Changing a Planned Change
 
-The end-to-end flow for adding or modifying behavior is six stages, each owned by a skill:
+The end-to-end flow for a planned change is six stages, each owned by a skill:
 
 **Draft** (`/grimoire:draft`) → **Plan** (`/grimoire:plan`) → **Review** (`/grimoire:review`, optional) → **Apply** (`/grimoire:apply`) → **Verify** (`/grimoire:verify`) → **PR** (`/grimoire:pr`).
 
@@ -176,7 +185,7 @@ Each skill's SKILL.md is the authoritative home for that stage's mechanics; the 
 - **Live on the branch.** Features, decisions, constraints, and schema are edited directly on the feature branch — no copy-into-change-folder, no promote step.
 - **No archive step.** The PR diff *is* the change; git history plus the `Change: <id>` commit trailer are the record. PR finalize just flips decision status to `accepted` and removes the ephemeral change folder.
 - **Never create a PR with `gh pr create` directly** while `.grimoire/changes/` contains an active change — route through `/grimoire:pr` so finalization happens.
-- **The user drives the pace.** Review mode uses per-section paired execution and approves coherent production increments at declared checkpoints, not individual files. Autonomous mode works the full task list, stopping only on blockers.
+- **Planning assigns review timing.** `structure-before` pauses once for costly shapes. `slice-after` runs autonomously until the consolidated pre-commit review. Optional per-file review remains harness-level behavior.
 
 ### IMPORTANT: tasks.md Is the Plan
 
@@ -190,18 +199,11 @@ This matters because:
 - Re-planning wastes time and may diverge from what was agreed
 - `tasks.md` supports resume — a new session should pick up where the last one left off, not start over
 
-Apply user-directed active-section corrections without evaluating the guidance or updating planning artifacts after each correction. An agent must ask for user direction before changing implementation direction; agents never create active-section drift autonomously.
+Apply user-directed implementation corrections immediately. Record one implementation lesson only when remaining work changes. Update only affected unchecked tasks, rerun affected tactical tests, and continue. Do not add a checkpoint, report, approval, persona rerun, or plan-wide reconciliation.
 
-Mark each task `[x]` as soon as focused verification passes and every pending checkpoint requirement for that task is approved or waived. Task checkboxes record runtime progress. Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.
+Mark each task `[x]` as soon as its exact tactical command passes. Task checkboxes record runtime progress and resume state.
 
-Keep only short drift notes needed by later work. After the whole section is final, reconcile once:
-
-1. Update the completed section's task descriptions and every affected later section once.
-2. Identify remaining planning gaps without relitigating applied user guidance.
-3. Clear the section's drift notes.
-4. Continue to the next section.
-
-Section reconciliation adds no drift checkpoint, report, reconciliation approval, or persona rerun. User-directed model, persistence, and migration mechanics are ordinary implementation corrections. Existing operation permission gates, red-green discipline, retry limits, and circuit breakers remain unchanged.
+An agent must ask for user direction before changing implementation direction. Agents never create active-section drift autonomously. Existing permission gates, red-green discipline, retry limits, and circuit breakers remain unchanged.
 
 If an agent suspects a task detail is wrong, ask the user before changing direction. If execution is genuinely impossible, flag the blocker with a specific explanation. Do not silently rewrite or reorder tasks.
 
