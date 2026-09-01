@@ -6,108 +6,67 @@ Feature: Build each task test-first
 
   # @manual — the actor is an AI agent running /grimoire:apply.
 
-  Scenario: A task is implemented only after its test fails first
-    Given a planned task
+  Scenario: Existing failures are baselined once
+    Given an approved change is ready for implementation
+    When grimoire starts the change
+    Then it runs every configured test suite once
+    And it records accepted pre-existing failures before code changes
+    And it does not run the full suites again during implementation
+
+  Scenario: A feature task uses one tactical red-green command
+    Given a planned feature task with an exact test command
     When I implement the task
-    Then a test for it is written and seen to fail before any code is written
-    And the code is written until that test passes
+    Then its new or changed test is seen to fail for the missing behavior
+    And collection or infrastructure errors do not count as red
+    And the production code is written until the same command passes
+    And no broader suite runs for task completion
 
   Scenario: Repeated failure stops the work instead of looping
     Given a task whose tests keep failing
     When the same approach has failed several times
     Then grimoire stops and asks for guidance rather than trying again
 
-  Scenario: A paired section reviews its structure before implementation
-    Given an approved paired section uses a structure checkpoint
-    When grimoire starts the section
+  Scenario: A structural activity is reviewed before implementation
+    Given planning assigns structure-before review to an activity
+    When grimoire starts the activity
     Then I review the intended production shape before tests or production code change
+    And approval lets the agent implement it autonomously with tactical red-green tests
 
-  Scenario: A paired section reviews one completed production increment once
-    Given an approved paired section uses a pending slice-after checkpoint
-    When one representative production increment has focused verification
-    Then I review its production-only diff and verification result
-    And tasks covered by the increment remain incomplete until I approve the slice
-    And approval completes those tasks and prevents another slice-after checkpoint
+  Scenario: Verification invokes one pre-commit review
+    Given planning assigns slice-after review to implementation activities
+    When grimoire verifies their completed tactical red-green work
+    Then grimoire runs configured non-test quality checks
+    And it invokes pre-commit review once over the complete diff
+    And pre-commit review uses only applicable best-practice reviewers
+    And it does not run a second LLM-backed best-practices check
+    And it does not run one review per activity or file
 
-  Scenario: A developer lets the current section finish autonomously
-    Given an active paired section has pending checkpoints
-    When I tell grimoire "Finish this section on your own"
-    Then the section switches to autonomous execution at the next safe production boundary
-    And its pending checkpoints remain pending
-
-  Scenario: A developer waives the current section's pending checkpoints
-    Given an active paired section has pending checkpoints
-    When I tell grimoire "Finish without further review"
-    Then the section switches to autonomous execution at the next safe production boundary
-    And its pending checkpoints are waived
-
-  Scenario: A developer resumes pairing for the current section
-    Given an active section is executing autonomously
-    When I tell grimoire "Pair with me from here"
-    Then the section switches to paired execution at the next safe production boundary
-
-  Scenario: A developer requests the next checkpoint
-    Given an active paired section has a pending checkpoint
-    When I tell grimoire "Show me the next slice"
-    Then grimoire continues until the next pending checkpoint
-
-  Scenario: A developer rejects an unapplied paired production patch
-    Given a paired section proposes a production increment with a retained failing test
-    When I reject the proposed patch
-    Then the production files remain unchanged
-    And the failing test remains in place
-    And a fresh paired agent returns a revised unapplied production patch
-
-  Scenario: A developer rejects a provisional slice after verification
-    Given a paired section has applied and verified a provisional production slice
-    And tasks covered by the slice remain incomplete
-    When I reject the slice-after checkpoint
-    Then the provisional production slice remains applied
-    And its covered tasks remain incomplete
-    And a fresh paired agent returns an unapplied corrective production patch
-    And grimoire verifies and presents the corrected slice at the same checkpoint
-
-  Scenario: A paired agent keeps production changes isolated
-    Given a paired section needs production and support changes
-    When the paired agent completes its work
-    Then it may change support files only
-    And it returns an exact unified production patch without applying it
-
-  Scenario: An issue is fixed without interrupting the active section
+  Scenario: User steering becomes an implementation lesson
     Given an active section follows an approved plan
-    When I identify an issue with an implementation detail and direct its correction
-    Then grimoire fixes the code and tests within the active section
-    And it does not evaluate my guidance against the plan being corrected
-    And it does not pause to update planning artifacts
-    And the section continues until focused verification passes
-
-  Scenario: A completed section updates affected planning once
-    Given every task in a section is verified
-    And every declared checkpoint is approved or waived
-    And the section differs from its planned implementation details
-    When grimoire completes the section
-    Then it updates the completed section to match the implementation
-    And it updates each affected later section once
-    And it identifies remaining planning gaps after applying my guidance
-    And it clears the section's drift notes before continuing
+    When I direct a different implementation approach
+    Then grimoire applies the correction without re-planning the change
+    And it records one terse lesson when remaining work is affected
+    And it updates only affected unchecked tasks
+    And it reruns only affected tactical tests before continuing
+    And it does not add a checkpoint, report, approval, or persona rerun
 
   Scenario: Verified task completion is recorded immediately
     Given an active section has multiple tasks
-    When a task passes focused verification and its pending checkpoint requirements
+    When a task's exact tactical test passes
     Then grimoire marks that task complete immediately
-    And it leaves task descriptions and affected later sections unchanged until the whole section is done
-
-  Scenario: Persistence details can be corrected during implementation
-    Given an active section includes a model or migration
-    When I direct a correction to its planned persistence details
-    Then grimoire fixes and verifies the persistence change within the section
-    And it does not treat persistence alone as a planning blocker
 
   Scenario: An agent does not create implementation drift
     Given an active section follows an approved plan
     When the agent suspects an implementation detail is wrong
     Then it asks me for direction before changing the plan
     And only my direction can create active-section drift
+
+  Scenario: Full verification runs once after pre-commit review
+    Given implementation and pre-commit review corrections are complete
+    When grimoire verifies the change
+    Then it runs every configured unit and BDD suite once
+    And it compares every failure with the accepted baseline
+    And it blocks finalization for any new failure
 
   Scenario: Finalization preserves deferred tasks
     Given a completed change has deferred tasks

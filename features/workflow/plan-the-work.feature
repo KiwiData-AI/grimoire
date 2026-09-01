@@ -17,25 +17,37 @@ Feature: Turn an approved spec into a plan
     When I ask grimoire to plan the work
     Then grimoire declines and tells me to draft and approve a spec first
 
-  Scenario: Planning proposes a section execution strategy
-    Given an approved change with work that has different review needs
+  Scenario: Planning groups work into substantial feature sections
+    Given an approved change with related implementation activities
     When I ask grimoire to plan the work
-    Then each implementation section declares its execution
-    And only paired sections may declare ordered checkpoints
-    And autonomous sections declare no checkpoints
-    And I review the complete section strategy before I approve the plan
+    Then the plan defaults to one substantial implementation section
+    And it uses a second section only for a distinct outcome or context boundary
+    And every section beyond two includes a specific justification
+    And final verification is a lifecycle gate instead of a task section
 
-  Scenario: Planning separates a new pattern from its repetition
-    Given an approved change establishes a pattern used by later work
+  Scenario: Planning assigns review timing by activity
+    Given an approved change with activities that need different review attention
     When I ask grimoire to plan the work
-    Then the first pattern implementation is separated from mechanical repetition
-    And the repeated work can use autonomous execution after the pattern is approved
+    Then high-leverage structural activities use structure-before review
+    And autonomously implemented activities use slice-after review
+    And each activity records its review timing beside its task checkbox
+    And slice-after activities join one consolidated pre-commit review
+    And I review the complete timing strategy before I approve the plan
 
-  Scenario: Planning defines paired production isolation
-    Given an approved change needs a paired pattern-establishing section
+  Scenario: Planning creates tactical red-green feature tasks
+    Given an approved change with testable behavior
     When I ask grimoire to plan the work
-    Then the section declares paired execution and its ordered checkpoints
-    And the paired agent is limited to support edits and an unapplied production patch
+    Then each task contains its test and production implementation
+    And each task names one exact command for both red and green
+    And the command selects only the new or changed tests
+    And the command uses a verified test-runner accelerator when available
+
+  Scenario: Planning does not manufacture Gherkin for internal work
+    Given an approved optimization or implementation change with no actor-visible behavior
+    When I ask grimoire to project and plan the work
+    Then no Gherkin feature file is created or modified
+    And the work uses the matching internal test or decision record
+    And planning continues without treating missing Gherkin as a gap
 
   Scenario: Planning orders actual section dependencies
     Given an approved change whose sections reference code and artifacts from other sections
@@ -50,12 +62,12 @@ Feature: Turn an approved spec into a plan
     Then grimoire reports all dependency errors together
     And grimoire blocks plan approval
 
-  Scenario: Autonomous implementation has no intermediate human gate
-    Given an approved change can be implemented and verified by an agent
-    When I ask grimoire to plan autonomous sections
-    Then every autonomous task uses deterministic commands or agent-executable tools
-    And no autonomous task asks for human approval, inspection, or waiting
-    And implementation runs without a human gate
+  Scenario: Slice-after implementation has no intermediate human gate
+    Given an approved activity uses slice-after review
+    When grimoire implements the activity
+    Then its tasks use deterministic commands or agent-executable tools
+    And its implementation runs without a human gate
+    And review waits for the consolidated pre-commit pass
 
   Scenario: Unavoidable external acceptance occurs after verification
     Given an approved change requires external acceptance that an agent cannot execute

@@ -7,7 +7,10 @@
 **Spec-driven AI development framework.** Encodes decades of software engineering discipline — requirements, design review, TDD, change management, traceability — into AI coding workflows so they can't be skipped.
 
 ```
-Your request → Gherkin spec → Implementation plan → Red-green BDD → Verified, auditable code
+Clear actor-visible behavior → Gherkin
+Architectural trade-off → MADR decision
+Internal optimization, refactor, configuration, or implementation detail → appropriate test or check
+Approved change → substantial implementation sections → tactical red-green → one verify procedure
 ```
 
 <!-- GRIMOIRE:HEALTH:START -->
@@ -20,7 +23,7 @@ The software industry spent decades learning hard lessons about building reliabl
 Grimoire adds the missing discipline:
 
 - **One home per fact** — actor-observable behavior is a Gherkin `.feature`; security/NFR/observability invariants are a constraints register; trade-offs are MADR decisions; data is a schema; code structure is the live graph. No fact lives in two places.
-- **Plans before implementation** — concrete task lists with exact file paths, not "implement the feature"
+- **Plans before implementation** — one or two substantial sections with vertical tasks, exact paths, and tactical test commands
 - **Tests that actually test** — test-first discipline at the right level (red-green BDD for behavior, unit tests for invariants) with assertion quality checks
 - **Codebase knowledge without exploration** — intent-focused area docs + data schemas, with live structure (symbols, call graphs, reusable code) from codebase-memory-mcp so the AI doesn't waste context reading files
 - **Full audit trail** — every commit traces back to a requirement via git trailers
@@ -80,8 +83,7 @@ You: "Users should be able to log in with 2FA"
 → /grimoire:draft    Designs the change on one living draft.md (Given/When/Then take shape here)
 → /grimoire:plan     Projects the design into login.feature + decisions, then generates tasks
 → /grimoire:review   (optional) Product, security, engineering + principles review
-→ /grimoire:apply    Implements test-first (BDD for behavior, unit for invariants)
-→ /grimoire:verify   Confirms all scenarios pass, no regressions
+→ /grimoire:apply    Implements tactically, then runs verification once
 → grimoire pr         Generates PR description from artifacts
 ```
 
@@ -112,6 +114,8 @@ Grimoire routes your request to its one correct home (an admission test keeps ea
 - **"Users should be able to log in with 2FA"** (external actor, observable) → Gherkin feature
 - **"Logs must never contain PII"** (an invariant, no actor) → `constraints.md` register, **not** a `.feature`
 - **"We should use PostgreSQL instead of MySQL"** → MADR decision record
+- **"Optimize this parser without changing behavior"** → characterization test or benchmark, with no required Gherkin
+- **"Update formatter configuration"** → direct configuration check, with no required Gherkin
 - **"The login page is broken"** → `/grimoire:bug` (reproduce first, then fix)
 - **"A tester found a problem"** → `/grimoire:bug-report` → `/grimoire:bug-triage` → routed fix
 
@@ -119,9 +123,9 @@ A `.feature` is allowed only if it has an external actor, is observable without 
 
 ### 2. Plan — Project the design, then generate concrete tasks
 
-Plan opens by **projecting** the agreed `draft.md` into its homes (features, constraints, decisions, `data.yml`, manifest), running the admission test and principles gate as it goes. Then every scenario becomes a pair: write the step definition (test), then write the production code. Tasks reference exact file paths, exact assertions, and real patterns from area docs, ordered along the technical spine (dependencies → data → API → logic → UI → verification).
+Plan opens by **projecting** the agreed `draft.md` into its homes, running the admission test and principles gate as it goes. Gherkin is optional. Clear actor-visible behavior extends an existing feature when possible. Internal optimizations, refactors, configuration, and implementation details use the appropriate test, check, constraint, or decision.
 
-The plan skill reads area docs for conventions and boundaries, and queries the code graph for reusable utilities and exact symbols — so the AI plans with real codebase knowledge, not guesses. Each task is tagged with its verification level: `scenario` (behavior), `unit-invariant` (a constraint), or `characterization` (internal/refactor).
+Plans default to one substantial section and use a second only for a distinct outcome or context boundary. Every activity receives activity-level review timing: `structure-before` for costly shapes or `slice-after` for autonomous implementation. Each vertical task contains its test change, production change, and one exact tactical red-green command. Optional harness-level per-file review remains available outside Grimoire state.
 
 ### 3. Review — Multi-perspective design review (optional)
 
@@ -138,34 +142,37 @@ Issues flagged as **blocker** or **suggestion**. Security findings tagged with O
 
 ### 4. Apply — Build test-first at the right level
 
-Red-green discipline stays; the test *vehicle* matches the task's `verify:` tag — a Gherkin step definition for `scenario` tasks, a unit/integration test for `unit-invariant` and `characterization` tasks. (No `.feature` is forced onto a constraint or an internal change — that's what filled feature files with slop.)
-
-Each approved task section uses paired or autonomous execution. Paired sections review the proposed structure and coherent production slices. Autonomous sections continue directly with red-green work and existing safeguards. `tasks.md` records the approved strategy and any runtime checkpoint state.
+Apply captures the full configured test baseline once. Red-green discipline then uses the test vehicle and exact tactical command recorded by each task. A `structure-before` activity receives one shape review, then implementation proceeds autonomously. A `slice-after` activity proceeds autonomously without an intermediate gate.
 
 This is an upstream, provider-neutral workflow. Source skills install for Claude, OpenCode, and Codex through `src/core/shared-setup.ts`.
 
 For each task:
 1. Write the failing test at the task's level
-2. Run it — **must fail** (red). A test that passes immediately is broken.
+2. Run the exact tactical command — it must fail because behavior is absent
 3. Write production code
-4. Run it — **must pass** (green)
+4. Run the same tactical command — it must pass
 5. Test quality check — verify strong assertions, not `assert True`
 6. Mark done, move to next task
 
+After all activities, apply invokes one `grimoire-verify` procedure. Verify runs deterministic checks, one pre-commit review, accepted tactical corrections, and one final suite run against the baseline. It does not also run the LLM-backed `best_practices` check.
+
 Artifacts are edited **live on the feature branch** the whole time — no promote step. Finalize just flips decision status to `accepted` and removes the ephemeral change folder.
 
-**Session management:** Each task (or group of 2-3) runs in a fresh subagent to avoid context bloat. `tasks.md` is the coordination mechanism — if the session is interrupted, the next agent picks up where you left off.
+**Session management:** Each substantial section runs in a fresh implementation context. `tasks.md` checkboxes preserve resume state.
 
 **Stuck detection:** After 3 failed attempts with different approaches on a single task, the agent stops and asks for help instead of looping.
 
 ### 5. Verify — Confirm everything works
 
+- **Deterministic checks** — validates artifacts and runs configured non-test checks by explicit step name
+- **Pre-commit review** — one complete-diff review using only applicable personas
 - **Completeness** — all tasks done
 - **Correctness** — every scenario has a step definition with real assertions
 - **Coherence** — architecture decisions are followed
 - **Test quality** — flags weak assertions (`assert True`, `toBeDefined()`), empty bodies, tautological tests
 - **Security compliance** — verifies plan-stage security patterns were followed (parameterized queries, bcrypt, no hardcoded secrets), checks review blockers were addressed, runs OWASP Top 10 surface scan on the diff, validates security-tagged scenarios (`@security`, `@auth`, `@pii`, `@pci-dss`, etc.)
 - **Dead features** — specs that exist but code no longer implements
+- **Final suites** — each configured unit and BDD suite runs once, then failures are compared with the accepted baseline
 
 ### 6. PR
 
@@ -246,57 +253,48 @@ The AI runs `/grimoire:plan`, which **first projects** the agreed `draft.md` int
 > **Change**: Add TOTP-based 2FA to login
 > **Features**: auth/login.feature
 > **Decisions**: 0003-totp-library.md
-> **Test command**: `pytest tests/ -k "auth"`
-> **Status**: 0/8 tasks complete
+> **Baseline commands**: `pytest`; `pytest-bdd features/`
+> **Status**: 0/2 tasks complete
 
-## 1. Data Layer
-- [ ] 1.1 Add `totp_secret` field to User model in `src/models/user.py`
-      - CharField, nullable, 32 chars
-      - Migration: add nullable column (safe for live DB)
-- [ ] 1.2 Run `python manage.py makemigrations && python manage.py migrate`
+## 1. Add TOTP login
+<!-- depends-on: none -->
 
-## 2. TOTP Verification
-- [ ] 2.1 Write step defs in `tests/step_defs/test_auth.py` for scenario: "Successful login with valid TOTP code"
-      - Given: create user with 2FA enabled, generate valid TOTP secret
-      - When: POST to `/verify-totp/` with valid code from `pyotp.TOTP(secret).now()`
-      - Then: assert response redirects to `/dashboard/` (status 302)
-      - Then: assert session `is_2fa_verified` is True
-- [ ] 2.2 Implement `VerifyTOTPView` in `src/views/auth.py`
+- [ ] 1.1 (verify: scenario) Complete successful TOTP login.
+      <!-- review: structure-before -->
+      - Test: add exact redirect and authenticated-session assertions in `tests/step_defs/test_auth.py`.
+      - Implement: add the nullable secret migration and `VerifyTOTPView` in `src/views/auth.py`.
+      - Red/green: `pytest tests/step_defs/test_auth.py -k successful_login_with_valid_totp --reuse-db`.
 
-## 3. Error Cases
-- [ ] 3.1 Write step defs for scenario: "Login rejected with expired TOTP code"
-- [ ] 3.2 Write step defs for scenario: "Login rejected with invalid TOTP code"
-
-## 4. Verification
-- [ ] 4.1 Run `pytest tests/ -k "auth"` — all new scenarios green
-- [ ] 4.2 Run `pytest tests/` — no regressions in existing tests
+- [ ] 1.2 (verify: scenario) Complete expired and invalid TOTP rejection.
+      <!-- review: slice-after -->
+      - Test: add exact error-message and retained-page assertions in `tests/step_defs/test_auth.py`.
+      - Implement: handle expired and invalid codes in `VerifyTOTPView`.
+      - Red/green: `pytest tests/step_defs/test_auth.py -k "expired_totp or invalid_totp" --reuse-db`.
 ```
 
 ### Apply
 
-The AI runs `/grimoire:apply`, creates branch `feat/add-2fa-login`, and works through tasks:
+The AI runs `/grimoire:apply`, creates branch `feat/add-2fa-login`, captures the baseline once, and works through tasks:
 
 ```
-Task 1.1: Add totp_secret field to User model
-  → Editing src/models/user.py
-  ✓ Done
-
-Task 2.1: Write step defs for "Successful login with valid TOTP code"
+Task 1.1: Complete successful TOTP login
+  → Reviewing the model and view shape once
   → Writing tests/step_defs/test_auth.py
-  → Running: pytest tests/ -k "successful_login_with_valid_totp"
+  → Running: pytest tests/step_defs/test_auth.py -k successful_login_with_valid_totp --reuse-db
   ✗ FAILED (red) — good, test correctly fails without production code
-
-Task 2.2: Implement VerifyTOTPView
+  → Updating the model, migration, and VerifyTOTPView
   → Writing src/views/auth.py
-  → Running: pytest tests/ -k "successful_login_with_valid_totp"
+  → Running: pytest tests/step_defs/test_auth.py -k successful_login_with_valid_totp --reuse-db
   ✓ PASSED (green)
   → Test quality check: assert response.status_code == 302 ✓ strong assertion
 
   ...continues through all tasks...
 
-Task 4.2: Full regression check
-  → Running: pytest tests/
-  ✓ 47 passed, 0 failed
+Post-implementation
+  → Invoking one grimoire-verify procedure
+  → Running deterministic checks and one pre-commit review
+  → Running configured unit and BDD suites once
+  ✓ No failures beyond the accepted baseline
 ```
 
 Every commit includes `Change: add-2fa-login` trailer. `tasks.md` is updated in real time.
@@ -862,7 +860,7 @@ Issues and pull requests welcome at [github.com/KiwiData-AI/grimoire](https://gi
 
 - `npm run build && npm test && npm run lint` — all green
 - `grimoire check` — pre-commit pipeline green
-- New behavior has a Gherkin scenario in `features/` (or a decision record under `.grimoire/decisions/` if it's an architectural choice)
+- Clear actor-visible behavior has a Gherkin scenario. Internal work uses its appropriate test, check, constraint, or decision without manufactured Gherkin.
 - Commit messages include a `Change:` trailer when the work is part of a tracked change
 - For dependency adds/upgrades: lockfile committed, no floating version ranges in `package.json` (see Security model above)
 

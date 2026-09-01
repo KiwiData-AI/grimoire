@@ -62,7 +62,7 @@ These are gates, not aspirations — a task that adds a duplicate home or a rein
 
 First, **score the complexity level (1–4)** now that the design is settled, and write it to `manifest.md` frontmatter as `complexity: <1-4>` (use the level table in `grimoire-draft` step 2 as the rubric). Then project each kind of fact:
 
-**Behaviors → `features/*.feature`.** For each behavioral fact in the design:
+**Behaviors → `features/*.feature`.** Extend an existing feature only for clear actor-visible behavior. A change may require no Gherkin edits.
 
 *The feature-file admission test* — a scenario may be written **only if it passes all four gates**; if it fails any, it is a constraint or a decision, not a feature:
 1. **External actor, outside the system boundary** — an end user, an operator, or a *third-party* system integrating with you does the thing. "External" means outside *your* system, not outside one module: a sibling service, an internal queue consumer, or another module in the same repo calling this one is **internal**, even though it's a separate process. Internal actor → contract test or constraint/decision, never a `.feature`.
@@ -73,6 +73,8 @@ First, **score the complexity level (1–4)** now that the design is settled, an
 **Internal protocols and service-to-service contracts are NOT features.** A change to how two of your own components talk — an internal RPC/queue/event shape, a module API, a wire format between your services — is a *contract*, verified by a contract/integration test (`verify: unit-invariant`), not by Gherkin. It fails gate 1: there is no external actor, only your own code on both ends. If a third-party integrates against the protocol it's external and may be a feature; two of your own services is internal. This is the second-biggest source of feature-file slop after invariants.
 
 Common slop this catches: invariants (→ `constraints.md`) — "PII is scrubbed from logs", "all endpoints require auth", "responses are gzipped", "errors logged with a trace id"; internal protocols (→ contract test) — "service A publishes an OrderPlaced event B consumes", "the worker accepts a job payload with these fields", "module X returns this struct to module Y".
+
+Internal nuances, refactors, and optimizations use unit, characterization, contract, benchmark, constraint, or ADR verification. Do not create or modify Gherkin merely to give internal work a scenario.
 
 *Extend vs. new — default is always extend; new files are the exception and require justification.* List existing feature files first (**required, not skippable** — do not write any scenario until this triage table is complete):
 
@@ -206,13 +208,11 @@ Level 1-2 changes with minor gaps may proceed; level 3-4 with multiple gaps shou
 **If no real gaps**, proceed directly to task generation.
 
 ### 4. Generate Tasks
-Create `.grimoire/changes/<change-id>/tasks.md`. **Every task produces both production code AND a test — but the test level matches the artifact the task derives from.** Tasks are structured as pairs: the failing test first, then the production code.
+Create `.grimoire/changes/<change-id>/tasks.md`. **Every task is one vertical checkbox containing its test and production change.** The test level matches the artifact the task derives from. Within the checkbox, the failing test comes first.
 
-**Build an executable section order before task approval.** Draft coherent
-sections. Derive the actual section dependency graph from referenced
-symbols, imports, schema and migration prerequisites, generated artifacts,
-fixtures, routes, and context files. Do not infer order from section titles or
-the technical spine.
+**Build an executable section order before task approval.** Default to one substantial implementation section. Use a second section only for a distinct outcome or context boundary. Every section beyond two requires a specific outcome, dependency, or context-boundary justification. Never create sections for technical layers, error cases, tests, verification, pattern establishment, or repetition alone.
+
+When multiple sections exist, derive the actual section dependency graph from referenced symbols, imports, schema and migration prerequisites, generated artifacts, fixtures, routes, and context files. Do not infer order from section titles or the technical spine.
 
 Topologically sort the sections. Use the technical spine only as a tie-breaker
 among independent sections. The spine order is dependencies → data/schema →
@@ -233,26 +233,12 @@ dependency metadata, unknown section IDs, forward dependencies, and cycles.
 Report all dependency errors together and block plan approval. Do not silently
 drop, rewrite, or reorder an invalid dependency declaration.
 
-**Define the section execution strategy before task approval.** Every implementation section declares both metadata comments:
+**Assign review timing before task approval.** Every implementation activity checkbox declares `<!-- review: structure-before -->` or `<!-- review: slice-after -->` immediately beneath it.
 
-```markdown
-<!-- execution: paired -->
-<!-- checkpoints: none | structure-before | slice-after | structure-before,slice-after -->
-
-<!-- execution: autonomous -->
-<!-- checkpoints: none -->
-```
-
-- `none` is exclusive. Do not combine it with another checkpoint.
-- Only paired sections may declare `structure-before` or `slice-after`.
-- Autonomous sections always declare `checkpoints: none`.
-- Checkpoints occur only in this order: `structure-before`, then `slice-after`.
-- Select `structure-before` for pattern-establishing or structural work with high downstream leverage.
-- Select `slice-after` when one representative verified increment should establish the pattern for remaining work.
-- Group each section around one coherent outcome. Do not group unrelated layers or outcomes merely because they modify nearby files.
-- Separate the first section that establishes a pattern from later mechanical repetition. Default the pattern-establishing section to `paired`; use `autonomous` for approved repetition when no new design decision remains.
-- Verification-only sections default to `<!-- execution: autonomous -->` and `<!-- checkpoints: none -->`.
-- The metadata is the approved strategy. Do not place runtime overrides or checkpoint state in it. `grimoire-apply` records effective execution and `pending`, `approved`, or `waived` checkpoint state separately in `tasks.md`.
+- Use `structure-before` for data models, repository layout, ownership boundaries, public interfaces, DRY-sensitive structure, performance-sensitive structure, and other costly-to-reverse shapes.
+- Use `slice-after` when the agent may implement directly and the activity can join the consolidated pre-commit review.
+- Review timing controls when the user reviews the activity. It does not restrict production-file editing.
+- Optional per-file review belongs to the agent harness, not `tasks.md`.
 
 **Keep autonomous implementation uninterrupted.** Autonomous sections contain
 no human approval, manual inspection, ask-the-user, or wait tasks. Convert
@@ -269,9 +255,9 @@ obtain agreement during plan approval.
 
 Before presenting tasks for approval, include a complete strategy table before the first task:
 
-| Section | Depends on | Execution | Checkpoints | Reason |
-|---------|------------|-----------|-------------|--------|
-| <section title> | `none` or earlier section IDs | `paired` or `autonomous` | `none`, `structure-before`, `slice-after`, or both in order | <why this review boundary fits the outcome> |
+| Section | Depends on | Activities | Review timing | Section justification |
+|---------|------------|------------|---------------|-----------------------|
+| <section title> | `none` or earlier section IDs | <task IDs> | <timing per task> | <distinct outcome or context boundary> |
 
 The user reviews and approves this complete table with the task list. Do not begin implementation from a plan without approved section strategy metadata.
 
@@ -292,7 +278,7 @@ The user reviews and approves this complete table with the task list. Do not beg
 - ADRs in this change (and their Confirmation sections) → `verify: unit-invariant` or `characterization`
 - `data.yml` entries in this change
 - The manifest's Assumptions, Pre-Mortem mitigations, and Prior Art borrowings
-- Verification tasks (run feature suite, run project suite, validate ADR confirmation)
+- ADR confirmation checks performed by the task implementing that decision
 
 Do not add tasks for scenarios you wish existed, edge cases you imagine, observability you'd like, or refactors you'd prefer. If you think one is needed, see Operating Rules §2 — propose, don't insert.
 
@@ -300,13 +286,7 @@ Do not add tasks for scenarios you wish existed, edge cases you imagine, observa
 
 **THE PLAN MUST BE SPECIFIC ENOUGH TO EXECUTE WITHOUT FURTHER PLANNING.** Specific means *answered*, not *delegated*: file paths resolved (not "find the right file"), reusable utilities named with exact symbol + path (not "check if one exists"), import paths verified (not "confirm the import"). See Operating Rules §1.
 
-The approved section outcome and source artifacts remain authoritative; implementation mechanics are correctable details. Apply user-directed active-section corrections without evaluating the guidance or updating planning artifacts after each correction. An agent must ask for user direction before changing implementation direction; agents never create active-section drift autonomously.
-
-Planning details guide implementation without becoming a mid-section maintenance obligation. Mark each task `[x]` as soon as focused verification passes and every pending checkpoint requirement for that task is approved or waived. Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.
-
-Keep only short drift notes needed by later work. After the whole section is final, update the completed section's task descriptions and every affected later section once. Then identify remaining planning gaps without relitigating applied user guidance, clear the section's drift notes, and continue.
-
-User-directed model, persistence, and migration mechanics are ordinary implementation corrections. Section reconciliation adds no drift checkpoint, report, reconciliation approval, or persona rerun. Existing operation permission gates remain unchanged.
+The approved outcomes and source artifacts remain authoritative. Implementation mechanics are correctable details. Apply user-directed corrections immediately. Record one terse implementation lesson only when the correction affects remaining work, update only affected unchecked tasks, and continue without plan-wide reconciliation.
 
 **THE PLAN MUST PREFER SIMPLICITY.** For each task, choose the approach with the least code, fewest new files, and smallest surface area. If a task can be solved by adding a few lines to an existing file, don't create a new module. If a standard library function does the job, don't pull in a dependency. If three lines of inline code are clearer than a helper, keep them inline. Flag any task that introduces a new abstraction, utility, or pattern — it needs a reason.
 
@@ -340,8 +320,8 @@ If no established pattern applies, state that explicitly in the task and explain
 Each task must include:
 - **What file(s) to create or edit** — exact paths, not vague references
 - **What to implement** — specific functions, classes, views, routes, not just "implement the feature"
-- **Which scenario it satisfies** — traceability back to the .feature file
-- **What the step definition should assert** — the expected behavior, not just "write a test"
+- **Which source artifact it satisfies** — scenario, constraint, decision, contract, manifest risk, or internal outcome
+- **What the test should assert** — the exact expected behavior or invariant, not just "write a test"
 
 Bad task (too vague — will trigger re-planning):
 ```
@@ -350,22 +330,17 @@ Bad task (too vague — will trigger re-planning):
 
 Good task (specific enough to execute):
 ```
-- [ ] 1.1 Write step defs in `tests/step_defs/test_auth.py` for scenario: "Successful login with valid TOTP code" in `auth/login.feature`
-      - Given step: call `client.post('/login/', credentials)` to log in
-      - When step: call `client.post('/verify-totp/', {'code': valid_code})`
-      - Then step: assert response redirects to `/dashboard/` (status 302)
-- [ ] 1.2 Add TOTP verification to `auth/views.py`:
-      - Create `VerifyTOTPView` accepting POST with `code` field
-      - Validate code against user's TOTP secret using `pyotp`
-      - On success: complete login session, redirect to dashboard
-      - On failure: return to verification page with error message
+- [ ] 1.1 (verify: scenario) Complete successful TOTP login in `tests/step_defs/test_auth.py` and `auth/views.py`.
+      <!-- review: structure-before -->
+      - Test: assert POST `/verify-totp/` returns status 302 and redirects to `/dashboard/`.
+      - Implement: add `VerifyTOTPView` validation and authenticated-session behavior.
+      - Red/green: `python manage.py test auth.tests.TestTotpLogin.test_valid --keepdb`.
 ```
 
 **From feature scenarios:**
-- Each new scenario → step definition task + implementation task
-- Each modified scenario → update step def + update implementation
+- Each new or modified scenario → one vertical task containing the step-definition change and production implementation
 - Group by capability/feature file
-- Step definitions come BEFORE production code (red-green BDD cycle)
+- Within the task, step definitions come before production code
 - **Use the project's configured BDD tool** — check `.grimoire/config.yaml` under `tools.bdd_test` for the test runner (e.g., `behave`, `pytest-bdd`, `cucumber-js`, `cucumber`). Step definitions must follow that tool's conventions:
   - **behave** (Python): step defs in `features/steps/`, use `@given`, `@when`, `@then` decorators from `behave`
   - **pytest-bdd** (Python): step defs alongside tests, use `@scenario`, `@given`, `@when`, `@then` from `pytest_bdd`
@@ -407,7 +382,7 @@ Follow the rules in `../references/testing-contracts.md`. Key points: mock at HT
 **From manifest Pre-Mortem:**
 - Each failure mode with a mitigation → the mitigation becomes a task or an edge case to cover in an existing task
 - Each failure mode marked "accepted" → add a comment in the relevant code or test noting the accepted risk, so future developers understand the trade-off
-- Pre-mortem risks often reveal missing scenarios — if a failure mode isn't covered by any Gherkin scenario, consider whether it should be
+- Pre-mortem risks may reveal missing verification. Use Gherkin only when the risk describes clear actor-visible behavior; otherwise use the matching internal test or check.
 
 **From decision Cost of Ownership:**
 - Prefer implementation approaches that minimize the maintenance burden identified in the ADR
@@ -425,10 +400,7 @@ Follow the rules in `../references/testing-contracts.md`. Key points: mock at HT
 - If `grimoire health`/mcp shows existing clones in the area you're touching, tasks should consolidate rather than add more
 - Add a "Reuse" section at the top of tasks.md listing specific functions/classes to import instead of rewriting
 
-**Verification (always last):**
-- Run ALL feature files — new and existing
-- Run full project test suite
-- Validate ADR confirmation criteria (if applicable)
+**Tactical red-green command:** Each checkbox contains the test change, production change, and one exact tactical command used for red and green. The tactical command selects only new or changed tests and uses only a runner accelerator verified from project configuration or existing commands. Examples include Django `--keepdb` and pytest-django `--reuse-db` only when the repository proves support. Final verification is absent from task sections; apply invokes `grimoire-verify` once after implementation.
 
 ### 5. Task Format
 The tasks file starts with a context block so any LLM can orient without re-reading every artifact. Each task section includes a `<!-- context: ... -->` block listing the exact files an agent should load before working on that section. This is critical for reducing context rot — each task or task group can run in a fresh session that loads only what it needs.
@@ -437,20 +409,18 @@ The tasks file starts with a context block so any LLM can orient without re-read
 # Tasks: <change-id>
 
 > **Change**: <one-line summary from manifest>
-> **Features**: <list of .feature files in this change>
+> **Features**: <list of changed .feature files, or "none">
 > **Decisions**: <list of ADRs in this change, or "none">
-> **Test command**: `<exact command to run feature tests, e.g., pytest tests/ -k "auth">`
+> **Baseline commands**: `<configured unit and BDD suite commands>`
 > **Status**: X/Y tasks complete
 
 ## Approved strategy
 
-| Section | Depends on | Execution | Checkpoints | Reason |
-|---------|------------|-----------|-------------|--------|
-| <Capability/Area> | `none` | `paired` | `structure-before,slice-after` | Establishes the pattern used by later sections. |
+| Section | Depends on | Activities | Review timing | Section justification |
+|---------|------------|------------|---------------|-----------------------|
+| <Capability outcome> | `none` | 1.1, 1.2 | 1.1 `structure-before`; 1.2 `slice-after` | Primary implementation outcome. |
 
-## 1. <Capability/Area>
-<!-- execution: paired -->
-<!-- checkpoints: structure-before,slice-after -->
+## 1. <Capability outcome>
 <!-- depends-on: none -->
 <!-- context:
   - features/<name>.feature
@@ -458,61 +428,20 @@ The tasks file starts with a context block so any LLM can orient without re-read
   - src/<area>/<file-to-edit>.ts
   - tests/<area>/<test-file>.ts
 -->
-- [ ] 1.1 (verify: scenario) Write step defs in `<exact path>` for scenario: "<scenario name>" in `features/<file>`
-      - Given: <what the step does, what it calls>
-      - When: <what the step does, what it calls>
-      - Then: <what to assert — specific expected values/states>
-- [ ] 1.2 Implement in `<exact path>`:
-      - <specific function/class/view to create or modify>
-      - <specific behavior to implement>
-      - <edge cases to handle>
+- [ ] 1.1 (verify: scenario) Complete "<scenario name>" in `<exact test and production paths>`.
+      <!-- review: structure-before -->
+      - Test: <specific new or changed test and exact assertion>.
+      - Implement: <specific production symbols and behavior>.
+      - Red/green: `<exact command selecting only this new or changed test, with a verified accelerator when available>`.
 
-## 2. Constraints
-<!-- execution: autonomous -->
-<!-- checkpoints: none -->
-<!-- depends-on: <earlier section IDs> -->
-<!-- context:
-  - .grimoire/docs/constraints.md
-  - src/<area>/<file-to-edit>.ts
-  - tests/<area>/<unit-test-file>.ts
--->
-- [ ] 2.1 (verify: unit-invariant) Write unit test in `<exact path>` asserting constraint: "<assertion from constraints.md>"
-      - Arrange: <setup>
-      - Assert: <the invariant — exact expected behavior, no Gherkin>
-- [ ] 2.2 Implement in `<exact path>`:
-      - <specific change that satisfies the invariant>
-
-## 3. Shared Steps
-<!-- execution: autonomous -->
-<!-- checkpoints: none -->
-<!-- depends-on: <earlier section IDs> -->
-<!-- context:
-  - tests/step_defs/common.py
-  - features/<all relevant .feature files>
--->
-- [ ] 3.1 Add to `<exact path>`:
-      - Given "<step text>": <what it does>
-      - Given "<step text>": <what it does>
-
-## 4. Architecture
-<!-- execution: paired -->
-<!-- checkpoints: structure-before,slice-after -->
-<!-- depends-on: <earlier section IDs> -->
-<!-- context:
-  - .grimoire/decisions/<nnnn-title>.md
-  - src/<files affected by decision>
--->
-- [ ] 4.1 (verify: characterization) In `<exact path>`: <specific change from ADR>
-- [ ] 4.2 Add test in `<exact path>`: <ADR confirmation check — what to assert>
-
-## 5. Verification
-- [ ] 5.1 Run `<exact test command>` — all new scenarios green
-- [ ] 5.2 Run `<exact test command>` — no regressions
-- [ ] 5.3 Run `<exact test command>` — full project suite
+- [ ] 1.2 (verify: characterization) Complete `<internal outcome>` in `<exact test and production paths>`.
+      <!-- review: slice-after -->
+      - Test: <specific characterization test and exact assertion>.
+      - Implement: <specific production symbols and behavior>.
+      - Red/green: `<exact command selecting only this new or changed test>`.
 ```
 
-**Context blocks are mandatory.** Every task section (except Verification) must have a `<!-- context: ... -->` listing the files needed. This serves two purposes:
-Every implementation section must also have valid `execution` and `checkpoints` metadata.
+**Context blocks are mandatory.** Every task section must have a `<!-- context: ... -->` listing the files needed. This serves two purposes:
 1. **Fresh sessions:** An agent starting a new session loads only the context block for its current section, avoiding accumulated noise from prior work
 2. **Subagent delegation:** In Claude Code, the parent agent passes the context list when spawning a subagent for a task group
 
@@ -522,16 +451,19 @@ Before presenting to the user, verify the plan:
 - [ ] Every implementation task carries a `verify:` tag matching its source artifact — `scenario` only for `.feature` behavior; `unit-invariant` for constraints; `characterization` for internal/refactor. No `.feature` scenario task for a constraint or internal change.
 - [ ] Every test task describes what to assert (no "write a test")
 - [ ] Every implementation task describes what to create/modify (no "add the code")
-- [ ] The verification section has the exact commands to run
+- [ ] Each task combines its test and production change in one vertical checkbox.
+- [ ] Each task has one exact tactical command used for red and green.
+- [ ] Each tactical command selects only new or changed tests and uses only verified runner accelerators.
+- [ ] No task or section runs final verification or a full configured suite.
 - [ ] The technical spine orders only independent sections: dependencies → data/schema → API/contract → logic → UI → verification.
 - [ ] Actual section dependencies were derived from referenced code and artifacts; sections are topologically sorted, with the technical spine used only to break ties.
 - [ ] Every implementation section has one `depends-on` comment; each dependency exists, points backward, and creates no cycle.
 - [ ] Tasks within each section are ordered so no task requires a later task.
-- [ ] Every implementation section has valid `execution` and `checkpoints` metadata; only paired sections declare checkpoints, `none` is exclusive, and checkpoints use the fixed order.
-- [ ] The complete section strategy table appears before the first task and is ready for user approval.
+- [ ] Every implementation activity has one review marker immediately beneath its checkbox.
+- [ ] The complete activity review-timing table appears before the first task and is ready for user approval.
 - [ ] Autonomous sections contain only deterministic commands or agent-executable work and contain no human gate.
 - [ ] Any unavoidable external acceptance is consolidated into one terminal section; plan approval explicitly agrees that execution is not autonomous end-to-end.
-- [ ] Each section has one coherent outcome; pattern establishment is separate from mechanical repetition.
+- [ ] The plan defaults to one substantial section, uses two only for distinct outcomes or context boundaries, and justifies every section beyond two.
 - [ ] No task requires the LLM to make architectural decisions — those should already be in the ADR
 - [ ] **Principles gate** (`../references/principles.md`): no task introduces a duplicate home for an existing fact (DRY), a second way to do an existing thing (one right way), a reinvented wheel where a tool/library/proven pattern exists (don't reinvent), or an abstraction/dependency justified only by a hypothetical (KISS). Any that does has a stated reason.
 
@@ -559,9 +491,9 @@ Check `.grimoire/config.yaml` for the configured agents:
 
 ## Important
 - **Specificity is the whole point.** A vague plan is worse than no plan — it gives false confidence and the LLM will re-plan anyway. Every task must be executable without thinking. "Implement the feature" is not a task — it's the *Skipping the plan / vague tasks* rationalization in `../references/red-flags.md`.
-- Tasks should be small and specific — one logical unit of work each
-- Every task traces back to a scenario or decision
-- Order matters: tasks follow the technical-spine order (`../references/design-spine.md`); verification last
+- Tasks should be substantial vertical slices with one test-code outcome.
+- Every task traces back to its source artifact or approved internal outcome.
+- Order matters: dependencies lead; the technical spine breaks ties between independent sections.
 - Don't generate tasks for things that already work (check the baseline)
 - Read the actual codebase before writing tasks. Reference real file paths, real patterns, real conventions. Don't guess.
 

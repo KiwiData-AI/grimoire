@@ -23,16 +23,16 @@ Format: `- <task-id> · tried <approach> · failed: <observed error / why>`
 
 - 2.2 · tried mocking the client wrapper · failed: mock satisfied an assertion prod code never reaches — mock at the HTTP boundary instead
 
-## Active-section drift notes
+## Implementation lessons
 
 <!--
-  Short-lived. Record only a user-directed implementation correction needed to
-  reconcile the completed section or affected later sections. Agents do not
-  create implementation drift autonomously. Clear these notes after post-section
-  reconciliation.
+  Short-lived. Record one terse user correction only when it changes remaining
+  work. Update only affected unchecked tasks and rerun their tactical tests.
+  Ordinary corrections need no checkpoint, report, approval, persona rerun, or
+  plan-wide reconciliation.
 -->
 
-Format: `- <task-id> · user directed <correction> · affects <later task or section>`
+Format: `- <task-id> · learned <correction> · affects <unchecked task IDs>`
 
 ## Discovered facts
 
