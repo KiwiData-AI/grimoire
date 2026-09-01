@@ -29,13 +29,15 @@ Do NOT write a `.feature` scenario for a `unit-invariant` or `characterization` 
 
 **`tasks.md` IS the plan. Do not enter plan mode. Do not create your own plan. Do not reorganize, re-derive, or "think through" the tasks before starting.**
 
+The approved section outcome and source artifacts remain authoritative; implementation mechanics are correctable details. Apply user-directed active-section corrections without evaluating the guidance or updating planning artifacts after each correction. An agent must ask for user direction before changing implementation direction; agents never create active-section drift autonomously.
+
 ### 2. Do Not Implement All Tasks In One Context
 
 **Spawn a fresh subagent (or start a fresh session) for each task section.** The parent/orchestrator reads `tasks.md` and delegates — it does NOT write code itself. Context degrades after 3-4 tasks and the LLM starts making mistakes based on stale file contents. See "Session Management" below for the exact workflow.
 
 The plan was already created in the plan stage, reviewed by the user, and approved. Your job is to EXECUTE it, not to re-evaluate it. Read `tasks.md`, find the first unchecked task, and start working.
 
-If you believe a task is wrong, incomplete, or impossible — flag it to the user. Do not silently re-plan. Do not skip tasks. Do not reorder tasks unless the user asks.
+If you suspect a task detail is wrong, ask the user before changing implementation direction. Apply a user-directed correction inside the active section. Flag genuine execution impossibility. Do not silently re-plan, skip, or reorder tasks.
 
 This applies to all LLMs: Claude, Codex, Cursor, Copilot, etc. The task list is the authority.
 
@@ -46,7 +48,9 @@ This applies to all LLMs: Claude, Codex, Cursor, Copilot, etc. The task list is 
 
 ## Routing
 - No tasks.md exists → `grimoire-plan` first
-- Task seems wrong or impossible → flag to user; do NOT silently re-plan or skip
+- Agent suspects a task detail is wrong → ask the user before changing direction
+- User directs an active-section correction → apply it without mid-section plan maintenance
+- Task is genuinely impossible → flag the blocker; do NOT silently re-plan or skip
 - Implementation reveals the spec is wrong → STOP. Go back to `grimoire-draft`.
 - Fix is needed (not a planned change) → `grimoire-bug`
 
@@ -146,7 +150,7 @@ runs focused verification to establish green.
 The orchestrator may apply one approved paired production patch and run focused
 verification. If `slice-after` is pending, keep every covered support and
 production task unchecked until the user approves the verified slice. Without a
-pending `slice-after`, mark the covered tasks `[x]` after focused verification.
+pending `slice-after`, mark each covered task `[x]` after focused verification.
 The orchestrator may not otherwise edit production code.
 
 **Autonomous execution:** Dispatch one section agent for direct red-green work.
@@ -178,9 +182,8 @@ passes focused verification, present:
 - Divergence from approved structure.
 - The pattern proposed for remaining work.
 
-Wait for approval before completing covered tasks or continuing. Approval
-records `slice-after=approved`, marks the covered tasks `[x]`, and prevents this
-checkpoint from recurring. Rejection keeps the provisional production slice
+Wait for approval before continuing. Approval records `slice-after=approved` and
+prevents this checkpoint from recurring. Rejection keeps the provisional production slice
 applied and keeps its tasks unchecked. Do not roll back the slice or require the
 paired agent to edit production files. Give the feedback and current slice to a
 fresh paired section agent. The agent may revise support files. Run revised or
@@ -202,15 +205,30 @@ section agent returns:
 
 Do not rewrite completed work when applying an override. Do not use an override
 to bypass red-green discipline, retry limits, blocker handling, circuit
-breakers, branch rules, or `tasks.md` authority. Mark tasks `- [x]` as they
-become eligible so `tasks.md` remains the resume record. A covered paired task
-with pending `slice-after` is not eligible until slice approval.
+breakers, branch rules, or `tasks.md` authority.
+
+#### Active-Section Corrections and Reconciliation
+
+Do not stop merely because user-directed implementation mechanics differ from
+the task details. Apply the direction inside the active section without
+evaluating it against the plan being corrected. An agent that suspects a detail
+is wrong asks the user before changing implementation direction.
+
+Keep only short drift notes needed by later work. User-directed model,
+persistence, and migration mechanics are ordinary implementation corrections.
+Existing operation permission gates remain unchanged, including approval before
+executing a migration against a non-test database.
+
+Mark each task `[x]` as soon as focused verification passes and every pending checkpoint requirement for that task is approved or waived. Task checkboxes are runtime progress, not task-content reconciliation. Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.
+
+After the whole section is final, update the completed section's task descriptions and every affected later section once, identify remaining planning gaps without relitigating applied user guidance, clear the section's drift notes, and continue to the next section. Section reconciliation adds no drift checkpoint, report, reconciliation approval, or persona rerun.
 
 ### Working Memory: `learnings.md`
 
-Apply keeps one ephemeral file, `.grimoire/changes/<change-id>/learnings.md` (create it from `templates/learnings.md` the first time you need it). It is the loop's memory between attempts and sessions, and it is **removed at finalize** with the rest of the change folder — nothing in it reaches the repo. Two sections, two lifecycles:
+Apply keeps one ephemeral file, `.grimoire/changes/<change-id>/learnings.md` (create it from `templates/learnings.md` the first time you need it). It is the loop's memory between attempts and sessions, and it is **removed at finalize** with the rest of the change folder — nothing in it reaches the repo. Three sections, three lifecycles:
 
 - **Failure-mode notes** — transient. After a failed attempt, append one line: what you tried and why it failed. Before any retry, read this section so you don't repeat a dead end. Prune a task's notes the moment it goes green. Never promote them.
+- **Active-section drift notes** — short-lived. Record only user-directed corrections needed to reconcile the completed section or affected later work. Clear them after post-section reconciliation.
 - **Discovered facts** — durable facts about the project learned while implementing (a build flag, a convention, an undocumented contract). Stage them here with their destination home; at finalize they are reconciled into that one home and cleared. Do **not** write them into `AGENTS.md`.
 
 Subagents and fresh sessions read and append to this file the same way they use `tasks.md` — it is shared state on disk, not context-window memory.
@@ -268,7 +286,7 @@ The per-task 3-attempt cap bounds a single task; it cannot see the *run* cycling
 
 **Do NOT implement all tasks in a single conversation context.** Context accumulates across tasks and degrades output quality — the LLM starts hallucinating based on stale file contents it read 5 tasks ago. This is not a suggestion. Fresh context per task section is required.
 
-**Size one task to one context.** The goal is not statelessness for its own sake — a task should be small enough that one coherent context carries it start to finish (stateful *within* a task), and context is reset *between* tasks. If a single task overflows its context mid-flight, that is a **smell that the task is too big** — split the spec, don't paper over it with a stateless restart loop. Fresh-context-per-section gives you the "reset between" half for free; keeping tasks small gives you the "continuity within" half.
+**Size one section to one context.** The goal is not statelessness for its own sake. One coherent context carries the section from its first unchecked task through section reconciliation. Reset context between sections. If a section overflows its context, record current checkbox state and a handoff before starting a fresh context for the remaining section work.
 
 Each task section in `tasks.md` has a `<!-- context: ... -->` block listing the exact files needed. This is the loading list for that section's fresh context.
 
@@ -311,7 +329,12 @@ The parent agent is the **orchestrator only** — it does NOT implement tasks it
    task's failure-mode notes before retrying it and don't repeat a recorded dead
    end; append a failure-mode note after any failed attempt; prune them when the
    task goes green; append durable project facts to Discovered facts with their
-   home (never to AGENTS.md). Never weaken or delete a test to force green.
+   home (never to AGENTS.md). Never weaken or delete a test to force green. A
+   user-directed correction to an implementation-specific test expectation must
+   still demonstrate red against the current production code before production
+   changes.
+
+   Only user direction may create active-section implementation drift. Apply that direction without evaluating it or maintaining planning artifacts mid-section; otherwise ask the user before changing implementation direction.
 
    When the section is complete, write a <!-- SESSION: ... --> handoff note
    under the last task and exit.
@@ -328,15 +351,21 @@ The parent agent is the **orchestrator only** — it does NOT implement tasks it
    checkpoint-state=<checkpoint-state or none>.
 
    You may edit production and support files. Follow the red-green cycle for
-   each task. Mark tasks [x] only after focused verification passes. Stop at a
-   declared pending checkpoint and at all existing blockers, specification
+   each task. Mark each task [x] only after focused verification passes and every
+   pending checkpoint requirement for that task is approved or waived. Stop at
+   a declared pending checkpoint and at all existing blockers, specification
    conflicts, retry limits, and circuit breakers.
 
    Use `.grimoire/changes/<change-id>/learnings.md` as working memory: read a
    task's failure-mode notes before retrying it and don't repeat a recorded dead
    end; append a failure-mode note after any failed attempt; prune them when the
    task goes green; append durable project facts to Discovered facts with their
-   home (never to AGENTS.md). Never weaken or delete a test to force green.
+   home (never to AGENTS.md). Never weaken or delete a test to force green. A
+   user-directed correction to an implementation-specific test expectation must
+   still demonstrate red against the current production code before production
+   changes.
+
+   Only user direction may create active-section implementation drift. Apply that direction without evaluating it or maintaining planning artifacts mid-section; otherwise ask the user before changing implementation direction.
 
    Before writing production code, read `../references/code-quality.md`,
    `../references/testing-contracts.md`, and `../references/pattern-guard.md`.
@@ -347,23 +376,27 @@ The parent agent is the **orchestrator only** — it does NOT implement tasks it
    under the last task and exit.
    ```
 3. Section agent reads `tasks.md` and the context files for that section.
-4. Section agent implements, marks tasks `[x]` when eligible, writes a handoff
-   note, and exits.
+4. Section agent implements tasks, marks each task complete when its focused
+   verification and pending checkpoint requirements pass, and writes a handoff
+   note with the current checkbox state.
 5. For paired execution, the parent presents one patch. Rejection retains the
    red test and redispatches the same increment with revision feedback.
 6. After patch approval, the parent applies it and runs focused verification.
 7. If `slice-after` is pending, the parent presents the verified representative
    increment. It keeps covered tasks unchecked until approval. Approval marks
-   the checkpoint approved and the covered tasks complete. Rejection keeps the
+   the checkpoint approved. Rejection keeps the
    provisional slice applied and both the checkpoint and tasks pending. The
    parent sends the feedback and current slice to a fresh paired agent, which
    returns an unapplied corrective production patch. The parent repeats patch
    approval, focused verification, and the same slice checkpoint.
-8. Without a pending `slice-after`, the parent marks covered tasks complete after
-   focused verification.
-9. If paired-section tasks remain unchecked, the parent redispatches the same
-   section. Otherwise, it spawns the next section agent.
-10. Repeat until all sections complete.
+8. Without a pending `slice-after`, the parent retains focused verification
+   evidence and continues the section.
+9. When all section tasks are complete and all checkpoints are approved or
+   waived, reconcile the completed task descriptions and affected later sections
+   once, then clear drift notes.
+10. If section work remains, redispatch the same section. Otherwise, spawn the
+    next section agent.
+11. Repeat until all sections complete.
 
 **The parent agent MUST NOT write production code or test code.** It may apply an approved paired production patch. Its other jobs are reading `tasks.md`, spawning subagents, and checking completion between sections. If the parent starts implementing tasks directly, context will degrade by section 3-4 and output quality will drop.
 
@@ -448,13 +481,15 @@ Work through `tasks.md` sequentially. **Every task follows the same cycle: test 
    - Assertions check behavior, not just types or existence — "response status is 302 and redirect URL is /dashboard/" not "response is not None"
    - If you wrote a test that would pass against a null/trivial implementation, strengthen it
 10. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix code, re-run tests, re-check. Do not mark `[x]` while a check fails.
-11. **Reconcile working memory:** prune this task's failure-mode notes from `learnings.md` — it's green, they've served their purpose. If you learned a durable project fact while implementing (a build flag, a convention, an undocumented contract, an architectural constraint), append it to the **Discovered facts** section with its destination home — don't write it into `AGENTS.md` and don't leave it only in context.
-12. Mark complete: `- [ ]` → `- [x]`
-13. Move to next task
+11. **Reconcile task working memory:** prune this task's failure-mode notes from `learnings.md` — it's green, they've served their purpose. If you learned a durable project fact while implementing (a build flag, a convention, an undocumented contract, an architectural constraint), append it to the **Discovered facts** section with its destination home — don't write it into `AGENTS.md` and don't leave it only in context.
+12. Mark complete: `- [ ]` → `- [x]` as soon as focused verification and pending checkpoint requirements pass.
+13. Record the red-green result and current checkbox state in the section handoff, then move to the next task. After the whole section is final, reconcile task descriptions and affected later sections once.
 
 **This is strict red-green BDD.** A test that has never been red has never proven it can catch a failure. The red step is NOT a formality — it is the proof that the test works. If you skip it or the test passes immediately, you have a false positive that provides zero safety.
 
-**Never game the gate (reward-hack guard).** When a test won't pass, fix the production code — never weaken or delete the test to force green. Deleting a test, loosening an assertion to match wrong output, narrowing what it checks, or skipping/`xfail`-ing it to get a green run is **stop-and-flag**, not a valid completion. The gate is the convergence signal; gaming it produces plausible-wrong code faster. If a test genuinely encodes the wrong expectation, that is a spec problem — STOP and go back to draft, don't quietly edit the test to pass.
+**User-directed test corrections:** When the user corrects an implementation-specific test expectation, update the test before changing production code. Run the corrected test against the current production code and confirm it fails. Only then change production code to make the corrected test pass.
+
+**Never game the gate (reward-hack guard).** When a test won't pass, fix the production code unless the user corrected its implementation-specific expectation. An agent must never weaken or delete a test without explicit user direction. Deleting a test, loosening an assertion to match wrong output, narrowing what it checks, or skipping/`xfail`-ing it to get a green run is **stop-and-flag**, not a valid completion. A user-directed expectation correction authorizes only that correction and still requires red-green proof. The gate is the convergence signal; gaming it produces plausible-wrong code faster.
 
 **Step definition rules:**
 - Organize by domain concept, not by feature file

@@ -73,6 +73,42 @@ Feature: Build each task test-first
     Then it may change support files only
     And it returns an exact unified production patch without applying it
 
+  Scenario: An issue is fixed without interrupting the active section
+    Given an active section follows an approved plan
+    When I identify an issue with an implementation detail and direct its correction
+    Then grimoire fixes the code and tests within the active section
+    And it does not evaluate my guidance against the plan being corrected
+    And it does not pause to update planning artifacts
+    And the section continues until focused verification passes
+
+  Scenario: A completed section updates affected planning once
+    Given every task in a section is verified
+    And every declared checkpoint is approved or waived
+    And the section differs from its planned implementation details
+    When grimoire completes the section
+    Then it updates the completed section to match the implementation
+    And it updates each affected later section once
+    And it identifies remaining planning gaps after applying my guidance
+    And it clears the section's drift notes before continuing
+
+  Scenario: Verified task completion is recorded immediately
+    Given an active section has multiple tasks
+    When a task passes focused verification and its pending checkpoint requirements
+    Then grimoire marks that task complete immediately
+    And it leaves task descriptions and affected later sections unchanged until the whole section is done
+
+  Scenario: Persistence details can be corrected during implementation
+    Given an active section includes a model or migration
+    When I direct a correction to its planned persistence details
+    Then grimoire fixes and verifies the persistence change within the section
+    And it does not treat persistence alone as a planning blocker
+
+  Scenario: An agent does not create implementation drift
+    Given an active section follows an approved plan
+    When the agent suspects an implementation detail is wrong
+    Then it asks me for direction before changing the plan
+    And only my direction can create active-section drift
+
   Scenario: Finalization preserves deferred tasks
     Given a completed change has deferred tasks
     When grimoire finalizes the change

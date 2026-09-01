@@ -164,6 +164,12 @@ public API, user-visible acceptance criteria, or production entry point. Wording
 formatting, test-fixture, and direct finding corrections do not trigger another
 review. An explicit user request always permits a new review.
 
+User-directed data-schema, model, persistence, or migration implementation
+mechanics alone do not trigger another persona review when no reviewed boundary,
+including the data schema, materially changes. Post-section drift reconciliation
+never requires a persona rerun or reconciliation approval. A later gap review may
+identify remaining gaps but must not reopen user guidance already applied.
+
 After the correction batch, deterministic gates are the final readiness
 authority. Fix a failing deterministic gate and rerun that gate. Do not convert
 that retry into another open-ended LLM review.

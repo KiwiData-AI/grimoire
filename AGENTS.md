@@ -182,7 +182,7 @@ Each skill's SKILL.md is the authoritative home for that stage's mechanics; the 
 
 When `tasks.md` exists for a change, it IS the plan. **Do not enter plan mode. Do not create your own plan. Do not re-derive tasks from the feature files.**
 
-The plan was created in the plan stage with specific file paths, specific assertions, and specific implementation details. It was reviewed and approved by the user. The apply stage executes it — nothing more.
+The approved section outcome and source artifacts remain authoritative; implementation mechanics are correctable details. The plan was created with specific paths, assertions, and implementation details to guide execution.
 
 This matters because:
 - The plan was written with full codebase context (real file paths, real patterns)
@@ -190,10 +190,20 @@ This matters because:
 - Re-planning wastes time and may diverge from what was agreed
 - `tasks.md` supports resume — a new session should pick up where the last one left off, not start over
 
-If a task seems wrong or impossible during apply:
-1. Flag it to the user with a specific explanation
-2. Wait for the user to decide: fix the task, skip it, or go back to plan
-3. Do NOT silently rewrite or reorder tasks
+Apply user-directed active-section corrections without evaluating the guidance or updating planning artifacts after each correction. An agent must ask for user direction before changing implementation direction; agents never create active-section drift autonomously.
+
+Mark each task `[x]` as soon as focused verification passes and every pending checkpoint requirement for that task is approved or waived. Task checkboxes record runtime progress. Keep task descriptions and affected later sections unchanged until every task in the section is complete and every declared checkpoint is approved or waived.
+
+Keep only short drift notes needed by later work. After the whole section is final, reconcile once:
+
+1. Update the completed section's task descriptions and every affected later section once.
+2. Identify remaining planning gaps without relitigating applied user guidance.
+3. Clear the section's drift notes.
+4. Continue to the next section.
+
+Section reconciliation adds no drift checkpoint, report, reconciliation approval, or persona rerun. User-directed model, persistence, and migration mechanics are ordinary implementation corrections. Existing operation permission gates, red-green discipline, retry limits, and circuit breakers remain unchanged.
+
+If an agent suspects a task detail is wrong, ask the user before changing direction. If execution is genuinely impossible, flag the blocker with a specific explanation. Do not silently rewrite or reorder tasks.
 
 ## Directory Structure
 

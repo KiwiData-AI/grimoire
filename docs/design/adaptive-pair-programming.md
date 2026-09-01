@@ -212,6 +212,33 @@ An execution switch takes effect at the next safe production boundary. An
 active subagent returns before replacement. Completed work is never rewritten
 by a runtime override.
 
+## Active-Section Corrections
+
+The approved section outcome and source artifacts remain authoritative;
+implementation mechanics are correctable details. Apply user-directed
+active-section corrections without evaluating the guidance or updating planning
+artifacts after each correction. An agent must ask for user direction before
+changing implementation direction; agents never create active-section drift
+autonomously.
+
+User-directed model, persistence, and migration mechanics are ordinary
+implementation corrections. Keep only short drift notes needed to reconcile the
+completed section or affected later work. Writing and testing migrations remains
+ordinary section work. Existing operation permission gates remain unchanged,
+including explicit approval before executing a migration against a non-test
+database.
+
+Mark each task `[x]` as soon as focused verification passes and every pending
+checkpoint requirement for that task is approved or waived. Keep task
+descriptions and affected later sections unchanged until every task in the
+section is complete and every declared checkpoint is approved or waived.
+
+Reconcile once after the whole section is final. Update the completed section's
+task descriptions and every affected later section once. Then identify remaining
+gaps, clear the section's drift notes, and continue. Post-section gap review may
+identify remaining gaps but must not reopen applied user guidance. This lifecycle
+adds no drift checkpoint, report, reconciliation approval, or persona rerun.
+
 ## Apply Behavior
 
 ### Paired Section
