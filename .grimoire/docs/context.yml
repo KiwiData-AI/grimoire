@@ -6,7 +6,7 @@
 # Update it when the environment changes (new service, migration, etc.)
 #
 # Created by: grimoire init
-# Last updated: 2026-05-17
+# Last updated: 2026-09-03
 
 # --- Deployment ---
 # How and where this project is deployed.
@@ -61,8 +61,8 @@ external_tools:
     purpose: "Open the PR after generating title/body"
   - name: jscpd
     required: false
-    used_by: [map, health]
-    purpose: "Duplicate code detection during map/health"
+    used_by: [health]
+    purpose: "Duplicate code detection during project health checks"
   - name: eslint
     required: false
     used_by: [check]

@@ -105,6 +105,31 @@ describe("generateDocs", () => {
     expect(content).toContain("User login");
     expect(content).toContain("Successful login");
     expect(content).toContain("Failed login");
+    expect(content).toContain("automated specification");
+  });
+
+  it("labels normal features as automated and @manual features as agent-run", async () => {
+    mockFindFiles.mockResolvedValue([
+      "/fake/root/features/login.feature",
+      "/fake/root/features/workflow/plan.feature",
+    ]);
+    mockReadFile.mockImplementation(async (path: any) => {
+      const file = String(path);
+      if (file.includes("package.json")) return '{"name": "test-project"}' as any;
+      if (file.endsWith("login.feature")) {
+        return "Feature: Login\n  Scenario: Sign in\n    When credentials are submitted\n    Then access is granted\n" as any;
+      }
+      if (file.endsWith("plan.feature")) {
+        return "@manual\nFeature: Plan work\n  Scenario: Prepare tasks\n    When a plan is requested\n    Then tasks are prepared\n" as any;
+      }
+      throw new Error("ENOENT");
+    });
+
+    await generateDocs({});
+
+    const content = String(mockWriteFile.mock.calls[0][1]);
+    expect(content).toContain("**Login** (`features/login.feature`) — automated specification");
+    expect(content).toContain("**Plan work** (`features/workflow/plan.feature`) — agent-run specification");
   });
 
   it("includes decisions section when decision files exist", async () => {

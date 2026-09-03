@@ -9,7 +9,7 @@ metadata:
 
 # grimoire-verify
 
-Verify the complete implementation once after tactical apply work. This procedure owns Grimoire alignment, deterministic checks, pre-commit review, and final suites.
+Verify the complete implementation once after section delivery. This procedure owns Grimoire alignment, deterministic checks, pre-commit review, and final suites. Use `../references/testing-lifecycle.md` for boundary cadence.
 
 ## Triggers
 - User wants to verify a grimoire change is correctly implemented
@@ -40,7 +40,7 @@ Two modes:
 
 ### 2. Load Artifacts
 For change verification:
-- Read `manifest.md`, proposed `.feature` files, decision records, `tasks.md`
+- Read `manifest.md`, changed live `.feature` files, changed decision records, and `tasks.md`
 - Read `baseline.md` if present (the test state captured at change start) — it's how you tell a regression from a failure that was already red
 
 For baseline verification:
@@ -54,7 +54,7 @@ Run these stages in order:
 2. Run existing Grimoire-specific static verification.
 3. Run configured deterministic non-test checks by explicit step name.
 4. Invoke `grimoire-precommit-review` once over the complete diff.
-5. Apply one accepted correction batch. Rerun only affected tactical tests and applicable deterministic checks.
+5. Apply one accepted correction batch. Run only the affected section confirmation when needed and applicable deterministic checks.
 6. Run each configured unit and BDD suite once.
 7. Compare every failure with `baseline.md`.
 
@@ -70,14 +70,17 @@ Do not run final suites before pre-commit review corrections. Do not run another
 - This is objective — checkboxes don't lie
 
 **B. Correctness — does the code match the specs?**
-For each scenario in the feature files:
+For each executable scenario in the feature files:
 1. Search the codebase for the production code that implements this behavior
 2. Search for the step definition that tests this scenario
 3. Verify the step definition makes real assertions (not empty, not `assert True`, not `pass`)
 4. If possible, confirm the test actually runs (check test output, CI results)
 
+For a feature tagged `@manual`, use its declared characterization or unit contract instead of requiring Cucumber step definitions. Verify that the contract asserts the scenario's workflow intent.
+
 Flag issues:
-- Scenario with no corresponding step definition → CRITICAL
+- Executable scenario with no corresponding step definition → CRITICAL
+- `@manual` scenario with no corresponding characterization or unit contract → CRITICAL
 - Step definition with empty/trivial body → CRITICAL
 - Step definition that doesn't match the scenario's intent → WARNING
 - Production code not found for a scenario → WARNING (may be indirect)
@@ -123,9 +126,7 @@ For each step definition:
    - Test creates a mock and then asserts against the mock's return value (circular) → CRITICAL
    - Try/except that swallows assertion errors → CRITICAL
    - Step definition has no `assert`/`expect` at all → CRITICAL (for Then steps)
-   - Test mocks the client wrapper instead of the HTTP boundary → WARNING (tests wiring, not contract compliance)
    - Test mocks internal code that lives in the same repo → WARNING (hides integration bugs)
-   - Contract test uses a fixture that doesn't match `schema.yml` → CRITICAL (fictional contract)
    - Test mocks so aggressively that removing production code still passes → CRITICAL
 
 4. **Report format:** Include test quality findings alongside correctness findings:
@@ -175,39 +176,7 @@ If no security tags exist and the change has no security surface, state so brief
 
 ### 5. Contract Test Coverage
 
-Verify that every external API integration has contract tests that match the documented contract.
-
-**A. Inventory external APIs:**
-
-Read `.grimoire/docs/data/schema.yml` and list every entry with `type: external_api`. For each:
-
-1. **Contract documented?** Check that the entry has `endpoints` with `request`, `response`, and `error_response` shapes. Missing contract documentation → WARNING (the contract is implicit and untested)
-
-2. **Contract test exists?** Search the test suite for tests that validate the client against the documented response shape. Look for:
-   - Tests that assert specific response fields match expected types/values
-   - Tests that use fixture/recorded responses matching the `schema.yml` shape
-   - Tests that verify error handling matches the documented `error_response`
-   - Missing contract test for a documented API → CRITICAL
-
-3. **Contract test matches schema?** Compare the fixture/recorded response used in tests against the `schema.yml` contract:
-   - Fixture has fields not in `schema.yml` → WARNING (undocumented dependency)
-   - `schema.yml` has `required: true` fields not asserted in tests → WARNING (untested contract guarantee)
-   - Client reads fields not in `schema.yml` → CRITICAL (invisible contract dependency)
-
-4. **Contract drift?** If this is a change verification (not baseline), compare `data.yml` against `schema.yml`:
-   - Any field changes on external APIs without corresponding test updates → CRITICAL
-   - New endpoints without contract tests → CRITICAL
-
-**Report format:**
-```markdown
-## Contract Coverage
-- [x] `stripe_api` — 3 endpoints, all with contract tests in `tests/integrations/test_stripe.py`
-- [ ] **[critical]** `github_api.get_user` — no contract test found for response shape
-- [ ] **[warning]** `sendgrid_api` — contract documented but `error_response` shape missing
-- [ ] **[critical]** `payments_api` — client reads `transaction.metadata.source` not in schema.yml (undocumented field dependency)
-```
-
-If no external APIs exist in `schema.yml`, skip this section.
+For changed external boundaries, apply `../references/testing-contracts.md`. Compare the live schema diff, client usage, and authoritative contract tests. Report missing or fictional evidence without inventing replacement fixtures or assertions. Skip when the change has no external boundary.
 
 ### 6. Dead Feature Detection
 Check for features that exist in specs but may no longer be implemented:
@@ -264,13 +233,15 @@ If a deterministic check fails, diagnose and report it. Do not hide it inside th
 
 Invoke `grimoire-precommit-review` once over the complete diff, including staged and unstaged change-related files. Select only personas relevant to the change surface. The review supplies the single general code and best-practice review with one accepted correction batch.
 
-After accepted corrections, rerun only affected tactical tests and applicable deterministic checks. Do not rerun the persona review unless scope, architecture, trust boundaries, data schemas, public APIs, acceptance criteria, or production entry points materially changed.
+After accepted corrections, run only the affected section confirmation when needed and applicable deterministic checks. Do not rerun the persona review unless scope, architecture, trust boundaries, data schemas, public APIs, acceptance criteria, or production entry points materially changed.
 
 ### 7. Final Suites and Baseline Comparison
 
 Run each configured unit and BDD suite once. Do not run either suite when it already ran after pre-commit review corrections through another verify step; one invocation per configured suite is the limit.
 
 Compare every failure with `baseline.md`. A failure absent from the accepted baseline is new and blocks finalization. A failure present in the baseline remains pre-existing. Without an accepted baseline, list failures as unclassified.
+
+Focused reruns diagnose only an observed final-suite failure. Do not rerun passing suites or add a duplicate feature-complete command.
 
 ### 8. Generate Report
 Produce a structured report:
@@ -309,23 +280,23 @@ Produce a structured report:
 
 ### 8. Recommend Next Steps
 Based on the report:
-- **All clear** → recommend committing and opening a PR (git diff is the staging area, the PR is the changelog)
+- **All clear** → recommend `grimoire-pr`, which invokes Apply finalization before opening the PR
 - **Critical issues** → must fix before committing
 - **Warnings only** → user decides whether to fix or accept
 - **Dead features found** → suggest a removal change or updating the features
 
 ## Important
 - Static verification and review findings are reported before correction. Apply only user-accepted review corrections in one batch.
-- Correction verification stays tactical. Final configured suites run once after corrections.
+- Correction verification uses only the affected section confirmation when needed. Final configured suites run once after corrections.
 - **"Should pass" is not evidence.** Declaring done without running is the *Declaring done without verifying* rationalization in `../references/red-flags.md`. Observe state, don't predict it.
 - Be specific: reference file paths and line numbers for every issue.
-- A scenario without a step definition is always CRITICAL — the spec is not tested.
+- An executable scenario without a step definition is always CRITICAL. A `@manual` scenario requires its declared characterization or unit contract instead.
 - A step definition with no assertions is always CRITICAL — it's a false positive.
 - Don't verify implementation details — only verify that the behavior described in the scenario is covered.
 - For baseline verification, this may take a while on large codebases. Present results incrementally by capability.
 
 ## Done
 When the verification report is presented, the workflow is complete. Suggest next steps based on findings:
-- **All clear** → `grimoire-commit` then `grimoire-pr`
+- **All clear** → `grimoire-pr`
 - **Critical issues** → must fix before committing
 - **Warnings only** → user decides whether to fix or accept

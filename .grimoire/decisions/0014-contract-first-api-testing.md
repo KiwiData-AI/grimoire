@@ -1,10 +1,12 @@
 ---
-status: accepted
+status: superseded by 0045
 date: 2026-04-05
 decision-makers: [Fred]
 ---
 
 # Contract-first external API testing strategy
+
+Superseded by [0045](0045-separate-spikes-from-delivery.md), which retains observed provider fixtures while separating unknown contracts from delivery.
 
 ## Context and Problem Statement
 When grimoire-managed code depends on external APIs, tests need to handle those dependencies. Should grimoire prescribe a testing strategy for external API boundaries, and if so, what approach?

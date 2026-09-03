@@ -6,8 +6,8 @@
 > NFR, performance budget, observability guarantee, or compliance rule lives here,
 > **not** in a `.feature`.
 >
-> Each constraint is verified by a `unit-invariant` test (created at plan/apply),
-> never by a Gherkin scenario. Keep this register narrow: assert, justify, point to
+> Each constraint is verified by an existing passing `unit-invariant` test or gate,
+> never by a Gherkin scenario. A row may be added only when its verification already passes. Keep this register narrow: assert, justify, point to
 > the proof. Don't let it grow into an issue tracker — open work belongs in your
 > tracker, not here.
 
@@ -20,6 +20,6 @@
 Add one row per constraint. Guidance:
 - Assertion: a flat "X always holds" statement. No Given/When/Then.
 - Rationale: why it matters, in one line.
-- How verified: the exact test id that proves it. If none yet, write "TODO: unit-invariant test" — the plan stage will create it.
+- How verified: the exact passing test id or gate that proves it. If none exists, do not add the row yet.
 - Links: the MADR that decided it (don't restate the decision here — DRY).
 -->

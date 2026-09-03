@@ -96,14 +96,25 @@ Given("a grimoire project", function (this: GrimoireWorld) {
 
 Given("a grimoire project with a documented feature", function (this: GrimoireWorld) {
   this.initProject();
-  this.write(".grimoire/changes/demo/manifest.md", manifest("implementing"));
-  this.write(".grimoire/changes/demo/features/example.feature", VALID_FEATURE);
+  this.write("features/example.feature", VALID_FEATURE);
 });
 
 Given("a grimoire project with a malformed feature", function (this: GrimoireWorld) {
   this.initProject();
-  this.write(".grimoire/changes/demo/manifest.md", manifest("implementing"));
-  this.write(".grimoire/changes/demo/features/broken.feature", MALFORMED_FEATURE);
+  this.write("features/broken.feature", MALFORMED_FEATURE);
+});
+
+Given("a grimoire project with live features and decisions", function (this: GrimoireWorld) {
+  this.initProject();
+  this.write("features/broken.feature", MALFORMED_FEATURE);
+  this.write(".grimoire/decisions/0001-broken.md", "# Missing decision frontmatter\n");
+});
+
+Given("an active change contains only coordination artifacts", function (this: GrimoireWorld) {
+  this.write(".grimoire/changes/change-a/manifest.md", manifest("complete"));
+  this.write(".grimoire/changes/change-a/tasks.md", "# Tasks\n\n- [ ] Work\n");
+  this.write(".grimoire/changes/change-b/manifest.md", manifest("accepted"));
+  this.write(".grimoire/changes/change-b/draft.md", "# Draft\n");
 });
 
 Given("a grimoire project with a documented feature and a decision", function (this: GrimoireWorld) {
@@ -129,6 +140,39 @@ Given("a grimoire project with a spec site build configured", function (this: Gr
 Given("a grimoire project with no spec site build configured", function (this: GrimoireWorld) {
   scaffoldSpecs(this);
 });
+
+Given("a grimoire project with executable and manual feature files", function (this: GrimoireWorld) {
+  this.initProject();
+  this.write("features/login.feature", VALID_FEATURE);
+  this.write("features/workflow/plan.feature", `@manual
+Feature: Plan work
+  Scenario: Prepare tasks
+    When planning starts
+    Then tasks are prepared
+`);
+});
+
+Given(
+  "a grimoire project with terminal decisions and intent-focused area documentation",
+  function (this: GrimoireWorld) {
+    this.initProject();
+    this.write(
+      ".grimoire/decisions/0001-old.md",
+      DECISION.replace("status: accepted", "status: superseded by 0002")
+    );
+    this.write(
+      ".grimoire/decisions/0002-current.md",
+      DECISION.replace("# Use the example approach", "# Use the current approach") +
+        "\nSupersedes [0001](0001-old.md).\n"
+    );
+    this.write(
+      ".grimoire/decisions/0003-retired.md",
+      DECISION.replace("status: accepted", "status: deprecated")
+    );
+    this.write(".grimoire/docs/index.yml", "areas:\n  - name: Core\n    path: .grimoire/docs/core.md\n    directory: src/core\n    description: Core behavior\n");
+    this.write(".grimoire/docs/core.md", "# Core\n\n## Purpose\nDescribes intent.\n");
+  }
+);
 
 Given(
   "a grimoire project with a file committed under a change {string}",
@@ -375,6 +419,19 @@ Then("the validation does not pass", function (this: GrimoireWorld) {
   assert.notEqual(this.result.code, 0, `validate should have failed:\n${this.out}`);
 });
 
+Then("the live features and decisions are validated", function (this: GrimoireWorld) {
+  assert.notEqual(this.result.code, 0, "malformed live specifications should fail validation");
+  const results = this.json<Array<{ file: string; errors: string[] }>>();
+  assert.ok(results.some((entry) => /features\/broken\.feature$/.test(entry.file)));
+  assert.ok(results.some((entry) => /decisions\/0001-broken\.md$/.test(entry.file)));
+});
+
+Then("each active change manifest is validated", function (this: GrimoireWorld) {
+  const results = this.json<Array<{ file: string; errors: string[] }>>();
+  assert.ok(results.some((entry) => entry.file === "change-a/manifest.md"));
+  assert.ok(results.some((entry) => entry.file === "change-b/manifest.md"));
+});
+
 Then("I see how well specs and decisions are covered", function (this: GrimoireWorld) {
   const { metrics } = this.json<{ metrics: Array<{ name: string; score: number | null }> }>();
   const names = metrics.map((m) => m.name.toLowerCase());
@@ -388,9 +445,25 @@ Then("I am given an overall health score", function (this: GrimoireWorld) {
   assert.ok(overall >= 0 && overall <= 100, `overall score out of range: ${overall}`);
 });
 
+Then("terminal decisions remain part of the durable history", function (this: GrimoireWorld) {
+  const drift = driftMetric(this);
+  assert.ok(
+    !drift.items?.some((item) => /terminal decision|delete the file/.test(item.message + item.action)),
+    `terminal decisions were flagged for deletion: ${JSON.stringify(drift.items)}`
+  );
+});
+
+Then("area documentation is not judged by source-file recency", function (this: GrimoireWorld) {
+  const drift = driftMetric(this);
+  assert.ok(
+    !drift.items?.some((item) => /core\.md.*(?:stale|recency|source)/i.test(item.message)),
+    `area documentation was judged by recency: ${JSON.stringify(drift.items)}`
+  );
+});
+
 interface DriftMetric {
   name: string;
-  items?: Array<{ severity: string; message: string }>;
+  items?: Array<{ severity: string; message: string; action: string }>;
 }
 
 function driftMetric(world: GrimoireWorld): DriftMetric {
@@ -423,6 +496,19 @@ Then("a browsable overview of the project is produced", function (this: Grimoire
     existsSync(join(this.dir, ".grimoire", "docs", "OVERVIEW.md")),
     "OVERVIEW.md was not created"
   );
+});
+
+function overview(world: GrimoireWorld): string {
+  return readFileSync(join(world.dir, ".grimoire", "docs", "OVERVIEW.md"), "utf-8");
+}
+
+Then("executable features are described as automated specifications", function (this: GrimoireWorld) {
+  assert.equal(this.result.code, 0, `docs failed:\n${this.out}`);
+  assert.match(overview(this), /\*\*Example behaviour\*\*.*automated specification/);
+});
+
+Then("manual workflow features are described as agent-run specifications", function (this: GrimoireWorld) {
+  assert.match(overview(this), /\*\*Plan work\*\*.*agent-run specification/);
 });
 
 Then(
@@ -465,6 +551,15 @@ Then("I see the change {string} among the work in progress", function (this: Gri
   );
 });
 
+Then("the result reports coordination artifacts without claiming copied specifications", function (this: GrimoireWorld) {
+  const payload = this.json<{ changes: Array<Record<string, unknown>> }>();
+  const change = payload.changes[0];
+  assert.deepEqual(
+    Object.keys(change).sort(),
+    ["branch", "hasDraft", "hasLearnings", "hasManifest", "hasTasks", "id", "stage", "status"].sort()
+  );
+});
+
 Then("I am shown how much of the change is complete", function (this: GrimoireWorld) {
   const { artifacts } = this.json<{
     artifacts: { tasks: { total: number; completed: number } | null };
@@ -473,6 +568,13 @@ Then("I am shown how much of the change is complete", function (this: GrimoireWo
   // Fixture has 2 of 3 tasks checked off.
   assert.equal(artifacts.tasks.total, 3, "wrong task total");
   assert.equal(artifacts.tasks.completed, 2, "wrong completed count");
+});
+
+Then("the result reports draft, planned, applying, or ready progress", function (this: GrimoireWorld) {
+  const status = this.json<{ stage: string; artifacts: Record<string, unknown> }>();
+  assert.match(status.stage, /^(draft|planned|applying|ready)$/);
+  assert.equal(status.stage, "applying");
+  assert.deepEqual(Object.keys(status.artifacts).sort(), ["manifest", "tasks"]);
 });
 
 Then("I am warned that the test is weak", function (this: GrimoireWorld) {

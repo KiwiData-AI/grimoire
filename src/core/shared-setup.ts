@@ -36,6 +36,7 @@ const DEFAULT_SKILL_AGENT = "claude";
 export const SKILL_NAMES = [
   "grimoire-draft",
   "grimoire-plan",
+  "grimoire-spike",
   "grimoire-apply",
   "grimoire-verify",
   "grimoire-audit",

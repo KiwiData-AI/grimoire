@@ -11,6 +11,8 @@ metadata:
 
 Systematically find, prioritize, and plan tech debt reduction. Combines automated scanning with LLM analysis to produce a prioritized debt register, then feeds approved items into the standard grimoire pipeline (draft → plan → apply).
 
+Use `../references/testing-lifecycle.md` for unknown-work routing, section confirmation, and final verification cadence.
+
 ## Triggers
 - User asks about tech debt, code quality, refactoring opportunities, or simplification
 - User wants to reduce complexity, lines of code, or structural bloat
@@ -22,6 +24,7 @@ Systematically find, prioritize, and plan tech debt reduction. Combines automate
 - Removing a feature → `grimoire-remove`
 - Fixing a bug → `grimoire-bug`
 - Documenting existing code → `grimoire-discover`
+- Current behavior, a dependency contract, or the safe refactoring direction is unknown → `grimoire-spike`
 
 ## Prerequisites
 - A grimoire-initialized project (`.grimoire/` exists)
@@ -34,7 +37,7 @@ Each debt item in the register follows a structured format influenced by the Cod
 
 **Required fields:**
 - `id` — unique identifier (debt-NNN, monotonically increasing)
-- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `reinvented_platform`, `dead_code`, `test_debt`, `pattern_divergence`, `comment_noise`
+- `category` — one of: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `reinvented_platform`, `dead_code`, `test_debt`, `pattern_divergence`, `comment_noise`, `deferred_task`
 - `severity` — `high`, `medium`, or `low`
 - `location` — file path (with optional `:line`), or `path ↔ path` for relationships
 - `title` — short human-readable summary
@@ -198,24 +201,18 @@ After the first batch, ask if the user wants to see more or start working on the
 - "Flattening this 4-level nested structure into 2 normalized types would eliminate the deep property chains throughout the codebase"
 - "This `EmailValidator` class (27 lines) is `\"@\" in email` — real validation is the confirmation mail" / "`moment` is imported for one format call — `Intl.DateTimeFormat`, 0 deps" (always name the concrete stdlib/native replacement and the lines or dependency it removes)
 
-### 6. Create Grimoire Changes
+### 6. Route Approved Findings
 
 For each item the user approves to fix:
 
-1. Create a grimoire change: `refactor-<debt-id>` (e.g., `refactor-debt-001`)
-2. Update the debt register item: set `status: in-progress`, set `change_id`
-3. Draft the change using the standard grimoire format:
-   - **Manifest** with the refactoring rationale (what the debt is, why it matters, what "done" looks like)
-   - **Feature files** if the refactoring changes behavior boundaries (rare for pure refactors, but splitting a module may change its public API)
-   - **Decision record** if the refactoring involves an architectural choice (e.g., "extract event system to decouple orders and inventory")
-4. Hand off to `/grimoire:plan` for task generation, then `/grimoire:apply` for implementation
+1. Update the debt register item to `triaged` and record the accepted scope.
+2. Route the finding and its evidence through `grimoire-draft`.
+3. After design approval, route through `grimoire-plan` for live artifact projection and tasks.
+4. Let Apply and Verify own implementation and final confirmation.
 
-**Refactoring-specific guidance for the plan/apply stages:**
-- **Capture a baseline first, then keep it.** Apply records which tests were already failing at change start (`baseline.md`, see `../references/test-baseline.md`). For a refactor this is the whole safety net: "passing" means *no new failures vs the baseline*, not "zero failures." A test red before you started is pre-existing and accepted; a test you turn red is the refactor breaking behavior — and that means it's not a refactoring. Diff against the baseline after each incremental move.
-- **Prefer incremental moves over big-bang rewrites.** Move one function at a time, run tests after each move.
-- **Add tests before refactoring if test debt is part of the item.** You need a safety net before restructuring.
-- **Update imports incrementally.** When moving code to a new module, re-export from the old location first, then update consumers, then remove the re-export.
-- **Update area docs after refactoring.** File paths and reusable code locations will have changed.
+Refactor produces findings. It does not create manifests, feature files, decisions, or tasks.
+
+Plan and Apply follow `../references/testing-lifecycle.md`. Keep the refactor within substantial sections, use each section's single confirmation, and leave final suites to Verify.
 
 ### 7. Track Progress
 
@@ -246,8 +243,8 @@ The debt register is a living document. Recommend:
 - **Respect wont-fix.** Some debt is cheaper to live with than to fix. A 500-line file that changes once a year is not worth splitting. Acknowledge this and move on.
 - **Simplification is the primary goal.** Every refactoring should make the codebase smaller, simpler, or more focused. If a refactoring adds complexity (more files, more abstractions, more indirection) without reducing something else, question whether it's actually an improvement.
 - **Measure before and after.** A refactoring without measurable improvement is just code churn. Track lines, complexity, coverage, and file count.
-- **Existing tests are your safety net.** Never refactor without tests. If tests don't exist, write them first (that's test debt — address it before or alongside the structural refactoring).
+- **Use the testing lifecycle.** Known characterization tests precede delivery code. Unknown behavior or safe direction routes to a spike.
 - **Present findings collaboratively** — same interview pattern as grimoire-audit. Batches of 3-5, let the user drive priority. Don't dump a 50-item list.
 
 ## Done
-When debt items are triaged (fixed, deferred, or accepted) and grimoire changes are created for approved fixes, the workflow is complete. Each approved fix flows through the standard pipeline: `grimoire-plan` → `grimoire-apply`.
+When debt items are triaged, the workflow is complete. Each approved fix flows through `grimoire-draft` → `grimoire-plan` → `grimoire-apply`.

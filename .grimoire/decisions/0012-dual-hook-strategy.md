@@ -22,7 +22,7 @@ Grimoire needs to run `grimoire check` before commits and validate `Change:` tra
 4. Husky/lint-staged — use the established JS ecosystem tool
 
 ## Decision Outcome
-Chosen option: "Dual hooks", because Claude Code hooks provide richer integration (post-commit feedback, structured output) while git hooks catch commits from any tool. The git hook is a simple shell script that runs `grimoire check --changed`. The Claude hook adds Change trailer validation for active grimoire changes.
+Chosen option: "Dual hooks", because Claude Code hooks provide richer integration while git hooks catch commits from any tool. Both pre-commit paths run only `grimoire check lint format doc_style --changed`; final verification owns broad checks and test suites. The Claude hook also validates Change trailers for active grimoire changes.
 
 ### Consequences
 - Good: Covers both Claude Code and vanilla git commit paths

@@ -1,8 +1,8 @@
 @manual
-Feature: Build each task test-first
+Feature: Build understood work test-first
   As a developer
-  I want each task implemented with a failing test before the code
-  So that every behaviour is covered by a test that genuinely exercises it
+  I want tests written before understood delivery work without repeated broad test runs
+  So that implementation remains protected without mechanical checks dominating delivery time
 
   # @manual — the actor is an AI agent running /grimoire:apply.
 
@@ -13,28 +13,31 @@ Feature: Build each task test-first
     And it records accepted pre-existing failures before code changes
     And it does not run the full suites again during implementation
 
-  Scenario: A feature task uses one tactical red-green command
-    Given a planned feature task with an exact test command
-    When I implement the task
-    Then its new or changed test is seen to fail for the missing behavior
-    And collection or infrastructure errors do not count as red
-    And the production code is written until the same command passes
-    And no broader suite runs for task completion
+  Scenario: A substantial section uses one simple confirmation
+    Given a planned section whose behavior and implementation direction are understood
+    When I implement the section
+    Then I write its known tests before its production code
+    And I do not need to run those tests before implementation to observe red
+    And I run at most one simple confirmation after the substantial section
+    And I defer that confirmation when it requires database or container startup
+    And no broad suite or quality-check bundle runs for section completion
 
   Scenario: Repeated failure stops the work instead of looping
-    Given a task whose tests keep failing
-    When the same approach has failed several times
-    Then grimoire stops and asks for guidance rather than trying again
+    Given delivery has failed through three different implementation attempts
+    When grimoire reaches the attempt limit
+    Then grimoire stops delivery before a fourth attempt
+    And a referenced spike presents the failure evidence and unresolved question
+    And grimoire waits for my direction before changing implementation direction
 
   Scenario: A structural activity is reviewed before implementation
     Given planning assigns structure-before review to an activity
     When grimoire starts the activity
     Then I review the intended production shape before tests or production code change
-    And approval lets the agent implement it autonomously with tactical red-green tests
+    And approval lets the agent implement the substantial section autonomously
 
   Scenario: Verification invokes one pre-commit review
     Given planning assigns slice-after review to implementation activities
-    When grimoire verifies their completed tactical red-green work
+    When grimoire verifies their completed section work
     Then grimoire runs configured non-test quality checks
     And it invokes pre-commit review once over the complete diff
     And pre-commit review uses only applicable best-practice reviewers
@@ -47,13 +50,13 @@ Feature: Build each task test-first
     Then grimoire applies the correction without re-planning the change
     And it records one terse lesson when remaining work is affected
     And it updates only affected unchecked tasks
-    And it reruns only affected tactical tests before continuing
+    And it preserves the section's single confirmation boundary
     And it does not add a checkpoint, report, approval, or persona rerun
 
   Scenario: Verified task completion is recorded immediately
     Given an active section has multiple tasks
-    When a task's exact tactical test passes
-    Then grimoire marks that task complete immediately
+    When the section's confirmation passes or is explicitly deferred by policy
+    Then grimoire marks every covered task complete immediately
 
   Scenario: An agent does not create implementation drift
     Given an active section follows an approved plan

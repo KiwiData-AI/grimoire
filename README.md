@@ -10,7 +10,8 @@
 Clear actor-visible behavior → Gherkin
 Architectural trade-off → MADR decision
 Internal optimization, refactor, configuration, or implementation detail → appropriate test or check
-Approved change → substantial implementation sections → tactical red-green → one verify procedure
+Unknown engineering question → evidence-driven spike
+Approved change → substantial implementation sections → section confirmation → one verify procedure
 ```
 
 <!-- GRIMOIRE:HEALTH:START -->
@@ -23,8 +24,9 @@ The software industry spent decades learning hard lessons about building reliabl
 Grimoire adds the missing discipline:
 
 - **One home per fact** — actor-observable behavior is a Gherkin `.feature`; security/NFR/observability invariants are a constraints register; trade-offs are MADR decisions; data is a schema; code structure is the live graph. No fact lives in two places.
-- **Plans before implementation** — one or two substantial sections with vertical tasks, exact paths, and tactical test commands
-- **Tests that actually test** — test-first discipline at the right level (red-green BDD for behavior, unit tests for invariants) with assertion quality checks
+- **Plans before implementation** — one or two substantial sections with exact paths, known tests, production changes, and one confirmation boundary
+- **Evidence before assumptions** — question-driven spikes resolve unknown behavior, contracts, causes, reproductions, and directions
+- **Tests that actually test** — known section tests precede production code; understood bug fixes retain one observed reproduction
 - **Codebase knowledge without exploration** — intent-focused area docs + data schemas, with live structure (symbols, call graphs, reusable code) from codebase-memory-mcp so the AI doesn't waste context reading files
 - **Full audit trail** — every commit traces back to a requirement via git trailers
 - **Architecture decisions on record** — MADR decision records so the AI doesn't re-litigate choices
@@ -83,7 +85,7 @@ You: "Users should be able to log in with 2FA"
 → /grimoire:draft    Designs the change on one living draft.md (Given/When/Then take shape here)
 → /grimoire:plan     Projects the design into login.feature + decisions, then generates tasks
 → /grimoire:review   (optional) Product, security, engineering + principles review
-→ /grimoire:apply    Implements tactically, then runs verification once
+→ /grimoire:apply    Writes known tests, implements sections, and confirms each section once
 → grimoire pr         Generates PR description from artifacts
 ```
 
@@ -118,14 +120,17 @@ Grimoire routes your request to its one correct home (an admission test keeps ea
 - **"Update formatter configuration"** → direct configuration check, with no required Gherkin
 - **"The login page is broken"** → `/grimoire:bug` (reproduce first, then fix)
 - **"A tester found a problem"** → `/grimoire:bug-report` → `/grimoire:bug-triage` → routed fix
+- **"We do not know the provider response shape"** → `/grimoire:spike` (one question, bounded probes, referenced evidence)
 
-A `.feature` is allowed only if it has an external actor, is observable without reading code/logs, uses domain language, and survives a reimplementation. Security controls, NFRs, and observability guarantees are invariants → they live in the constraints register. You design all this on one living `draft.md`; it is **projected** into its homes — `.feature` files (with security tags like `@security`, `@auth`, `@pii`, `@pci-dss` when applicable), constraint entries, decision records, `data.yml` for schema changes, and a manifest — at the **start of Plan**, so Draft's one job is to design the change.
+A `.feature` is allowed only if it has an external actor, is observable without reading code/logs, uses domain language, and survives a reimplementation. Security controls, NFRs, and observability guarantees are invariants → they live in the constraints register. You design all this on one living `draft.md`; Plan projects it into live feature files, constraint entries, decision records, `.grimoire/docs/data/schema.yml`, and a manifest. Draft's one job is design.
 
 ### 2. Plan — Project the design, then generate concrete tasks
 
 Plan opens by **projecting** the agreed `draft.md` into its homes, running the admission test and principles gate as it goes. Gherkin is optional. Clear actor-visible behavior extends an existing feature when possible. Internal optimizations, refactors, configuration, and implementation details use the appropriate test, check, constraint, or decision.
 
-Plans default to one substantial section and use a second only for a distinct outcome or context boundary. Every activity receives activity-level review timing: `structure-before` for costly shapes or `slice-after` for autonomous implementation. Each vertical task contains its test change, production change, and one exact tactical red-green command. Optional harness-level per-file review remains available outside Grimoire state.
+Plans default to one substantial section and use a second only for a distinct outcome or context boundary. Every activity receives activity-level review timing: `structure-before` for costly shapes or `slice-after` for autonomous implementation. Each section contains known tests, production changes, and at most one cheap section confirmation. Optional harness-level per-file review remains available outside Grimoire state.
+
+Unresolved mechanics become `S<n>` spike activities with one question, required evidence, a probe boundary, and an evidence-based exit. Planning does not invent downstream schemas, fixtures, endpoints, responses, or assertions.
 
 ### 3. Review — Multi-perspective design review (optional)
 
@@ -135,32 +140,35 @@ Personas validate the change before any code is written:
 - **Senior engineer** — simplicity, code reuse, architecture fit, task quality
 - **Security engineer** — STRIDE threat analysis, OWASP Top 10 / CWE classification, compliance verification (PCI-DSS, HIPAA, GDPR, SOC2 when configured), input validation, auth boundaries, vulnerable dependencies, secrets
 - **QA engineer** — testability, negative scenarios, edge cases, observability, regression risk
-- **Data engineer** — schema design, migration safety, index coverage (when `data.yml` present)
+- **Data engineer** — live schema design, migration safety, and index coverage when data changes
 - **Principles auditor** — flags duplicate homes (DRY), second ways to do a thing (one right way), reinvented wheels, speculative complexity (KISS), and any `.feature` that is really a constraint
 
 Issues flagged as **blocker** or **suggestion**. Security findings tagged with OWASP category and CWE ID. Skip for small/low-risk changes.
 
-### 4. Apply — Build test-first at the right level
+### 4. Apply — Deliver understood sections
 
-Apply captures the full configured test baseline once. Red-green discipline then uses the test vehicle and exact tactical command recorded by each task. A `structure-before` activity receives one shape review, then implementation proceeds autonomously. A `slice-after` activity proceeds autonomously without an intermediate gate.
+Apply captures the full configured test baseline once. A `structure-before` activity receives one shape review, then implementation proceeds autonomously. A `slice-after` activity proceeds without an intermediate gate.
 
 This is an upstream, provider-neutral workflow. Source skills install for Claude, OpenCode, and Codex through `src/core/shared-setup.ts`.
 
-For each task:
-1. Write the failing test at the task's level
-2. Run the exact tactical command — it must fail because behavior is absent
-3. Write production code
-4. Run the same tactical command — it must pass
-5. Test quality check — verify strong assertions, not `assert True`
-6. Mark done, move to next task
+For each substantial section:
 
-After all activities, apply invokes one `grimoire-verify` procedure. Verify runs deterministic checks, one pre-commit review, accepted tactical corrections, and one final suite run against the baseline. It does not also run the LLM-backed `best_practices` check.
+1. Write all known tests before production code.
+2. Implement every covered activity.
+3. Run at most one cheap section confirmation, or defer it when database or container startup is required.
+4. Mark covered activities complete together.
+
+Planned delivery does not run tests only to observe red. Unknown work routes to `/grimoire:spike`. After three failed delivery attempts, a findings-only spike requires human direction before attempt four. Understood bug fixes retain one failing reproduction before production changes and one passing reproduction afterward.
+
+After all activities, apply invokes one `grimoire-verify` procedure. Verify runs deterministic checks, one pre-commit review, accepted section corrections, and one final suite run against the baseline. Focused reruns diagnose only observed final-suite failures.
+
+Generated commit hooks run only lint, format, and doc-style checks. Unit and BDD suites remain at the verification boundary.
 
 Artifacts are edited **live on the feature branch** the whole time — no promote step. Finalize just flips decision status to `accepted` and removes the ephemeral change folder.
 
 **Session management:** Each substantial section runs in a fresh implementation context. `tasks.md` checkboxes preserve resume state.
 
-**Stuck detection:** After 3 failed attempts with different approaches on a single task, the agent stops and asks for help instead of looping.
+**Stuck detection:** After three failed delivery attempts, the agent records a findings-only `S<n>` spike and waits for human direction.
 
 ### 5. Verify — Confirm everything works
 
@@ -176,7 +184,7 @@ Artifacts are edited **live on the feature branch** the whole time — no promot
 
 ### 6. PR
 
-`grimoire pr` generates a PR description from the branch diff, features, decisions, and task progress. Optional `--review` runs an LLM review of the actual diff. `--create` creates via `gh` or `glab`.
+`grimoire pr` finalizes an active change when needed, then generates a PR description from Git history and changed live artifacts. `--create` creates via `gh` or `glab`.
 
 There is no archive step. Features, decisions, constraints, and schema were edited live on the branch; the PR diff *is* the change, and git history + the `Change: <id>` commit trailer are the record.
 
@@ -263,32 +271,30 @@ The AI runs `/grimoire:plan`, which **first projects** the agreed `draft.md` int
       <!-- review: structure-before -->
       - Test: add exact redirect and authenticated-session assertions in `tests/step_defs/test_auth.py`.
       - Implement: add the nullable secret migration and `VerifyTOTPView` in `src/views/auth.py`.
-      - Red/green: `pytest tests/step_defs/test_auth.py -k successful_login_with_valid_totp --reuse-db`.
 
 - [ ] 1.2 (verify: scenario) Complete expired and invalid TOTP rejection.
       <!-- review: slice-after -->
       - Test: add exact error-message and retained-page assertions in `tests/step_defs/test_auth.py`.
       - Implement: handle expired and invalid codes in `VerifyTOTPView`.
-      - Red/green: `pytest tests/step_defs/test_auth.py -k "expired_totp or invalid_totp" --reuse-db`.
+
+### Section confirmation
+
+`pytest tests/step_defs/test_auth.py -k "successful_login_with_valid_totp or expired_totp or invalid_totp" --reuse-db`
 ```
 
 ### Apply
 
-The AI runs `/grimoire:apply`, creates branch `feat/add-2fa-login`, captures the baseline once, and works through tasks:
+The AI runs `/grimoire:apply`, creates branch `feat/add-2fa-login`, captures the baseline once, and implements the section:
 
 ```
-Task 1.1: Complete successful TOTP login
+Section 1: Add TOTP login
   → Reviewing the model and view shape once
-  → Writing tests/step_defs/test_auth.py
-  → Running: pytest tests/step_defs/test_auth.py -k successful_login_with_valid_totp --reuse-db
-  ✗ FAILED (red) — good, test correctly fails without production code
+  → Writing all known tests in tests/step_defs/test_auth.py
   → Updating the model, migration, and VerifyTOTPView
   → Writing src/views/auth.py
-  → Running: pytest tests/step_defs/test_auth.py -k successful_login_with_valid_totp --reuse-db
-  ✓ PASSED (green)
-  → Test quality check: assert response.status_code == 302 ✓ strong assertion
-
-  ...continues through all tasks...
+  → Running one section confirmation
+  ✓ PASSED
+  → Marking tasks 1.1 and 1.2 complete together
 
 Post-implementation
   → Invoking one grimoire-verify procedure
@@ -377,10 +383,10 @@ For `INFRA/CONFIG` it would emit a ticket stub for the platform team. For `SECUR
 
 ### Fix
 
-Developer runs `/grimoire:bug 0042`. Reproduce-first discipline:
+Developer runs `/grimoire:bug 0042` after triage establishes a reliable reproduction and direction:
 
 ```
-1. Write failing test reproducing the bug
+1. Write and observe the failing reproduction
    → tests/checkout/test_place_order.py::test_payment_timeout
    → pytest -k test_payment_timeout
    ✗ FAILED — reproduces the timeout
@@ -395,7 +401,7 @@ Developer runs `/grimoire:bug 0042`. Reproduce-first discipline:
    ✓ 31 passed
 ```
 
-Skill also drafts the missing scenario into `features/checkout/place-order.feature` (under a `# pending tester sign-off` comment) and appends a tester verification checklist to `report.md`:
+If the bug exposes a missing actor-visible requirement, the fix routes through Draft and Plan. The bug workflow appends a tester verification checklist to `report.md`:
 
 ```
 .grimoire/bugs/0042-place-order-timeout/report.md (verification section)
@@ -427,7 +433,7 @@ PR #312: Add bulk export endpoint
   Data lens        ✓ schema unchanged
 ```
 
-Output is structured Markdown ready to paste as a PR comment, or wired through `gh pr comment 312 --body-file review.md`. Each finding includes file:line, severity, and a suggested change — same format the post-implementation review uses on your own diffs (`grimoire pr --review`), so reviewers and authors share one mental model.
+Output is structured Markdown ready to paste as a PR comment. Each finding includes file:line, severity, and a suggested change. Verify uses the same review engine for the author's complete diff.
 
 </details>
 
@@ -442,7 +448,8 @@ Grimoire owns the **inner loop** — the Dev and Sec portions of DevSecOps. Ops 
 | Requirements engineering | Gherkin specs as executable acceptance tests | Draft skill |
 | Architecture decisions | MADR records with cost-of-ownership | Draft skill |
 | Design review | Multi-persona review before code is written | Review skill |
-| Test-driven development | Test-first: red-green BDD for behavior, unit tests for invariants | Apply skill |
+| Test-first delivery | Known section tests before production code, with one section confirmation | Apply skill |
+| Engineering investigation | Question-driven spikes with bounded probes and evidence-based exits | Spike skill |
 | Test quality | Static analysis for weak/empty/tautological tests | `grimoire test-quality`, verify skill |
 | Regression prevention | All existing tests must pass; regressions block completion | Apply + verify skills |
 | Change management | Manifests, task tracking, session resumption, live-on-branch edits | Full lifecycle |
@@ -539,7 +546,7 @@ When configured, `grimoire docs` regenerates `.grimoire/site/` — one page per 
 
 The index embeds the overview's Configured Tools table, so publishing the built site publishes your config/tooling summary — review before hosting publicly.
 
-### Pre-Commit Pipeline
+### Check Pipeline
 
 ```
 grimoire check
@@ -558,9 +565,9 @@ grimoire check
   9 passed, 0 failed, 1 skipped
 ```
 
-Auto-detected during `grimoire init`. Any tool can use `name: llm` with a `prompt:` for AI-powered review. Also sets up enforcement hooks for Claude Code (`.claude/hooks.json`) and git (`.git/hooks/pre-commit`).
+Auto-detected during `grimoire init`. Any tool can use `name: llm` with a `prompt:` for AI-powered review. Generated editor and commit hooks run only cheap lint, format, and doc-style checks. Unit and BDD suites remain baseline and final-verification boundaries.
 
-> ⚠️ **Security: `.grimoire/config.yaml` is trusted code.** `grimoire check` and `grimoire health` execute the shell commands defined in your config's tool steps (`command:` / `check_command:`), and the installed pre-commit hook runs `grimoire check` automatically on every commit. This is the same trust model as `npm` scripts, `Makefile`s, or git hooks — the config can run any command on your machine. **Do not run `grimoire check`/`health`, commit, or let an AI agent commit in a freshly cloned untrusted repository** until you have reviewed its `.grimoire/config.yaml`. Grimoire never sends your code anywhere: the only network calls are an npm version check (your package name only; opt out with `GRIMOIRE_NO_UPDATE_CHECK=1`) and piping diffs to the LLM CLI *you* configured.
+> ⚠️ **Security: `.grimoire/config.yaml` is trusted code.** `grimoire check` and `grimoire health` execute the shell commands defined in your config's tool steps (`command:` / `check_command:`), and the installed pre-commit hook runs the configured lint, format, and doc-style steps automatically on every commit. This is the same trust model as `npm` scripts, `Makefile`s, or git hooks — the config can run any command on your machine. **Do not run `grimoire check`/`health`, commit, or let an AI agent commit in a freshly cloned untrusted repository** until you have reviewed its `.grimoire/config.yaml`. Grimoire never sends your code anywhere: the only network calls are an npm version check (your package name only; opt out with `GRIMOIRE_NO_UPDATE_CHECK=1`) and piping diffs to the LLM CLI *you* configured.
 
 ### Test Quality
 
@@ -569,7 +576,7 @@ grimoire test-quality              # Analyze all test files
 grimoire test-quality tests/**     # Specific files
 ```
 
-Static analysis catching weak tests: empty bodies, missing assertions, weak assertions (`assert True`, `toBeDefined()`), tautological tests. Supports Python and JS/TS. Integrated into apply (per-task gate) and verify (test intelligence).
+Static analysis catches empty bodies, missing assertions, weak assertions (`assert True`, `toBeDefined()`), and tautological tests. Supports Python and JS/TS. Final verification owns the authoritative test-quality gate.
 
 ### Bug Workflow
 
@@ -631,12 +638,7 @@ grimoire health
 
 ### Contract Testing
 
-The plan, apply, and verify skills enforce a contract-first approach for external APIs:
-
-- **Mock at the HTTP boundary only** — never mock internal code or client wrappers
-- **Fixtures must match `schema.yml`** — test data mirrors the documented API contract
-- **Contract drift detection** — verify flags when external API changes don't have matching test updates
-- **Client code reads only documented fields** — prevents coupling to undocumented API behavior
+External API work follows the authoritative [testing and contract reference](skills/references/testing-contracts.md). Unknown provider behavior routes to a spike before delivery tests are planned.
 
 ### Response Style (STE)
 
@@ -650,13 +652,9 @@ Brevity-with-clarity response style based on ASD-STE100 (Simplified Technical En
 
 For Claude Code, the `ste` plugin (in this repo's marketplace, `plugins/ste`) enforces the same style with a session hook plus per-turn reinforcement — install it with `/plugin marketplace add KiwiData-AI/grimoire` then `/plugin install ste@grimoire`. `grimoire init` and `grimoire update` print these commands when `integrations.ste_plugin` is enabled.
 
-### Conflict Detection
-
-`grimoire list` detects when multiple active changes modify the same feature file and flags the conflict.
-
 ### Debt Register
 
-The refactor skill maintains `.grimoire/debt-register.yml` — a persistent record of tech debt items with severity, Fowler quadrant classification (deliberate/inadvertent × prudent/reckless), fingerprint-based dedup, and aging signals. Formal exceptions live in `.grimoire/debt-exceptions.yml` with optional expiry dates.
+The refactor skill maintains `.grimoire/docs/debt-register.yml` — a persistent record of tech debt items with severity, Fowler quadrant classification, fingerprint-based dedup, and aging signals. Formal exceptions live in `.grimoire/debt-exceptions.yml` with optional expiry dates.
 
 ### Multi-LLM Support
 
@@ -684,10 +682,11 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 
 | Skill | Purpose |
 |-------|---------|
-| `/grimoire:draft` | Draft features and/or decisions collaboratively |
+| `/grimoire:draft` | Design one change collaboratively on `draft.md` |
 | `/grimoire:plan` | Generate detailed implementation tasks from specs |
+| `/grimoire:spike` | Investigate one engineering question with bounded probes and referenced evidence |
 | `/grimoire:review` | Multi-perspective design review (PM, engineer, security, QA, data, principles) |
-| `/grimoire:apply` | Execute tasks test-first at the right level (BDD for behavior, unit for invariants) |
+| `/grimoire:apply` | Write known tests, implement substantial sections, and confirm each section once |
 | `/grimoire:verify` | Post-implementation verification + test quality |
 | `/grimoire:audit` | Discover undocumented features and decisions |
 | `/grimoire:remove` | Tracked feature removal with impact assessment |
@@ -743,7 +742,6 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | `grimoire pr --review` | Run post-implementation LLM review of diff |
 | `grimoire test-quality [files]` | Analyze test files for quality issues |
 | `grimoire trace <file[:line]>` | Trace file to originating grimoire change |
-| `grimoire diff <id>` | Compare proposed change specs against the baseline |
 | `grimoire docs [-o <path>]` | Generate human-readable project overview |
 | `grimoire health` | Project health score |
 | `grimoire health --badges <file>` | Write shields.io badges into a file (e.g., README.md) |
@@ -858,8 +856,7 @@ Issues and pull requests welcome at [github.com/KiwiData-AI/grimoire](https://gi
 
 **Before opening a PR:**
 
-- `npm run build && npm test && npm run lint` — all green
-- `grimoire check` — pre-commit pipeline green
+- Run `/grimoire:verify` once after implementation. It owns deterministic checks and the final configured suites.
 - Clear actor-visible behavior has a Gherkin scenario. Internal work uses its appropriate test, check, constraint, or decision without manufactured Gherkin.
 - Commit messages include a `Change:` trailer when the work is part of a tracked change
 - For dependency adds/upgrades: lockfile committed, no floating version ranges in `package.json` (see Security model above)
@@ -906,7 +903,7 @@ Skills are pure markdown — instructions for the AI, not executable code.
 
 1. Create `src/commands/<name>.ts` — thin wrapper that parses args and calls core
 2. Create `src/core/<name>.ts` — business logic
-3. Register in `src/cli/index.ts`
+3. Register in `src/cli/program.ts`
 
 ### Adding a New Tool Detection
 
@@ -922,9 +919,10 @@ Skills are pure markdown — instructions for the AI, not executable code.
 - **One right way.** Each thing has a single sanctioned approach. Two ways to do the same job is a defect, even if both work.
 - **Don't reinvent the wheel.** Use the tool that exists — git for isolation/staging/history, standard libraries for crypto/auth/parsing — not a bespoke grimoire clone of it.
 - **Features are tests — when they're behavior.** A `.feature` is the requirement and the acceptance test, but only for actor-observable behavior. Invariants are unit-tested constraints, not Gherkin.
-- **Red-green is mandatory.** A test must fail before it passes — at the right level (BDD for behavior, unit for invariants).
+- **Investigation precedes delivery.** Unknown behavior, contracts, causes, reproductions, and directions use evidence-driven spikes.
+- **Tests precede planned production code.** Planned sections do not run tests only to observe red; understood bug fixes keep one observed reproduction.
 - **Decisions are documented.** Architecture choices that aren't written down get relitigated.
-- **Reproduce before you fix.** Every bug gets a failing test before any code changes.
+- **Reproduce before you fix.** Understood bugs get one observed failing reproduction. Unknown defects enter a spike first.
 - **Simple over clever.** Less code, fewer abstractions, smallest surface area.
 - **Removal is deliberate.** Removing a feature gets the same rigor as adding one.
 - **The fix is upstream.** You don't fix codebase entropy by reviewing harder — you fix it by requiring specs before code.

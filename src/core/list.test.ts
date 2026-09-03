@@ -44,10 +44,17 @@ function captureOutput(fn: () => Promise<void>): Promise<string[]> {
 
 describe("listChanges", () => {
   it("reports empty when no changes dir", async () => {
-    mockReaddir.mockRejectedValue(new Error("ENOENT"));
+    mockReaddir.mockRejectedValue(Object.assign(new Error("not found"), { code: "ENOENT" }));
     const logs = await captureOutput(() => listChanges(true));
     const parsed = JSON.parse(logs.join(""));
     expect(parsed.changes).toEqual([]);
+  });
+
+  it("does not report an empty list when coordination cannot be read", async () => {
+    const failure = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    mockReaddir.mockRejectedValue(failure);
+
+    await expect(listChanges(true)).rejects.toBe(failure);
   });
 
   it("reports no active changes when dir is empty", async () => {
@@ -57,7 +64,7 @@ describe("listChanges", () => {
   });
 
   it("lists changes with manifest info in json mode", async () => {
-    mockReaddir.mockImplementation(async (path: any, opts?: any) => {
+    mockReaddir.mockImplementation(async (path: any) => {
       const p = String(path);
       if (p.includes("changes")) {
         return [{ name: "add-auth", isDirectory: () => true }] as any;
@@ -65,7 +72,7 @@ describe("listChanges", () => {
       return [] as any;
     });
     mockFileExists.mockImplementation(async (path: string) => {
-      return path.includes("manifest.md");
+      return path.includes("manifest.md") || path.includes("draft.md") || path.includes("learnings.md");
     });
     mockReadFile.mockResolvedValue("---\nstatus: implementing\nbranch: feat/auth\n---\n" as any);
 
@@ -75,27 +82,17 @@ describe("listChanges", () => {
     expect(parsed.changes[0].id).toBe("add-auth");
     expect(parsed.changes[0].status).toBe("implementing");
     expect(parsed.changes[0].branch).toBe("feat/auth");
-  });
-
-  it("detects conflicts when multiple changes touch same feature", async () => {
-    mockReaddir.mockImplementation(async (path: any) => {
-      if (String(path).includes("changes")) {
-        return [
-          { name: "change-a", isDirectory: () => true },
-          { name: "change-b", isDirectory: () => true },
-        ] as any;
-      }
-      return [] as any;
+    expect(parsed.changes[0]).toMatchObject({
+      hasManifest: true,
+      hasTasks: false,
+      hasDraft: true,
+      hasLearnings: true,
     });
-    mockFileExists.mockResolvedValue(false);
-    mockGlob.mockResolvedValue(["features/shared.feature"] as any);
-
-    const logs = await captureOutput(() => listChanges(true));
-    const parsed = JSON.parse(logs.join(""));
-    expect(parsed.conflicts).toHaveLength(1);
-    expect(parsed.conflicts[0].file).toBe("features/shared.feature");
-    expect(parsed.conflicts[0].changes).toContain("change-a");
-    expect(parsed.conflicts[0].changes).toContain("change-b");
+    expect(parsed.changes[0]).not.toHaveProperty("hasFeatures");
+    expect(parsed.changes[0]).not.toHaveProperty("hasDecisions");
+    expect(parsed.changes[0]).not.toHaveProperty("featureFiles");
+    expect(parsed).not.toHaveProperty("conflicts");
+    expect(mockGlob).not.toHaveBeenCalled();
   });
 });
 

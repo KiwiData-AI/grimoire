@@ -1,5 +1,5 @@
 ---
-status: proposed # proposed | accepted | deprecated | superseded by NNNN
+status: accepted
 date: 2026-06-27
 decision-makers: [fred]
 ---

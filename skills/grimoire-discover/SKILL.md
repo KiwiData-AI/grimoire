@@ -58,7 +58,7 @@ The graph gives AST-accurate structure across many languages. You use it to *und
 Ask the user what to document (or accept the scope passed in by a calling skill):
 - **Full scan** — document all significant areas (default for first run); use `get_architecture` to enumerate them
 - **Area scan** — document specific directories (e.g., "just the API layer")
-- **Targeted refresh** — a list of directories is passed in (e.g. from `grimoire-plan`'s staleness gate). Regenerate only those area docs and update their `last_updated` entries in `index.yml`. Fast-path for when an area's *intent* changed; does not touch areas outside the passed list.
+- **Targeted refresh** — regenerate only named area docs whose purpose, boundaries, placement, or conventions changed. Do not touch areas outside the passed list.
 
 Check `.grimoire/docs/index.yml` if it exists — don't redo work unless refreshing. Remember discover runs when **intent** changes (new area, shifted boundary), not on every code change — structure is always live from the graph.
 
@@ -275,31 +275,9 @@ The `directory` field links each doc back to the source directory — it's how a
 
 **Generate the `stories:` map.** Walk `features/`, then group the feature files by *functional story* — the user-facing capability area they serve, not the source directory. Propose the grouping to the user and let them rename/merge stories before writing. A feature not yet assigned to a story falls back to its feature-directory group in the OVERVIEW, so partial maps are fine. `stories` is the one place that grouping lives (DRY) — `grimoire docs` reads it, nothing else defines it.
 
-### Freshness Tracking
+### Intent Change Tracking
 
-Every area doc and the data schema must include a `Last updated` date in a comment or header. This lets other skills (plan, apply) judge whether the docs are trustworthy or stale.
-
-**In `index.yml`**, track freshness per area:
-```yaml
-areas:
-  - name: api
-    path: .grimoire/docs/api.md
-    directory: src/api
-    description: REST API layer — views, serializers, URL routing
-    last_updated: 2026-04-05
-```
-
-**In each area doc**, include a last-updated line at the top:
-```markdown
-# API Layer
-> Last updated: 2026-04-05
-```
-
-**In `schema.yml`**, the `Last updated` comment at the top already serves this purpose.
-
-**Staleness rule:** If an area doc is older than the most recent commit touching that directory (check via `git log -1 --format=%ci <directory>`), it's potentially stale. When running a full scan or gap fill, flag stale docs and offer to refresh them.
-
-**Why this matters:** Area docs are the primary mechanism for reducing context window usage and preventing hallucinations. Stale docs are worse than no docs — they give the agent confident but wrong information about file paths, function names, and patterns. Freshness tracking lets other skills know when to trust the docs vs. when to fall back to reading source files.
+Refresh an area doc when its purpose, boundaries, placement, or conventions change. Ordinary source edits do not invalidate intent-only documentation. `index.yml` maps each area to its source directory for targeted refreshes.
 
 ### 7.5 Health Check (repo-wide)
 
@@ -328,7 +306,7 @@ After generating, show the user:
 - The **verify** skill can check new code against documented conventions
 - The **audit** skill can trigger a discover pass as part of onboarding
 - The **design** skill reads `.grimoire/docs/components.md` first to avoid generating duplicate components
-- The **plan** skill gates on staleness for level 3-4 changes (when an area's *intent* doc lags its directory) and directs the user to run a targeted refresh before planning
+- The **plan** skill reads area intent and queries the graph for current structure.
 
 ## Important
 - **Start from the graph.** Use `get_architecture` to enumerate areas and `search_graph`/`trace_path` to understand each one. Read source files only to pin down intent the graph can't express.

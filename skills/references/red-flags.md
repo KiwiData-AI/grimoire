@@ -30,10 +30,10 @@ rationalization that it "isn't worth it this time."
 **Why it's wrong:** A vague plan is worse than none — it gives false confidence and you re-plan mid-implementation anyway, now with code already written the wrong way. "Implement the feature" is not a task; it restates the goal.
 **Instead:** Every task names exact files and one approach, small enough to execute without thinking (grimoire-plan). If a task needs thought to start, it isn't planned yet.
 
-## Code before the test (→ grimoire-apply)
+## Code before known delivery tests (→ testing-lifecycle.md)
 **Catch yourself saying:** "I'll add the test after." · "Let me just see it work first." · "The test is trivial, red-first is ceremony."
-**Why it's wrong:** A test written after the code is shaped to pass the code, not to catch its bugs — it asserts what you built, not what was required. A test that never failed has never proven anything. This is the single most common discipline bypass.
-**Instead:** Red first — watch it fail for the right reason, then make it pass (grimoire-apply). If you wrote code before the test, the honest move is to delete the code and start from red.
+**Why it's wrong:** A test written after delivery code is shaped to pass that code instead of expressing the understood requirement.
+**Instead:** Use `testing-lifecycle.md`. Planned delivery writes all known section tests first without a mechanical red run. Understood bug fixes retain one observed red-green reproduction. Unknown work enters a spike.
 
 ## Skipping review (→ grimoire-review)
 **Catch yourself saying:** "It looks fine." · "I reviewed it as I wrote it." · "Too small to need review."
@@ -55,7 +55,7 @@ This is scope creep / YAGNI — its home is **`principles.md` §4 (KISS/YAGNI)**
 
 - **draft** — *Skipping the spec*, *Silently filling a gap*
 - **plan** — *Skipping the plan / vague tasks*
-- **apply** — *Code before the test*
+- **apply** — *Code before known delivery tests*
 - **review** — *Skipping review*
 - **verify** — *Declaring done without verifying*
 

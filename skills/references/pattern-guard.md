@@ -1,6 +1,6 @@
 # Pattern Guard Reference
 
-Loaded by `grimoire-apply` and `grimoire-bug`. Run **before writing the test** for each task — not after, not as a review pass. The goal is to write code that matches the codebase's established conventions the first time, rather than writing to generic patterns and fixing divergence later.
+Loaded by `grimoire-apply` and `grimoire-bug` when a section introduces production structure. Run once before writing that section. The goal is to match established conventions before implementation.
 
 This is not a quality checklist. It is a reconnaissance step: find out how this codebase already solves this class of problem, then write to that pattern.
 
@@ -8,7 +8,7 @@ Requires `codebase-memory-mcp` indexed. If the graph is not available, skip this
 
 ---
 
-## Run Before Each Task
+## Run Before a Structural Section
 
 ### Step 1 — Classify the code being written
 
@@ -127,7 +127,7 @@ This brief is your constraint set for this task. Apply it while writing — not 
 
 ### Step 5 — Write to the brief
 
-When writing the test and production code for this task:
+When writing the section tests and production code:
 
 - Apply the brief's rules as hard constraints, not suggestions
 - If the task spec conflicts with the brief (e.g., feature file implies a return shape the codebase doesn't use), flag it to the user before writing — don't silently choose one
@@ -168,7 +168,7 @@ From <N> peers (<file1>, <file2>, ...):
 [7. Deviation noted: <if you must deviate, why>]
 ```
 
-Write the brief into the task's handoff note in `tasks.md` so future sessions have it.
+Write the brief into the section handoff note in `tasks.md` so future sessions have it.
 
 ---
 

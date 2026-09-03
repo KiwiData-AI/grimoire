@@ -2,6 +2,8 @@
 
 Reference for `grimoire-refactor` step 2. Each category produces findings with a category, location, severity, and suggested action.
 
+Scan category values are: `hotspot`, `structural_bloat`, `data_structure`, `circular_dependency`, `dependency_staleness`, `broken_promise`, `duplication`, `reinvented_platform`, `dead_code`, `test_debt`, `pattern_divergence`, and `comment_noise`. The register also accepts `deferred_task` entries created during finalization.
+
 ## 2a. Hotspots (churn x complexity)
 
 Files that change frequently AND are hard to change. Highest-ROI refactoring targets.

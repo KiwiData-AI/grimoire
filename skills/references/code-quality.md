@@ -1,16 +1,16 @@
 # Code Quality Reference
 
-Loaded by skills that write production code (`grimoire-apply`, `grimoire-bug`). Run as a checklist **after the test goes green, before marking the task done**. Same shape as the test-quality check — short, concrete, and gated.
+Loaded by skills that write production code (`grimoire-apply`, `grimoire-bug`). Apply this writing guidance while editing. Final verification is the authoritative quality gate.
 
 LLM-generated code drifts toward predictable failure modes: too many branches, too many guards, too many helpers wrapping single calls, too many names that mean nothing. This reference exists to make those drifts visible while the code is fresh.
 
-Most rules already live in `AGENTS.md` "Engineering Principles" and in the touched area's `.grimoire/docs/<area>.md`. Those win. This file is the concrete checklist; the principles are the source of truth.
+Most rules already live in `AGENTS.md` "Engineering Principles" and in the touched area's `.grimoire/docs/<area>.md`. Those win. This file supplies concrete writing checks; the principles are the source of truth. Self-check corrections do not trigger automatic test reruns. The section confirmation or bug reproduction cadence remains controlled by `testing-lifecycle.md`.
 
 ---
 
-## Quality Gate (run before marking task `[x]`)
+## Writing checks
 
-For each production file you wrote or edited, walk the seven checks below. Any failure → fix the code, re-run tests, then re-check. The gate is not a code review — it's a self-check that catches the cheap mistakes before the human reviewer sees them.
+Use the seven checks below while writing and during a quick self-check. Correct an issue directly. Final verification performs the independent quality audit.
 
 ### 1. Reuse before write
 
@@ -133,9 +133,9 @@ def build_chat(model_id):
 
 ---
 
-## Quick self-check (paste into the task loop)
+## Quick self-check
 
-Before marking a task `[x]`:
+Before section confirmation or bug completion:
 
 - [ ] Searched for existing utilities before writing new ones (§1)
 - [ ] No function with more than ~7 branches or ~30 lines without a reason (§2, §3)
@@ -145,7 +145,7 @@ Before marking a task `[x]`:
 - [ ] Comments are terse, self-contained, ≤2 lines of prose — no *what*, no external-artifact refs (feature/scenario/ADR/test/ticket) (§7)
 - [ ] Diff stays inside the task's scope — no "while I'm here" refactors
 
-If any box can't be ticked, fix the code (not the checklist) and re-run tests.
+If any box cannot be ticked, fix the code rather than weakening the guidance.
 
 ---
 
@@ -164,9 +164,8 @@ If any box can't be ticked, fix the code (not the checklist) and re-run tests.
 
 ---
 
-## Notes for the reviewer / self
+## Notes for the reviewer
 
-- The gate is **per file, per task**. Not a separate review pass.
-- "I'll clean it up later" is the failure mode. Clean it before the test goes green stays green.
+- "I'll clean it up later" is the failure mode. Apply this guidance while writing.
 - If a check seems wrong for *this* codebase, the project's `AGENTS.md` / area doc / neighbor patterns win. Cite the override; don't ignore silently.
-- The full review-stage Senior Engineer + Code Style personas (`./review-personas.md`) catch what slipped through. This gate exists so they have less to catch.
+- The review-stage Senior Engineer and Code Style personas (`./review-personas.md`) catch what slipped through.

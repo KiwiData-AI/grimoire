@@ -199,6 +199,7 @@ describe("updateProject", () => {
     expect(mockCopyFile.mock.calls.length).toBeGreaterThan(0);
     const skillPaths = mockCopyFile.mock.calls.map((c) => String(c[1]));
     expect(skillPaths.some((p) => p.includes("grimoire-draft"))).toBe(true);
+    expect(skillPaths.some((p) => p.includes("grimoire-spike"))).toBe(true);
   });
 
   it("installs grimoire-precommit-review skill", async () => {

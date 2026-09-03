@@ -1,6 +1,6 @@
 ---
 name: grimoire-plan
-description: Project an agreed draft.md into its homes (features, constraints, decisions, manifest), then derive implementation tasks from them. Use after the design is approved in grimoire-draft.
+description: Project an agreed draft.md into live features, constraints, decisions, schema, and a manifest, then derive implementation tasks. Use after grimoire-draft approval.
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
@@ -9,7 +9,9 @@ metadata:
 
 # grimoire-plan
 
-Plan opens by **projecting** the agreed `draft.md` into its durable homes (features, constraints, decisions, `data.yml`, manifest), then derives implementation tasks from them. The output must be detailed enough that any LLM can execute the tasks without further planning.
+Plan opens by **projecting** the agreed `draft.md` contents directly into their durable live homes, then derives implementation tasks from them. The output must be detailed enough that any LLM can execute the tasks without further planning.
+
+Use `../references/testing-lifecycle.md` for spike classification, delivery cadence, section confirmation, and final verification.
 
 ## Triggers
 - User has approved a grimoire draft and wants to plan implementation
@@ -18,11 +20,12 @@ Plan opens by **projecting** the agreed `draft.md` into its durable homes (featu
 
 ## Routing
 - No approved change exists → `grimoire-draft` first
-- Change is Level 1 (trivial) → plan is optional; suggest applying directly with minimal tasks
+- A behavior, contract, cause, reproduction, or implementation direction is unknown → add a referenced `S<n>` spike and leave affected mechanics unresolved
+- Change is Level 1 (trivial) → leave Grimoire and make the direct change without planned-change artifacts
 - User wants to review the design → `grimoire-review` (after plan, before apply)
 
 ## Prerequisites
-- A change exists in `.grimoire/changes/<change-id>/` with an agreed `draft.md` — the user has approved the design in `grimoire-draft`. Plan's first step **projects** that design into its homes (features, constraints, MADRs, `data.yml`, manifest); those do not need to exist yet.
+- A change exists in `.grimoire/changes/<change-id>/` with an agreed `draft.md`. Plan projects that design into live features, constraints, MADRs, `.grimoire/docs/data/schema.yml`, and a manifest.
 
 ## Workflow
 
@@ -41,7 +44,7 @@ Resolve each one yourself before writing the task. Tools: codebase-memory-mcp (`
 **2. Clarify or propose, never assume.** When the spec is ambiguous or silent on something you need to plan:
 
 - **Ambiguous** (spec contradicts itself, two readings are plausible) → ask the user one specific question. Do not pick a reading and proceed.
-- **Silent on a scenario you think is needed** (e.g., "what if the login attempt rate-limits?") → propose adding it. Route back to `grimoire-draft` for the spec update, or ask the user to confirm before you add a corresponding task. **Do not silently invent scenarios, edge cases, or tasks not derivable from approved features / ADRs / `data.yml` / manifest sections.**
+- **Silent on a scenario you think is needed** (e.g., "what if the login attempt rate-limits?") → propose adding it. Route back to `grimoire-draft` for the spec update, or ask the user to confirm before you add a corresponding task. **Do not silently invent scenarios, edge cases, or tasks not derivable from approved live artifacts or manifest sections.**
 - **Confident** (spec is clear or the unstated detail follows obviously from project conventions) → plan, but note the inference in a `<!-- inferred: ... -->` comment so the user can override.
 
 The plan implements what's approved. It does not expand scope to hit a checklist.
@@ -99,24 +102,20 @@ Then write Gherkin (Feature title + user story; Background for shared preconditi
 
 **Decisions → `.grimoire/decisions/NNNN-*.md`.** Project each Decisions-ledger entry (a Y-statement in `draft.md`), applying the **novelty gate**: a MADR is for a decision with a real, project-specific trade-off between viable alternatives — not for industry-default tooling picks or ecosystem-forced conventions. Ask: *would a competent engineer on this stack make a different choice, and need our reasoning to understand ours?* If no, skip it. Obvious tooling/convention picks fold into the existing `Tooling and convention baseline` ADR (one line: choice → why), not a new sequential record. Genuine trade-offs get the next sequential number, status `proposed` (`grimoire-apply` flips to `accepted` at finalize), using `.grimoire/decisions/template.md` — the Y-statement's context clause becomes the ADR's *Context and Problem Statement*.
 
-**Data changes → `.grimoire/changes/<change-id>/data.yml`.** If the change adds/modifies/removes data models, fields, indexes, or external API integrations, write `data.yml` (same YAML shape as `schema.yml`, only what's changing, `action:` on each entry):
+**Data changes → `.grimoire/docs/data/schema.yml`.** Edit the durable schema directly when the change adds, modifies, or removes data models, fields, indexes, or external API integrations. Git records the proposed diff. Use the schema format from `../references/schema-format.md`.
 
 ```yaml
-# Proposed data changes for: add-user-profiles
 users:
-  action: modify
+  type: table
   source: src/models/user.py
   fields:
-    avatar_url: { action: add, type: varchar, nullable: true }
-    legacy_name: { action: remove }
+    avatar_url: { type: varchar, nullable: true }
 profiles:
-  action: add
   type: collection
   fields:
     user_id: { type: objectId, ref: users }
     bio: { type: string, max_length: 500 }
 github_api:
-  action: add
   type: external_api
   provider: GitHub
   schema_ref: https://docs.github.com/en/rest
@@ -136,9 +135,11 @@ github_api:
         status: { type: integer }
 ```
 
-**Contract documentation is mandatory for external APIs.** Every endpoint must document `request` (what you send), `response` (fields you read, `required: true` for those your code depends on), and `error_response` (the error shape you handle). The task-generation step below turns this into contract tests. If you don't know the exact shape, reference `schema_ref` and document the subset your client uses — that subset is the contract. No data impact → skip `data.yml` entirely.
+**Contract documentation is mandatory for external APIs.** Every endpoint must document `request`, `response`, and `error_response` shapes observed from an authoritative source or system. When the exact provider response is unknown, add a referenced spike and leave the live schema unchanged. Do not invent a subset, fixture, schema, endpoint, or assertion. No data impact means no schema edit. Provider-test mechanics live in `../references/testing-contracts.md`.
 
-**Manifest (`manifest.md`).** Generate it from `draft.md` as the durable plan glue: `complexity` (just scored), Why + Non-goals, the artifact list (added/modified/removed features, decisions, constraints), and a **Prior Art** section summarizing the build-vs-buy research captured in `draft.md` (what was found/evaluated, why adopt/build/hybrid; if building, what's borrowed). **Level 3–4** also carry **Assumptions** (what must be true; mark evidence vs. unvalidated; flag unvalidated ones on the critical path) and a **Pre-Mortem** (2–5 plausible failure modes 6 months out, with mitigations or "accepted"). These come straight from the `draft.md` Decided/Open and Cut sections.
+**Manifest (`manifest.md`).** Generate this ephemeral coordination record from `draft.md`: `complexity` (just scored), Why + Non-goals, the artifact list (added/modified/removed features, decisions, constraints), and a **Prior Art** section summarizing the build-vs-buy research captured in `draft.md` (what was found/evaluated, why adopt/build/hybrid; if building, what's borrowed). **Level 3–4** also carry **Assumptions** (what must be true; mark evidence vs. unvalidated; flag unvalidated ones on the critical path) and a **Pre-Mortem** (2–5 plausible failure modes 6 months out, with mitigations or "accepted"). These come straight from the `draft.md` Decided/Open and Cut sections.
+
+Create the manifest with status `approved`. Apply changes it to `implementing` when delivery begins.
 
 **Do NOT delete `draft.md`.** Retain it read-only as the agreed reference through the rest of plan → apply. `grimoire-apply` removes it with the change folder at finalize.
 
@@ -153,7 +154,7 @@ The homes now exist; the rest of plan reads and breaks them into tasks.
 
 ### 2. Read All Artifacts
 
-Read the change's artifacts following `../references/artifact-map.md` — it defines what each file is, the grimoire-docs-first / graph-for-structure discipline, the **reading-altitude** rule (read contracts and signatures, not internal source or unit tests), and the staleness gate. Plan-specific reading on top of that:
+Read the change's artifacts following `../references/artifact-map.md` — it defines what each file is, the docs-and-graph discipline, and the **reading-altitude** rule. Plan-specific reading on top of that:
 
 - `.grimoire/docs/constraints.md` — any constraints (security/NFR/observability) this change touches. These produce `unit-invariant` tasks, not scenarios.
 - The current baseline (`features/`, `.grimoire/decisions/`) via `git diff main` — exactly what this change adds vs. what already existed.
@@ -173,7 +174,7 @@ Before generating tasks, evaluate whether the specifications are detailed enough
 - The spec contradicts itself (a scenario violates a non-goal; two scenarios disagree).
 - A scenario you need to plan against has missing detail you cannot infer from project conventions (e.g., "redirect to dashboard" — which dashboard URL?).
 - The manifest is missing a section the complexity level requires (Assumptions / Pre-Mortem / Prior Art on level 3-4).
-- A scenario references an external API or data model with no contract in `data.yml` / `schema.yml`.
+- A scenario references an external API or data model with no contract in `.grimoire/docs/data/schema.yml`.
 
 **Not a gap** (do not flag):
 - The spec doesn't include a scenario you personally would have added. The approved feature set is the scope. If you think a scenario is missing, see "Clarify or propose, never assume" in Operating Rules — propose it back to draft, do not silently add planning for it.
@@ -191,7 +192,7 @@ Persona lens (only those relevant to the change) — see `../references/elicitat
 - **PM**: User stories present? Given/When/Then specific?
 - **Engineer**: Critical-path assumptions validated or flagged? Prior art documented (if building custom)?
 - **Security**: Scenarios with auth/input/sensitive-data tags have corresponding constraints? Quality Attribute targets not blank?
-- **Data**: External APIs or new models have `data.yml`? Constraints (required/unique/nullable) specified?
+- **Data**: External APIs or new models are documented in `.grimoire/docs/data/schema.yml`? Constraints (required/unique/nullable) specified?
 - **QA**: Where the spec explicitly references an error path, is the expected behavior specified?
 
 **Response paths when a gap is found:**
@@ -208,7 +209,7 @@ Level 1-2 changes with minor gaps may proceed; level 3-4 with multiple gaps shou
 **If no real gaps**, proceed directly to task generation.
 
 ### 4. Generate Tasks
-Create `.grimoire/changes/<change-id>/tasks.md`. **Every task is one vertical checkbox containing its test and production change.** The test level matches the artifact the task derives from. Within the checkbox, the failing test comes first.
+Create `.grimoire/changes/<change-id>/tasks.md`. Every delivery activity is one vertical checkbox containing its known tests and production change. The test level matches the source artifact. Write all known section tests before production code. Do not invent downstream mechanics for unresolved work; emit an `S<n>` spike using `../references/testing-lifecycle.md`.
 
 **Build an executable section order before task approval.** Default to one substantial implementation section. Use a second section only for a distinct outcome or context boundary. Every section beyond two requires a specific outcome, dependency, or context-boundary justification. Never create sections for technical layers, error cases, tests, verification, pattern establishment, or repetition alone.
 
@@ -226,7 +227,7 @@ dependency comment:
 
 Use `none` only when the section has no prerequisites. A dependency may reference
 only an earlier section ID. Within each section, order tasks so no task requires
-a later task. Keep test-first order inside each dependency layer.
+a later task. Keep tests before production work inside each dependency layer.
 
 Validate the complete graph before presenting the plan. Collect missing
 dependency metadata, unknown section IDs, forward dependencies, and cycles.
@@ -270,13 +271,15 @@ The user reviews and approves this complete table with the task list. Do not beg
 | an internal protocol / service-to-service contract (internal RPC, queue/event shape, module API between your own components) | `unit-invariant` | contract/integration test asserting the wire shape both ends agree on |
 | an ADR consequence, refactor, or internal change with no spec | `characterization` | unit / characterization test |
 
+`@manual` workflow scenarios use characterization tests for deterministic skill contracts. Do not create undefined Cucumber steps for them.
+
 **Do not plan a `.feature` scenario task for a constraint, an internal protocol, or an internal change.** Constraints and internal protocols get `unit-invariant` tests (a contract test for a protocol asserts the payload/event shape both ends agree on); other internal changes get `characterization` tests. Forcing Gherkin onto a non-behavioral concern is the antipattern that fills feature files with slop (one right way: external actor-observable behavior → scenario, everything else — invariants, internal protocols, refactors → unit/contract test). If a `.feature` in the change actually describes an internal protocol (slop that slipped past draft), flag it and route the task to `unit-invariant`, don't write step definitions for it.
 
 **THE PLAN'S SCOPE IS WHAT WAS APPROVED.** Tasks may only derive from:
 - `.feature` scenarios in this change → `verify: scenario`
 - Constraints added/touched in `.grimoire/docs/constraints.md` → `verify: unit-invariant`
 - ADRs in this change (and their Confirmation sections) → `verify: unit-invariant` or `characterization`
-- `data.yml` entries in this change
+- Live schema edits in `.grimoire/docs/data/schema.yml`
 - The manifest's Assumptions, Pre-Mortem mitigations, and Prior Art borrowings
 - ADR confirmation checks performed by the task implementing that decision
 
@@ -334,7 +337,10 @@ Good task (specific enough to execute):
       <!-- review: structure-before -->
       - Test: assert POST `/verify-totp/` returns status 302 and redirects to `/dashboard/`.
       - Implement: add `VerifyTOTPView` validation and authenticated-session behavior.
-      - Red/green: `python manage.py test auth.tests.TestTotpLogin.test_valid --keepdb`.
+
+### Section confirmation
+
+`python manage.py test auth.tests.TestTotpLogin.test_valid --keepdb`
 ```
 
 **From feature scenarios:**
@@ -356,37 +362,32 @@ Good task (specific enough to execute):
 - These go in the project's common step location (check existing test setup)
 - Group by domain concept, NOT by feature file
 
-**From data.yml (if present):**
+**From live schema edits (if present):**
 - Each new model → migration task + ORM/schema task
 - Each modified field → migration task (specify: is it safe to run live? nullable? default?)
 - Each removed field → migration task with data cleanup if needed
 - Each new external API → client wrapper task referencing `schema_ref` for the full contract
-- Each new or modified external API → **contract validation test task** that asserts the client's request/response shapes match the contract documented in `data.yml` / `schema.yml`. The test should:
-  - Validate that every `required: true` response field is read and typed correctly in the client
-  - Validate that request payloads match the documented shape (required fields present, types correct)
-  - Validate error response handling matches the documented `error_response` shape
-  - Use a recorded/fixture response (not a live call) so the test runs locally without network access
-- Each modified external API client (existing API, changed usage) → **contract regression test** that catches if the client drifts from the documented contract. If the client starts reading a new field or stops sending a required field, the test must fail.
+- Each new or modified external API with an observed contract gets the appropriate provider contract task from `../references/testing-contracts.md`.
+- Unknown provider responses remain a spike. Do not plan provider fixtures or assertions before authoritative evidence exists.
 - Data tasks come BEFORE feature implementation tasks — the models must exist before code that uses them
 - Order: schema/model changes → migrations → contract tests → seed data (if any) → then feature code
 
-**Mocking strategy for external services:**
-Follow the rules in `../references/testing-contracts.md`. Key points: mock at HTTP boundary (not client), fixtures must match `schema.yml`, include error fixtures. Each contract test task must specify: (1) which HTTP mocking library, (2) which fixture file, (3) what the fixture contains (from `schema.yml`).
+**Integration boundaries:** Follow `../references/testing-contracts.md`. Do not restate its provider mechanics in tasks.
 
 **Test data:** Do not add tasks that ask the user for sample data or example scenarios. Per `../references/testing-contracts.md` (Test Data Generation), every test task that needs data must name the generation source — the project's existing data factory / property-based tool (`factory_boy`, `@faker-js/faker`, `model_bakery`, `Hypothesis`, `fast-check`, etc., detected from `config.tools` / existing test imports), and which fields the scenario pins vs. lets the factory fill. AI-authored literal data is a last resort: only plan it when the user explicitly asked for generated data, or no factory exists and a specific crafted value is needed — and say which in the task. If the project has no data-factory tooling and the change clearly needs one, surface adopting it as a build-vs-buy line, don't smuggle the dependency into an implementation task.
 
 **From manifest Assumptions:**
-- Each unvalidated assumption on the critical path → a verification task (spike, proof-of-concept, or integration test that confirms the assumption holds)
+- Each unvalidated assumption on the critical path → a referenced spike with one question, required evidence, a probe boundary, and affected unchecked tasks
 - If an assumption turns out to be wrong during planning, flag it to the user — it may invalidate the change
 
 **From manifest Pre-Mortem:**
 - Each failure mode with a mitigation → the mitigation becomes a task or an edge case to cover in an existing task
-- Each failure mode marked "accepted" → add a comment in the relevant code or test noting the accepted risk, so future developers understand the trade-off
+- Each failure mode marked "accepted" remains documented in the manifest or owning decision. Do not duplicate it in code comments.
 - Pre-mortem risks may reveal missing verification. Use Gherkin only when the risk describes clear actor-visible behavior; otherwise use the matching internal test or check.
 
 **From decision Cost of Ownership:**
 - Prefer implementation approaches that minimize the maintenance burden identified in the ADR
-- If the ADR identifies sunset criteria, add a task to document them where they'll be seen (e.g., a comment in config, a monitoring alert, or a calendar reminder)
+- If the ADR identifies executable sunset criteria, include the matching existing gate or planned operational action. Do not duplicate ADR rationale in code comments.
 - If maintenance burden is high, prefer simpler alternatives even if they're less elegant
 
 **From manifest Prior Art (when building custom):**
@@ -400,7 +401,7 @@ Follow the rules in `../references/testing-contracts.md`. Key points: mock at HT
 - If `grimoire health`/mcp shows existing clones in the area you're touching, tasks should consolidate rather than add more
 - Add a "Reuse" section at the top of tasks.md listing specific functions/classes to import instead of rewriting
 
-**Tactical red-green command:** Each checkbox contains the test change, production change, and one exact tactical command used for red and green. The tactical command selects only new or changed tests and uses only a runner accelerator verified from project configuration or existing commands. Examples include Django `--keepdb` and pytest-django `--reuse-db` only when the repository proves support. Final verification is absent from task sections; apply invokes `grimoire-verify` once after implementation.
+**Section confirmation:** Each substantial section names one optional post-section confirmation. It must be the cheapest meaningful command that shows the section loads or its primary path works. Defer it when it requires database or container startup. Do not plan a red run, broad suite, lint bundle, coverage run, or comprehensive feature command for section completion. Final verification is absent from task sections; apply invokes `grimoire-verify` once after implementation.
 
 ### 5. Task Format
 The tasks file starts with a context block so any LLM can orient without re-reading every artifact. Each task section includes a `<!-- context: ... -->` block listing the exact files an agent should load before working on that section. This is critical for reducing context rot — each task or task group can run in a fresh session that loads only what it needs.
@@ -432,13 +433,15 @@ The tasks file starts with a context block so any LLM can orient without re-read
       <!-- review: structure-before -->
       - Test: <specific new or changed test and exact assertion>.
       - Implement: <specific production symbols and behavior>.
-      - Red/green: `<exact command selecting only this new or changed test, with a verified accelerator when available>`.
 
 - [ ] 1.2 (verify: characterization) Complete `<internal outcome>` in `<exact test and production paths>`.
       <!-- review: slice-after -->
       - Test: <specific characterization test and exact assertion>.
       - Implement: <specific production symbols and behavior>.
-      - Red/green: `<exact command selecting only this new or changed test>`.
+
+### Section confirmation
+
+`<one cheap command, or "deferred: requires database/container startup">`
 ```
 
 **Context blocks are mandatory.** Every task section must have a `<!-- context: ... -->` listing the files needed. This serves two purposes:
@@ -452,8 +455,8 @@ Before presenting to the user, verify the plan:
 - [ ] Every test task describes what to assert (no "write a test")
 - [ ] Every implementation task describes what to create/modify (no "add the code")
 - [ ] Each task combines its test and production change in one vertical checkbox.
-- [ ] Each task has one exact tactical command used for red and green.
-- [ ] Each tactical command selects only new or changed tests and uses only verified runner accelerators.
+- [ ] Each section has at most one cheap confirmation command after implementation, or a policy-based deferral.
+- [ ] No planned-change task requires an observed red run.
 - [ ] No task or section runs final verification or a full configured suite.
 - [ ] The technical spine orders only independent sections: dependencies → data/schema → API/contract → logic → UI → verification.
 - [ ] Actual section dependencies were derived from referenced code and artifacts; sections are topologically sorted, with the technical spine used only to break ties.

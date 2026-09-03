@@ -11,7 +11,7 @@ supersedes: 0030-mcp-required-conventions-replace-area-docs
 
 ADR 0030 made codebase-memory-mcp a **hard requirement** and decided to **replace area docs with per-area `conventions/` files**. Implementation of the artifact-model redesign (ADR 0031) reversed both halves of that decision:
 
-- A hard MCP requirement would mean projects without the server installed cannot use grimoire at all. In practice the value of grimoire (drafting, planning, review, red-green apply) does not depend on the graph being present — only the *structure-lookup* steps do, and those degrade gracefully to reading source files.
+- A hard MCP requirement would mean projects without the server installed cannot use grimoire at all. In practice the value of grimoire (drafting, planning, review, and section delivery) does not depend on the graph being present — only the *structure-lookup* steps do, and those degrade gracefully to reading source files.
 - The separate `conventions/<area>.md` split never shipped. What ships is **intent-focused area docs** (Purpose, Boundaries, Conventions) — a single per-area doc that captures what the graph can't know, with structure (symbols, key files, reusable code) queried live from the graph rather than frozen into tables.
 
 ADR 0030 therefore describes a model the codebase does not implement. It needs to be superseded so the decision register matches reality.
@@ -51,7 +51,7 @@ ADR 0030 is superseded. Its driver (one consistent code-discovery path, no silen
 
 | Attribute      | Target | Measurement |
 |----------------|--------|-------------|
-| Data freshness | Always current when graph present | Graph queried live; area docs carry a `Last updated` and a staleness check vs git |
+| Data freshness | Live structure is always current when the graph is present | Graph queried live; area docs change only when intent, boundaries, placement, or conventions change |
 | Availability   | Usable without MCP | Skills degrade to source reading when the graph is unavailable |
 
 ### Cost of Ownership

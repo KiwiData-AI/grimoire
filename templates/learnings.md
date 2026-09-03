@@ -6,7 +6,7 @@
   of the scaffolding — nothing here persists to the repo. Re-read it at the start
   of every task section and before every retry.
 
-  Three sections, three lifecycles. Keep them separate; never write them into
+  Four sections, separate lifecycles. Keep them separate; never write them into
   `AGENTS.md`.
 -->
 
@@ -15,8 +15,8 @@
 <!--
   Transient. One line per dead end: what was tried and why it failed, so the next
   attempt does not repeat it. This is the antidote to thrashing — a stuck retry
-  MUST read this section first. Pruned per task: delete a task's entries the
-  moment that task goes green. Never promoted anywhere.
+  MUST read this section first. Pruned per section: delete the section's entries
+  when its section confirmation passes. Never promoted anywhere.
 -->
 
 Format: `- <task-id> · tried <approach> · failed: <observed error / why>`
@@ -27,12 +27,27 @@ Format: `- <task-id> · tried <approach> · failed: <observed error / why>`
 
 <!--
   Short-lived. Record one terse user correction only when it changes remaining
-  work. Update only affected unchecked tasks and rerun their tactical tests.
+  work. Update only affected unchecked tasks and preserve the section confirmation boundary.
   Ordinary corrections need no checkpoint, report, approval, persona rerun, or
   plan-wide reconciliation.
 -->
 
 Format: `- <task-id> · learned <correction> · affects <unchecked task IDs>`
+
+## Spike lessons
+
+<!--
+  Evidence from question-driven engineering spikes. Allocate S<n> as the next
+  unused positive integer in this change. A lesson may refine only affected
+  unchecked implementation mechanics.
+-->
+
+### S<n> — <question>
+- Trigger: <why delivery could not proceed>
+- Probes: <what was tried>
+- Evidence: <observed facts>
+- Answer: <answered | disproved | blocked | inconclusive, with conclusion>
+- Impact: <affected unchecked tasks or durable destination>
 
 ## Discovered facts
 

@@ -28,8 +28,8 @@ Audit an existing codebase to discover undocumented features and architecture de
 Ask the user what to audit:
 - **Features** — find behavioral functionality that has no `.feature` file
 - **Decisions** — find implicit architecture decisions that have no ADR
-- **Conventions** — find conventions files in `.grimoire/docs/conventions/` whose placement/naming rules no longer match the codebase
-- **Both** / **All** — full audit (default: features + decisions + conventions)
+- **Area intent** — find `.grimoire/docs/<area>.md` files whose purpose, boundaries, placement, or conventions no longer match the project
+- **Both** / **All** — full audit (default: features + decisions + area intent)
 
 Check what's already documented:
 - Read all files in `features/` for existing behavioral specs
@@ -64,18 +64,18 @@ For each pattern found, check if a corresponding ADR exists. If not, apply the *
 - **Only propose an ADR for a novel decision** — one with a real, project-specific trade-off between viable alternatives. An industry-default pick on this stack (the standard test runner, CLI parser, git wrapper, linter; the ecosystem-forced module convention) is **not** novel. Test: *would a competent engineer on this stack pick differently, and need the reasoning to understand the choice?* If no, do not backfill an ADR for it.
 - **Do NOT mint one ADR per default tooling pick.** That is the most common audit-backfill failure — it floods the register with "we used the standard tool" records. Collect the obvious tooling/convention defaults into a single `Tooling and convention baseline` ADR (one row each: choice → why), and reserve sequential ADRs for genuine trade-offs (e.g. "Huey instead of Celery", "regex over tree-sitter").
 
-### 3.5. Conventions Drift Detection
-Read each file in `.grimoire/docs/conventions/`. For each file:
+### 3.5. Area Intent Drift Detection
+Read each intent-focused area file registered in `.grimoire/docs/index.yml`. For each file:
 1. Use MCP `get_architecture` or `search_graph` to query the current code structure for the relevant area
-2. Compare the conventions file's placement rules, naming rules, and patterns against what MCP reports the codebase actually does
-3. Flag any conventions rule that no longer matches:
+2. Compare its purpose, boundaries, placement rules, naming rules, and patterns against current evidence
+3. Flag semantic guidance that no longer matches:
    - "api.md says new views go in `src/api/views/` but MCP shows views now in `src/api/handlers/`"
    - "models.md says models are prefixed with `I` but no `I`-prefixed models found in MCP graph"
 
-Present drifted conventions to the user with the same batched interview approach:
+Present drifted area intent to the user with the same batched interview approach:
 > "api.md states that new views go in `src/api/views/`, but the codebase now places them in `src/api/handlers/`. Options:
-> - **refresh** — update the conventions file to match current code (I'll open it for editing with MCP-sourced state)
-> - **accept-as-is** — the conventions file is intentionally ahead of the code
+> - **refresh** — update the area doc to match current intent (I'll open it for editing with MCP-sourced state)
+> - **accept-as-is** — the area doc is intentionally ahead of the code
 > - **skip** — leave for now"
 
 Skip this step when the user's scope answer was "features only" or "decisions only".
@@ -83,7 +83,7 @@ Skip this step when the user's scope answer was "features only" or "decisions on
 ### 4. Interview the User
 Do NOT dump a massive list. Present findings in batches of 3-5, grouped by area, and ask the user about each:
 
-Clearly label each batch item as one of: "undocumented feature", "undocumented decision", or "drifted convention"
+Clearly label each batch item as one of: "undocumented feature", "undocumented decision", or "drifted area intent"
 
 For features:
 > "I found a document review workflow with routes for `/dais/review/document/<id>/`. There's tab switching, error modals, and tag editing. I don't see a feature file covering this. Should I draft one?"
@@ -97,14 +97,8 @@ Let the user:
 - **Clarify** — provide context the code doesn't show
 - **Group** — "those three things are actually one feature"
 
-### 5. Draft Artifacts
-For confirmed items, create a grimoire change:
-- Change ID: `audit-<area>` (e.g., `audit-auth`, `audit-data-model`)
-- Draft `.feature` files for confirmed behavioral specs
-- Draft MADR records for confirmed decisions
-- Write manifest summarizing what was discovered and documented
-
-Group related items into single changes — don't create one change per discovery.
+### 5. Route Confirmed Findings
+Group related findings into coherent change proposals. Route accepted proposals through `grimoire-draft`, then `grimoire-plan`. Audit produces findings and evidence; it does not create durable specifications, decisions, manifests, or tasks.
 
 ### 6. Dead Feature Detection
 
@@ -139,7 +133,7 @@ After the interview, summarize:
 - How many features are dead or stale
 - How many decisions are documented vs. undocumented
 - How many decisions are stale
-- How many conventions files drifted vs. up-to-date
+- How many area intent files drifted vs. up-to-date
 
 Then emit a **Top Actions** list — most-risk first, each with the exact path and the single next move. The ranking comes from the deterministic checks (§6), not impression, so the same commit yields the same list:
 
@@ -147,7 +141,7 @@ Then emit a **Top Actions** list — most-risk first, each with the exact path a
 ## Top Actions
 1. `features/billing/invoice.feature` — dead (InvoiceView deleted ~3mo ago); create a removal change.
 2. `.grimoire/decisions/0007-search-backend.md` — stale (library no longer in deps); deprecate or update.
-3. `.grimoire/docs/conventions/api.md` — drifted (views moved to `src/api/handlers/`); refresh.
+3. `.grimoire/docs/api.md` — drifted boundary guidance; refresh the area intent.
 ```
 
 ## Important
@@ -160,4 +154,4 @@ Then emit a **Top Actions** list — most-risk first, each with the exact path a
 - For decisions, focus on choices that were non-obvious or have alternatives. "We use Python" doesn't need an ADR. "We use Huey instead of Celery" probably does.
 
 ## Done
-When the audit interview is complete and confirmed items are drafted as grimoire changes, the workflow is complete. Suggest next steps: `grimoire-plan` for approved changes, or another audit pass for uncovered areas.
+When the audit interview is complete and findings are classified, the workflow is complete. Suggest `grimoire-draft` for accepted changes, followed by `grimoire-plan`.

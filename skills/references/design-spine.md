@@ -149,10 +149,10 @@ plan's shape mirrors the design:
 dependencies → data/schema → API/contract → business logic → UI by component → verification
 ```
 
-Within each layer, **test first** — the failing test for that layer-pair before its code.
-This is the per-layer red-green unit, not a single global acceptance test up front. The order
-is fixed on purpose: over time the user learns that schema changes always land before API
-changes, contract tests before clients, UI last.
+Within each substantial delivery section, write the known tests before production code.
+Testing cadence, spike routing, and section confirmation are defined only in
+`testing-lifecycle.md`. The layer order remains fixed: schema changes land before API changes,
+contract tests before clients, and UI last.
 
 ---
 
@@ -160,7 +160,7 @@ changes, contract tests before clients, UI last.
 
 - **design** — UX-workflow spine (traversal direction) at the user-flow step.
 - **draft** — pick + walk the spine in the design loop; Y-statement ledger; ceremony gate.
-- **plan** — task order = technical-spine order; test-first per layer.
+- **plan** — task order = technical-spine order; lifecycle comes from `testing-lifecycle.md`.
 - **review / verify** — check that decisions name their context and each layer validates the prior.
 
 Each skill links its own section; none restate the spine. This is the one home (DRY).

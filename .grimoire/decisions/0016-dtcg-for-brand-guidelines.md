@@ -25,7 +25,7 @@ Grimoire onboarding needs to capture brand guidelines (colors, typography, spaci
 ## Considered Options
 
 1. **W3C Design Tokens (DTCG) JSON** — emerging W3C standard; `$value`/`$type`/`$description` schema; Style Dictionary + Tokens Studio + design-extract all support it.
-2. **Custom grimoire YAML** — consistent with `data.yml`, `context.yml`, `config.yaml`. Familiar to existing grimoire users.
+2. **Custom grimoire YAML** — consistent with Grimoire's YAML configuration and schema artifacts. Familiar to existing grimoire users.
 3. **Tailwind config (`tailwind.config.js`)** — common in JS ecosystem but JS-only and Tailwind-specific.
 4. **CSS custom properties file** — closest to runtime but lacks semantic metadata (type, description, group).
 
@@ -49,7 +49,7 @@ Voice/tone (which DTCG doesn't cover) lives alongside as `.grimoire/brand/voice.
 
 This decision deliberately inverts ADR-0007's YAML default. The split rule:
 
-- **YAML** — grimoire-internal artifacts (`config.yaml`, `schema.yml`, `context.yml`, `data.yml`, `index.yml`). Consumed only by grimoire and the AI agent reading these files. Human-readable, comments-friendly, terse.
+- **YAML** — grimoire-internal artifacts (`config.yaml`, `.grimoire/docs/data/schema.yml`, `context.yml`, `index.yml`). Consumed only by grimoire and the AI agent reading these files. Human-readable, comments-friendly, terse.
 - **JSON (DTCG)** — brand tokens. Consumed by external ecosystems (Figma Tokens Studio plugin, Style Dictionary compilers, design-extract scrapers, CSS-in-JS runtimes). Standard required for round-tripping with design tools.
 
 Decision rule: artifact stays in YAML unless it has a real interop requirement with an existing JSON-native ecosystem. Brand tokens cross that line; no other current artifact does.

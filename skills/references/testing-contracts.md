@@ -2,19 +2,21 @@
 
 Loaded by skills that involve writing tests, mocking external services, or verifying contract compliance.
 
-## Mocking Strategy
+## Integration Boundary
 
-**Mock at the HTTP boundary, not at the client level.**
+Choose the test boundary by ownership.
 
-- **DO mock**: the HTTP transport layer using the project's HTTP mocking library (check `config.tools` or existing test imports for: `responses`, `httpx_mock`, `nock`, `msw`, `wiremock`). Fixture responses must match the contract in `schema.yml`.
-- **DON'T mock**: your own client wrapper. If you mock `stripe_client.create_charge()`, you're testing that your code calls a function — not that it handles the real response shape. The client wrapper is the code under test.
-- **DON'T mock**: internal services within the same repo. Use the real code. Mocking between internal modules hides integration bugs that only surface in production.
+- **Provider contract test:** exercise the real client wrapper through the HTTP transport boundary. Fixtures must be captured from an authoritative observed provider response and match `schema.yml`.
+- **Repository orchestration test:** stub the repository-owned adapter-result type when the test targets orchestration around that adapter. This isolates owned coordination without claiming that the stub represents provider behavior.
+- **Internal integration test:** use real internal repository modules when the contract between them is under test.
+
+Never treat a repository orchestration stub as provider contract evidence. Never invent a provider response from documentation fragments, client code, or an assumed subset.
 
 ## Fixture Management
 
 - Fixtures live alongside tests (e.g., `tests/fixtures/stripe_create_charge.json`)
 - One fixture per endpoint, named after the endpoint, not the test
-- Each fixture is a concrete instance of the `schema.yml` contract
+- Each provider fixture is a concrete instance of the `schema.yml` contract captured from an authoritative observed provider response
 - When the contract changes, the fixture must change — stale fixtures are false-positive tests
 - Include at least one error response fixture per external API (matching `error_response` in `schema.yml`)
 
@@ -31,7 +33,7 @@ Loaded by skills that involve writing tests, mocking external services, or verif
 
    Build records through the factory, override only the fields the scenario actually pins, and let the tool fill the rest. For invariants ("never accepts a negative amount", "round-trips any valid payload"), prefer **property-based generation** (Hypothesis / fast-check / jqwik) over a handful of literals — it covers the input space the spec describes instead of one example.
 
-2. **Recorded / fixture responses** for external-API contracts — concrete instances of the `schema.yml` contract (see Fixture Management above). These are captured shapes, not invented ones.
+2. **Recorded / fixture responses** for external-API contracts — authoritative observed concrete instances of the `schema.yml` contract. These are captured shapes, not invented ones.
 
 3. **AI-authored literal test data — last resort, only on explicit instruction.** Hand-writing literal records (the agent inventing `{name: "Acme Corp", amount: 4200, ...}`) is permitted **only when the user explicitly asks for generated test data**, or no factory tooling exists in the project *and* the case needs one specific crafted value (a known edge constant, a regression repro). When you fall back to this, say so — note in the task/test why a factory wasn't used. Never silently invent a dataset.
 
@@ -39,17 +41,18 @@ No data-factory tool configured and the project has tests? Match whatever those 
 
 ## Contract Test Requirements
 
-Every external API integration needs contract tests that assert:
+Write provider contract tests only after authoritative responses have been observed. Each test must assert:
 1. Every `required: true` response field is read and typed correctly in the client
 2. Request payloads match the documented shape (required fields present, types correct)
 3. Error response handling matches the documented `error_response` shape
-4. Use recorded/fixture responses (not live calls) so tests run locally without network
+4. Use authoritative recorded/fixture responses so routine tests run locally without network
 
 For contract regression tests: if the client starts reading a new field or stops sending a required field, the test must fail.
 
 ## Mocking Anti-Patterns
 
 - Mocking your own client wrapper and asserting it was called — tests wiring, not behavior
+- Presenting a repository-owned adapter-result stub as evidence of provider behavior
 - `unittest.mock.patch` on the function under test — replacing the thing you're testing
 - Fixture responses that don't match any documented contract — fictional, prove nothing
 - Mocking so aggressively that removing production code still passes the test
@@ -70,7 +73,7 @@ Before importing a module, calling a function, or adding a dependency — confir
 - Never guess at a package name
 
 **APIs and endpoints:**
-- Check `schema.yml` for external API contracts (real endpoints, methods, field names)
+- Check `schema.yml` and authoritative observed responses for external API contracts
 - For internal APIs, read the area doc or route file — don't assume paths
 
 ## Step Definition Conventions

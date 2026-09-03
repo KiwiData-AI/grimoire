@@ -65,13 +65,13 @@ git log <base>..<head> --format="%B" | grep -E "^Change:"
 If present:
 - Change ID = trailer value
 - Load artifacts: check `.grimoire/changes/<change-id>/` for an active change. If the change is already finalized/merged the change folder is gone — read the artifacts from the PR's head branch (`git diff main` shows the live `features/`, `.grimoire/decisions/`, `.grimoire/docs/constraints.md`) and use the `Change:` trailer to correlate commits.
-- Read `manifest.md`, all `.feature` files in the change, decision records, `tasks.md`, `data.yml`
+- Read the active manifest and tasks when present, plus changed live features, decisions, constraints, and schema.
 - Also grep for `Scenarios:` and `Decisions:` trailers to scope review to the named items
 
 If no `Change:` trailer exists, that's itself a finding for a grimoire-managed repo: flag as **suggestion** ("commits missing audit trailer — `grimoire trace` won't find this PR") unless the project clearly doesn't use grimoire.
 
 ### 4. Gather Project Context
-See `../references/artifact-map.md` for what each artifact is and the grimoire-docs-first / staleness discipline.
+See `../references/artifact-map.md` for artifact ownership and the docs-and-graph reading discipline.
 - `.grimoire/config.yaml` — language, tools, `commit_style`, `comment_style`, `project.compliance`, `dep_audit`
 - `.grimoire/docs/context.yml` — deployment environment, related services
 - `.grimoire/docs/data/schema.yml` — current data baseline

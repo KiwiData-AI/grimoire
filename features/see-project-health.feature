@@ -14,3 +14,9 @@ Feature: See how well a project uses grimoire
     When I check the project's health
     Then the report flags the stale change
     And the report flags the constraint that lacks a proving test
+
+  Scenario: Health preserves durable history and intent documentation
+    Given a grimoire project with terminal decisions and intent-focused area documentation
+    When I check the project's health
+    Then terminal decisions remain part of the durable history
+    And area documentation is not judged by source-file recency
