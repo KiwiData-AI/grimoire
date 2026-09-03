@@ -629,6 +629,9 @@ describe("initProject", () => {
       expect(allLog).toMatch(/discover/i);
       expect(allLog).not.toMatch(/grimoire map/);
       expect(allLog).toMatch(/codebase-memory-mcp/);
+      expect(allLog).toMatch(/intent-focused area docs/i);
+      expect(allLog).toMatch(/ephemeral coordination/i);
+      expect(allLog).not.toMatch(/\.grimoire\/archive/);
     });
 
     it("prints draft (not discover) as next step for greenfield projects", async () => {
@@ -653,6 +656,7 @@ describe("initProject", () => {
       expect(nextStepsText).not.toMatch(/discover/i);
       expect(nextStepsText).not.toMatch(/grimoire map/);
       expect(nextStepsText).not.toMatch(/codebase-memory-mcp/);
+      expect(nextStepsText).toMatch(/design your first change/i);
     });
   });
 });

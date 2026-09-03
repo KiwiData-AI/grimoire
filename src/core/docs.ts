@@ -199,7 +199,8 @@ async function renderFeatureEntry(file: string, featuresDir: string): Promise<st
     storyLines.push(`${m[1]} ${m[2]}`);
   }
   const lines: string[] = [];
-  lines.push(`**${title}** (\`features/${rel}\`)`);
+  const mode = /^\s*@manual\b/m.test(content) ? "agent-run specification" : "automated specification";
+  lines.push(`**${title}** (\`features/${rel}\`) — ${mode}`);
   if (storyLines.length > 0) lines.push(`> ${storyLines.join(" · ")}`);
   lines.push("");
   const scenarios = content.match(/^\s*Scenario(?: Outline)?:\s*(.+)$/gm);
@@ -253,7 +254,7 @@ async function buildFeaturesSection(
   if (featureFiles.length === 0) return null;
 
   const lines: string[] = ["## Capabilities\n"];
-  lines.push("What the app does, for whom. Grouped by functional story; each scenario is an executable acceptance test.\n");
+  lines.push("What the app does, for whom. Grouped by functional story and labeled by execution mode.\n");
 
   // Group by functional story (from index.yml `stories:` map) when defined,
   // else fall back to the top-level feature directory as the group.

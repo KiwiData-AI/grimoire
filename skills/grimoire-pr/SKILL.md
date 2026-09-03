@@ -21,7 +21,7 @@ and creates the PR.
 
 ## Routing
 - Open tasks without an explicit deferral note → `grimoire-apply` first. The health check blocks the PR until every task is checked or explicitly deferred.
-- Want a pre-merge design review → this skill includes optional post-implementation review
+- Implementation has not completed Verify → `grimoire-verify` first
 
 ## Prerequisites
 - The work is on a feature branch.
@@ -87,15 +87,6 @@ the PR summary with the `⚠️` line. No such migration means omit the section.
 
 **Health warnings** — list the warnings collected in step 3 (e.g. `@not-implemented` scenarios with their tags).
 
-#### Post-Implementation Review (Optional)
-If the user wants a pre-merge review, **do NOT hand-roll a checklist** — apply the shared persona engine so self-review runs the *same rubrics as design review*: INVEST (PM), the YAGNI ladder + Rule of Three + Chesterton's Fence (Senior Engineer), STRIDE + LINDDUN + OWASP API Top 10 (Security), BVA/FIRST against the spec (QA), Expand–Contract + the deployment-impact flag (Data), then the Contrarian calibration pass.
-
-1. Get the diff: `git diff <base>...HEAD`.
-2. Apply `../references/review-personas.md` to that diff — same engine `grimoire-precommit-review` uses (it IS this review, pre-push). Run the **Diff review** path: build the Project Briefing (§1), pick personas via the diff-review complexity table (§3), apply the materiality / steel-man / severity gates (§2/§2a/§2b), then the Contrarian pass (§4.8). If the branch is already pushed, defer to `grimoire-pr-review` instead — identical engine, fuller PR metadata.
-3. Present the engine's findings alongside the PR description. Blockers → fix before creating the PR (or open a draft). Carry any Data-persona downtime/breaking flag into the Deployment-impact section above.
-
-One review engine, one set of rubrics — design and code alike. This skill no longer keeps a separate, lighter review prompt (DRY).
-
 ### 5. Create PR
 Check that the branch is pushed to the remote before creating. If not, offer to push first.
 
@@ -123,7 +114,6 @@ Return the PR URL.
 - The `Change: <change-id>` line at the bottom lets `grimoire trace` find the PR; the CLI includes it.
 - Don't pad the description with boilerplate. Keep it factual: what changed, why, how to verify.
 - A downtime-incurring or backward-incompatible schema migration MUST carry a `⚠️` flag in the PR body (Deployment impact section) — never let it merge silently. Zero-downtime is not forced; *visibility* of the cost is.
-- The post-implementation review is optional and quick — it's not a replacement for the design review, just a sanity check on the actual code.
 
 ## Done
 When the PR is created (or the description presented for manual creation), the workflow is complete: decisions accepted, deferred tasks logged, change folder removed, description traced to the artifacts. Suggest merging the PR to complete the change — git history + the `Change:` trailer are the record; there is no separate archive step.

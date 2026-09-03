@@ -6,7 +6,6 @@ import chalk from "chalk";
 import { fileExists } from "../utils/fs.js";
 import type {
   GrimoireConfig,
-  ToolConfig,
   BugTrackerConfig,
   TestingToolConfig,
 } from "../utils/config.js";

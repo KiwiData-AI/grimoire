@@ -7,8 +7,10 @@ Feature: Review the work currently in progress
     Given a grimoire project with an active change "add-login"
     When I list the active work
     Then I see the change "add-login" among the work in progress
+    And the result reports coordination artifacts without claiming copied specifications
 
   Scenario: A single change reports its progress
     Given a grimoire project with an active change "add-login" that is partly done
     When I check the status of "add-login"
     Then I am shown how much of the change is complete
+    And the result reports draft, planned, applying, or ready progress

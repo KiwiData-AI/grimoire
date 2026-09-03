@@ -8,6 +8,13 @@ Feature: Validate the project's specifications
     When I validate the specifications
     Then I am told the specifications are well-formed
 
+  Scenario: Validation reads specifications from their live homes
+    Given a grimoire project with live features and decisions
+    And an active change contains only coordination artifacts
+    When I validate the specifications
+    Then the live features and decisions are validated
+    And each active change manifest is validated
+
   Scenario: A malformed specification is reported
     Given a grimoire project with a malformed feature
     When I validate the specifications

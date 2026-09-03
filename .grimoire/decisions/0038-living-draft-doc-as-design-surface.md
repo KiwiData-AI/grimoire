@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-06-17
 decision-makers: [Fred]
 ---
@@ -73,7 +73,7 @@ Concrete changes shipped together:
   the doc.
 - **Projection happens at the start of `grimoire-plan`, after the design is agreed** (amended;
   originally `grimoire-draft`). The fine fact-to-home routing (admission test + jurisdiction)
-  and the principles gate run there, generating features/constraints/MADRs/`data.yml`/manifest
+  and the principles gate run there, editing features, constraints, MADRs, and schema directly in their live homes and creating the manifest
   live in their real locations. The coarse routing (is this a grimoire change at all?) stays up
   front in draft.
 - **Complexity is an output.** Up front there is only a binary triviality gate (typo/config
@@ -81,8 +81,8 @@ Concrete changes shipped together:
 - **Refactors mandate a current-state map.** For `kind: refactor`, the design starts by
   mapping how the touched system works today with `file:line` breadcrumbs, using the
   codebase graph (`index_repository` first if needed), plus a severity-ranked gaps list.
-- **Ephemeral, git-backed.** `draft.md` is retained read-only through plan → … → apply as
-  the agreed reference, then deleted when `grimoire-apply` clears the change folder. Git
+- **Ephemeral, git-backed.** `draft.md` is retained read-only through plan → … → PR as
+  the agreed reference, then deleted during Apply finalization. Git
   history preserves it — "deleted" ≠ lost.
 - **Decisions still project to separate MADRs.** The inline ledger is a thinking convenience;
   at projection each novel decision becomes a sequential MADR (novelty gate unchanged),
@@ -109,13 +109,12 @@ Concrete changes shipped together:
 
 | Attribute   | Target | Measurement |
 |-------------|--------|-------------|
-| Consistency | One home per fact at rest | Homes are the only authority after projection; `draft.md` is reference-only and deleted at apply |
+| Consistency | One home per fact at rest | Homes are the only authority after projection; `draft.md` is reference-only and deleted during finalization |
 | Reviewability | Whole change graspable in one doc | A single `draft.md` carries diagram + ledger + sketches + open items |
 
 ### Cost of Ownership
 
-- **Maintenance burden**: Adds `templates/draft.md` and a projection step in `grimoire-draft`;
-  one extra deletion in `grimoire-apply`. Removes the immediate-fragmentation drafting path.
+- **Maintenance burden**: Adds `templates/draft.md`, Plan projection, and one finalization deletion. Removes the immediate-fragmentation drafting path.
 - **Ongoing benefits**: Easier design review/iteration; refactors grounded in current-state
   maps; honest complexity scoring; coupled decisions legible during design.
 - **Sunset criteria**: Revisit if the ephemeral-then-project flow proves to cost more than the
@@ -127,4 +126,4 @@ After implementation: (1) a non-trivial change produces a `.grimoire/changes/<id
 and nothing is written to `features/`/`constraints.md`/`decisions/` until projection;
 (2) a `kind: refactor` design contains a Current state section with `file:line` breadcrumbs;
 (3) `complexity` is absent from `draft.md` and present in the manifest after projection;
-(4) `grimoire-apply` removes `draft.md` with the change folder and git history still contains it.
+(4) Apply finalization removes `draft.md` with the change folder and git history still contains it.

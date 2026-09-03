@@ -7,3 +7,9 @@ Feature: Generate a human-readable project overview
     Given a grimoire project with a documented feature and a decision
     When I generate the project overview
     Then a browsable overview of the project is produced
+
+  Scenario: The overview distinguishes executable and manual specifications
+    Given a grimoire project with executable and manual feature files
+    When I generate the project overview
+    Then executable features are described as automated specifications
+    And manual workflow features are described as agent-run specifications

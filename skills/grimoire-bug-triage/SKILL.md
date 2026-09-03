@@ -211,41 +211,9 @@ Depends on classification:
 
 **Code defect (needs architectural changes)** → `grimoire-draft` takes over:
 
-If the fix requires significant structural changes (new abstractions, schema changes, cross-cutting modifications), it's not a bug fix — it's a change that needs proper design. Generate a draft manifest stub to hand off context:
+If the fix requires structural, schema, or cross-cutting changes, route the report and triage evidence to `grimoire-draft`. Draft owns the design document. Plan owns live artifact projection, the manifest, and tasks. Triage produces evidence, not planned-change artifacts.
 
-1. Create `.grimoire/changes/<change-id>/manifest.md` with:
-   ```markdown
-   ---
-   id: <change-id>
-   type: bug-driven-change
-   source-bug: <bug-id>
-   status: proposed
-   date: <YYYY-MM-DD>
-   ---
-
-   # <short description of the change needed>
-
-   ## Origin
-   Bug report: `.grimoire/bugs/<bug-id>/report.md`
-   Triage: `.grimoire/bugs/<bug-id>/triage.md`
-
-   ## Problem
-   <root cause summary from triage — why a simple fix isn't enough>
-
-   ## Violated Specs
-   <copy from bug report — which feature scenarios describe the expected behavior>
-
-   ## Scope
-   <what needs to change architecturally — from the triage investigation>
-
-   ## Context for Draft
-   <!-- grimoire-draft should pick up from here -->
-   - The bug report has the user-facing symptoms
-   - The triage has the root cause analysis and investigation evidence
-   - The violated specs define what "correct" looks like
-   ```
-2. Update the bug report status to `routed-to-draft`
-3. Tell the user: "This needs a proper design change. I've created a draft stub at `<path>` with the bug context. Run `grimoire-draft` to continue."
+Update the bug report status to `routed-to-draft` and identify the report and triage paths for the Draft handoff.
 
 **Infrastructure / Configuration / Data** → the fix happens outside grimoire:
 1. Ensure a ticket exists for the responsible team with all the triage evidence

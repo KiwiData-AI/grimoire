@@ -40,7 +40,7 @@ Two modes:
 
 ### 2. Load Artifacts
 For change verification:
-- Read `manifest.md`, proposed `.feature` files, decision records, `tasks.md`
+- Read `manifest.md`, changed live `.feature` files, changed decision records, and `tasks.md`
 - Read `baseline.md` if present (the test state captured at change start) — it's how you tell a regression from a failure that was already red
 
 For baseline verification:
@@ -126,10 +126,7 @@ For each step definition:
    - Test creates a mock and then asserts against the mock's return value (circular) → CRITICAL
    - Try/except that swallows assertion errors → CRITICAL
    - Step definition has no `assert`/`expect` at all → CRITICAL (for Then steps)
-   - Provider contract test mocks the client wrapper instead of the HTTP boundary → WARNING
-   - Repository orchestration test stubs its repository-owned adapter-result type → allowed; it is not provider contract evidence
    - Test mocks internal code that lives in the same repo → WARNING (hides integration bugs)
-   - Contract test uses a fixture that doesn't match `schema.yml` → CRITICAL (fictional contract)
    - Test mocks so aggressively that removing production code still passes → CRITICAL
 
 4. **Report format:** Include test quality findings alongside correctness findings:
@@ -179,42 +176,7 @@ If no security tags exist and the change has no security surface, state so brief
 
 ### 5. Contract Test Coverage
 
-Verify that every external API integration has contract tests that match the documented contract.
-
-**A. Inventory external APIs:**
-
-Read `.grimoire/docs/data/schema.yml` and list every entry with `type: external_api`. For each:
-
-1. **Contract documented?** Check that the entry has `endpoints` with `request`, `response`, and `error_response` shapes. Missing contract documentation → WARNING (the contract is implicit and untested)
-
-2. **Contract test exists?** Search the test suite for tests that validate the client against the documented response shape. Look for:
-   - Tests that assert specific response fields match expected types/values
-   - Tests that use fixture/recorded responses matching the `schema.yml` shape
-   - Tests that verify error handling matches the documented `error_response`
-   - Missing contract test for a documented API → CRITICAL
-
-   Provider contract fixtures must come from authoritative observed responses. Repository orchestration stubs of owned adapter-result types do not count as provider contract coverage.
-
-3. **Contract test matches schema?** Compare the fixture/recorded response used in tests against the `schema.yml` contract:
-   - Fixture origin cannot be traced to an authoritative observed response → CRITICAL (fictional contract)
-   - Fixture has fields not in `schema.yml` → WARNING (undocumented dependency)
-   - `schema.yml` has `required: true` fields not asserted in tests → WARNING (untested contract guarantee)
-   - Client reads fields not in `schema.yml` → CRITICAL (invisible contract dependency)
-
-4. **Contract drift?** If this is a change verification (not baseline), compare `data.yml` against `schema.yml`:
-   - Any field changes on external APIs without corresponding test updates → CRITICAL
-   - New endpoints without contract tests → CRITICAL
-
-**Report format:**
-```markdown
-## Contract Coverage
-- [x] `stripe_api` — 3 endpoints, all with contract tests in `tests/integrations/test_stripe.py`
-- [ ] **[critical]** `github_api.get_user` — no contract test found for response shape
-- [ ] **[warning]** `sendgrid_api` — contract documented but `error_response` shape missing
-- [ ] **[critical]** `payments_api` — client reads `transaction.metadata.source` not in schema.yml (undocumented field dependency)
-```
-
-If no external APIs exist in `schema.yml`, skip this section.
+For changed external boundaries, apply `../references/testing-contracts.md`. Compare the live schema diff, client usage, and authoritative contract tests. Report missing or fictional evidence without inventing replacement fixtures or assertions. Skip when the change has no external boundary.
 
 ### 6. Dead Feature Detection
 Check for features that exist in specs but may no longer be implemented:
@@ -318,7 +280,7 @@ Produce a structured report:
 
 ### 8. Recommend Next Steps
 Based on the report:
-- **All clear** → recommend committing and opening a PR (git diff is the staging area, the PR is the changelog)
+- **All clear** → recommend `grimoire-pr`, which invokes Apply finalization before opening the PR
 - **Critical issues** → must fix before committing
 - **Warnings only** → user decides whether to fix or accept
 - **Dead features found** → suggest a removal change or updating the features
@@ -335,6 +297,6 @@ Based on the report:
 
 ## Done
 When the verification report is presented, the workflow is complete. Suggest next steps based on findings:
-- **All clear** → `grimoire-commit` then `grimoire-pr`
+- **All clear** → `grimoire-pr`
 - **Critical issues** → must fix before committing
 - **Warnings only** → user decides whether to fix or accept

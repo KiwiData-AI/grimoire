@@ -11,18 +11,15 @@ vi.mock("../utils/paths.js", () => ({
   resolveChangePath: vi.fn((_root: string, id: string) => `/fake/root/.grimoire/changes/${id}`),
 }));
 
-vi.mock("fast-glob", () => ({ default: vi.fn().mockResolvedValue([]) }));
-
 import { readFile } from "node:fs/promises";
-import fg from "fast-glob";
 
 const mockReadFile = vi.mocked(readFile);
-const mockGlob = vi.mocked(fg);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGlob.mockResolvedValue([]);
 });
+
+const missingFile = () => Object.assign(new Error("not found"), { code: "ENOENT" });
 
 function captureJson(fn: () => Promise<void>): Promise<any> {
   const logs: string[] = [];
@@ -37,11 +34,18 @@ function captureJson(fn: () => Promise<void>): Promise<any> {
 
 describe("getChangeStatus", () => {
   it("returns draft status when no manifest exists", async () => {
-    mockReadFile.mockRejectedValue(new Error("ENOENT"));
+    mockReadFile.mockRejectedValue(missingFile());
     const result = await captureJson(() => getChangeStatus("test", { json: true }));
     expect(result.status).toBe("draft");
     expect(result.stage).toBe("draft");
     expect(result.artifacts.manifest).toBe(false);
+  });
+
+  it("does not report missing coordination when a file cannot be read", async () => {
+    const failure = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    mockReadFile.mockRejectedValue(failure);
+
+    await expect(getChangeStatus("test", { json: true })).rejects.toBe(failure);
   });
 
   it("parses status and branch from manifest frontmatter", async () => {
@@ -49,7 +53,7 @@ describe("getChangeStatus", () => {
       if (String(path).includes("manifest.md")) {
         return "---\nstatus: implementing\nbranch: feat/auth\n---\n# Change";
       }
-      throw new Error("ENOENT");
+      throw missingFile();
     });
 
     const result = await captureJson(() => getChangeStatus("test", { json: true }));
@@ -62,7 +66,7 @@ describe("getChangeStatus", () => {
     mockReadFile.mockImplementation(async (path: any) => {
       if (String(path).includes("manifest.md")) return "---\nstatus: draft\n---\n";
       if (String(path).includes("tasks.md")) return "- [ ] Task one\n- [ ] Task two";
-      throw new Error("ENOENT");
+      throw missingFile();
     });
 
     const result = await captureJson(() => getChangeStatus("test", { json: true }));
@@ -75,39 +79,34 @@ describe("getChangeStatus", () => {
     mockReadFile.mockImplementation(async (path: any) => {
       if (String(path).includes("manifest.md")) return "---\nstatus: draft\n---\n";
       if (String(path).includes("tasks.md")) return "- [x] Task one\n- [ ] Task two";
-      throw new Error("ENOENT");
+      throw missingFile();
     });
 
     const result = await captureJson(() => getChangeStatus("test", { json: true }));
     expect(result.stage).toBe("applying");
   });
 
-  it("detects complete stage when all tasks done", async () => {
+  it("detects ready stage when all tasks are done", async () => {
     mockReadFile.mockImplementation(async (path: any) => {
       if (String(path).includes("manifest.md")) return "---\nstatus: draft\n---\n";
       if (String(path).includes("tasks.md")) return "- [x] Task one\n- [x] Task two";
-      throw new Error("ENOENT");
+      throw missingFile();
     });
 
     const result = await captureJson(() => getChangeStatus("test", { json: true }));
-    expect(result.stage).toBe("complete");
+    expect(result.stage).toBe("ready");
     expect(result.artifacts.tasks.completed).toBe(2);
   });
 
-  it("includes features and decisions from glob", async () => {
+  it("reports only manifest and task coordination artifacts", async () => {
     mockReadFile.mockImplementation(async (path: any) => {
       if (String(path).includes("manifest.md")) return "---\nstatus: draft\n---\n";
-      throw new Error("ENOENT");
+      throw missingFile();
     });
-    mockGlob.mockImplementation(async (pattern: any) => {
-      if (String(pattern).includes(".feature")) return ["features/auth.feature"] as any;
-      if (String(pattern).includes(".md")) return ["decisions/001.md"] as any;
-      return [] as any;
-    });
-
     const result = await captureJson(() => getChangeStatus("test", { json: true }));
-    expect(result.artifacts.features).toEqual(["features/auth.feature"]);
-    expect(result.artifacts.decisions).toEqual(["decisions/001.md"]);
+    expect(result.artifacts).toEqual({ manifest: true, tasks: null });
+    expect(result.artifacts).not.toHaveProperty("features");
+    expect(result.artifacts).not.toHaveProperty("decisions");
   });
 
   it("pretty prints status with all details", async () => {
@@ -115,13 +114,8 @@ describe("getChangeStatus", () => {
       const p = String(path);
       if (p.includes("manifest.md")) return "---\nstatus: implementing\nbranch: feat/auth\n---\n# Change";
       if (p.includes("tasks.md")) return "- [x] Task A\n- [ ] Task B\n- [ ] Task C";
-      throw new Error("ENOENT");
+      throw missingFile();
     });
-    mockGlob.mockImplementation(async (pattern: any) => {
-      if (String(pattern).includes(".feature")) return ["features/login.feature"] as any;
-      return [] as any;
-    });
-
     const logs: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
       logs.push(args.join(" "));
@@ -140,7 +134,7 @@ describe("getChangeStatus", () => {
   });
 
   it("pretty prints draft stage with no tasks", async () => {
-    mockReadFile.mockRejectedValue(new Error("ENOENT"));
+    mockReadFile.mockRejectedValue(missingFile());
 
     const logs: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
@@ -160,7 +154,7 @@ describe("getChangeStatus", () => {
       const p = String(path);
       if (p.includes("manifest.md")) return "---\nstatus: draft\n---\n";
       if (p.includes("tasks.md")) return "- [x] Done task\n- [ ] Pending one\n- [ ] Pending two";
-      throw new Error("ENOENT");
+      throw missingFile();
     });
 
     const result = await captureJson(() => getChangeStatus("test", { json: true }));

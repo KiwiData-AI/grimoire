@@ -30,33 +30,34 @@
 
 ## Capabilities
 
-What the app does, for whom. Grouped by functional story; each scenario is an executable acceptance test.
+What the app does, for whom. Grouped by functional story and labeled by execution mode.
 
 ### (root)
 
-**Assess the quality of tests** (`features/assess-test-quality.feature`)
+**Assess the quality of tests** (`features/assess-test-quality.feature`) — automated specification
 > As a developer · I want weak or meaningless tests flagged · So that my test suite gives real confidence
 
 - A weak test is flagged
 - Strong tests pass the assessment
 
-**Generate a human-readable project overview** (`features/generate-a-project-overview.feature`)
+**Generate a human-readable project overview** (`features/generate-a-project-overview.feature`) — automated specification
 > As a developer · I want a single browsable summary of what the project does and why · So that newcomers can understand it without reading every spec
 
 - An overview is produced from the project's specs and decisions
+- The overview distinguishes executable and manual specifications
 
-**Generate a browsable spec site** (`features/generate-a-spec-site.feature`)
+**Generate a browsable spec site** (`features/generate-a-spec-site.feature`) — automated specification
 > As a developer · I want a searchable website built from my project's features, decisions, and constraints · So that the team can review specs without reading raw files
 
 - The spec site is built alongside the overview
 - Spec site generation is skipped when not configured
 
-**Initialize a project for spec-driven development** (`features/initialize-a-project.feature`)
+**Initialize a project for spec-driven development** (`features/initialize-a-project.feature`) — automated specification
 > As a developer adopting grimoire · I want to set grimoire up in my project · So that I can start capturing specs and running checks
 
 - Setting up grimoire makes the project ready to use
 
-**Lint comments as the agent writes them** (`features/lint-comments-at-write-time.feature`)
+**Lint comments as the agent writes them** (`features/lint-comments-at-write-time.feature`) — automated specification
 > As a developer · I want broken comments caught the moment an agent writes them · So that self-containment is enforced at the edit, not left to ignored instructions
 
 - A comment referencing an external artifact is rejected
@@ -69,43 +70,45 @@ What the app does, for whom. Grouped by functional story; each scenario is an ex
 - Warn mode surfaces issues without blocking
 - Linting off is a no-op
 
-**Prepare a pull request from a change** (`features/prepare-a-pull-request.feature`)
+**Prepare a pull request from a change** (`features/prepare-a-pull-request.feature`) — automated specification
 > As a developer finishing a change · I want a pull request description generated from my work · So that reviewers understand the intent without me writing it by hand
 
 - A pull request description is generated after change cleanup
 - A branch contains multiple related changes
 
-**Review the work currently in progress** (`features/review-active-work.feature`)
+**Review the work currently in progress** (`features/review-active-work.feature`) — automated specification
 > As a developer · I want to see the changes in progress and how far along they are · So that I know what is being worked on and what remains
 
 - Active changes are listed
 - A single change reports its progress
 
-**Run quality checks before committing** (`features/run-checks-before-committing.feature`)
+**Run quality checks before committing** (`features/run-checks-before-committing.feature`) — automated specification
 > As a developer · I want to run the project's quality checks on demand · So that I catch problems before they reach a commit
 
 - Checks report what passed and what did not
 
-**See how well a project uses grimoire** (`features/see-project-health.feature`)
+**See how well a project uses grimoire** (`features/see-project-health.feature`) — automated specification
 > As a developer · I want an at-a-glance view of my project's spec and test coverage · So that I know where the documentation and coverage gaps are
 
 - Health reports coverage and an overall score
 - Health reports spec-process drift
+- Health preserves durable history and intent documentation
 
-**Trace code back to the change that introduced it** (`features/trace-code-to-its-requirement.feature`)
+**Trace code back to the change that introduced it** (`features/trace-code-to-its-requirement.feature`) — automated specification
 > As a developer · I want to follow a file back to the change that created it · So that I understand why the code exists
 
 - A file is traced to its originating change
 
-**Validate the project's specifications** (`features/validate-specifications.feature`)
+**Validate the project's specifications** (`features/validate-specifications.feature`) — automated specification
 > As a developer · I want to confirm my specs are well-formed · So that downstream planning and review can trust them
 
 - Well-formed specifications pass validation
+- Validation reads specifications from their live homes
 - A malformed specification is reported
 
 ### Workflow
 
-**Build understood work test-first** (`features/workflow/build-test-first.feature`)
+**Build understood work test-first** (`features/workflow/build-test-first.feature`) — agent-run specification
 > As a developer · I want tests written before understood delivery work without repeated broad test runs · So that implementation remains protected without mechanical checks dominating delivery time
 
 - Existing failures are baselined once
@@ -124,13 +127,13 @@ What the app does, for whom. Grouped by functional story; each scenario is an ex
 - Finalization reviews and immediately commits the complete index
 - Finalization resumes from ordinary Git state after cleanup
 
-**Design a UI grounded in a user problem** (`features/workflow/design-a-ui-from-a-problem.feature`)
+**Design a UI grounded in a user problem** (`features/workflow/design-a-ui-from-a-problem.feature`) — agent-run specification
 > As a designer or developer · I want UI design to start from a stated user problem and end in testable scenarios · So that the design is justified and ready to build against
 
 - A design starts from a problem and yields scenarios
 - Every required state is accounted for
 
-**Capture an intent as the right kind of spec** (`features/workflow/draft-an-intent.feature`)
+**Capture an intent as the right kind of spec** (`features/workflow/draft-an-intent.feature`) — agent-run specification
 > As a developer · I want to describe what I want in plain language · So that it is captured in the form the team can review and build against
 
 - A non-trivial change is designed on a single document first
@@ -140,20 +143,20 @@ What the app does, for whom. Grouped by functional story; each scenario is an ex
 - An invariant is recorded as a constraint, not a behaviour
 - A defect is redirected to the bug workflow
 
-**Fix a bug reproduction-first** (`features/workflow/fix-a-bug.feature`)
+**Fix a bug reproduction-first** (`features/workflow/fix-a-bug.feature`) — agent-run specification
 > As a developer · I want a bug reproduced by a failing test before it is fixed · So that the fix is proven and the bug cannot silently return
 
 - A bug is reproduced before it is fixed
 - An unknown defect is investigated before its regression test
 - A defect is not turned into a new feature spec
 
-**Isolate new feature work on its own branch** (`features/workflow/isolate-feature-work-on-a-branch.feature`)
+**Isolate new feature work on its own branch** (`features/workflow/isolate-feature-work-on-a-branch.feature`) — agent-run specification
 > As a developer · I want new feature work to start on a dedicated branch · So that unrelated changes never get entangled
 
 - Starting a feature on a shared branch is interrupted
 - Accepting the suggestion moves work onto a fresh branch
 
-**Turn an approved spec into a plan** (`features/workflow/plan-the-work.feature`)
+**Turn an approved spec into a plan** (`features/workflow/plan-the-work.feature`) — agent-run specification
 > As a developer · I want an approved spec broken into concrete, ordered tasks · So that implementation follows a reviewed plan instead of improvisation
 
 - An approved spec becomes an ordered task list
@@ -163,12 +166,13 @@ What the app does, for whom. Grouped by functional story; each scenario is an ex
 - Planning creates section-level delivery tasks
 - Planning preserves an unresolved implementation question
 - Planning does not manufacture Gherkin for internal work
+- Planning edits schema documentation in its durable home
 - Planning orders actual section dependencies
 - Planning rejects an invalid section dependency graph
 - Slice-after implementation has no intermediate human gate
 - Unavoidable external acceptance occurs after verification
 
-**Review a change before coding begins** (`features/workflow/review-a-change-before-coding.feature`)
+**Review a change before coding begins** (`features/workflow/review-a-change-before-coding.feature`) — agent-run specification
 > As a developer · I want a change examined from several expert perspectives before implementation · So that gaps and risks are caught while they are still cheap to fix
 
 - A change is reviewed from multiple perspectives
@@ -176,19 +180,19 @@ What the app does, for whom. Grouped by functional story; each scenario is an ex
 - Accepted review findings receive one correction batch
 - A material correction requires a new review
 
-**Investigate an engineering question with a spike** (`features/workflow/run-an-engineering-spike.feature`)
+**Investigate an engineering question with a spike** (`features/workflow/run-an-engineering-spike.feature`) — agent-run specification
 > As a developer · I want uncertain engineering work separated from delivery · So that evidence resolves the question before tests or production code encode an assumption
 
 - A spike answers one explicit question with evidence
 - A resolved spike informs active delivery
 
-**Safely decommission a feature** (`features/workflow/safely-remove-a-feature.feature`)
+**Safely decommission a feature** (`features/workflow/safely-remove-a-feature.feature`) — agent-run specification
 > As a maintainer · I want removal to show impact before anything is deleted · So that I never delete something other work still depends on
 
 - Impact is shown and confirmed before deletion
 - Removal is blocked while other work depends on it
 
-**Verify an implementation against its spec** (`features/workflow/verify-the-implementation.feature`)
+**Verify an implementation against its spec** (`features/workflow/verify-the-implementation.feature`) — agent-run specification
 > As a developer finishing a change · I want confirmation the implementation matches the spec · So that I can hand it off knowing nothing was missed
 
 - Verification confirms the spec is fully met
@@ -270,7 +274,9 @@ Shared knowledge documents that workflow skills load on demand. Reference files 
 Gherkin specifications for grimoire's own behavior. Each `.feature` file describes how grimoire works — these are the contracts the CLI, skills, and workflows must honor.
 
 - `features/` is the single home for every spec. Changes are made live on the feature branch by editing these files directly; git history is the record of what changed — there is no separate proposed/baseline copy and no archive.
-- Features are reference docs for humans and AI agents; they are not executed. `grimoire validate` parses them for structure but does not run them as tests.
+- Executable specifications run through the configured BDD runner.
+- `@manual` specifications use declared characterization or unit contracts instead of BDD step definitions.
+- `grimoire validate` checks Gherkin structure; Verify owns execution and contract confirmation.
 - Specs are grouped by area subdirectory — pick the directory matching the feature's primary user concern (e.g. `features/cli/` for CLI command behavior, `features/workflow/` for the skill pipeline, `features/bug/` for bug-handling skills).
 - Gherkin is optional. Use it only for clear actor-visible behavior that remains meaningful after reimplementation.
 - Prefer extending an existing feature when the actor and capability already match.
@@ -304,7 +310,6 @@ Key decisions recorded as MADR (Markdown Any Decision Records).
 | 0010 | Skills are pure markdown instructions, not executable code | accepted | 2026-04-01 |
 | 0011 | Use managed block markers for AGENTS.md and README badges | accepted | 2026-04-01 |
 | 0012 | Install both Claude Code hooks and git pre-commit hooks | accepted | 2026-04-05 |
-| 0014 | Contract-first external API testing strategy | accepted | 2026-04-05 |
 | 0016 | Use W3C Design Tokens (DTCG) format for brand guidelines | accepted | 2026-05-17 |
 | 0017 | One `grimoire-design` skill, not split (brand/design/figma) | accepted | 2026-05-17 |
 | 0018 | Figma MCP is the canonical design input; HTML/ASCII fallback only | accepted | 2026-05-17 |
@@ -316,15 +321,15 @@ Key decisions recorded as MADR (Markdown Any Decision Records).
 | 0032 | codebase-memory-mcp is the recommended structure source, with a source-reading fallback | accepted | 2026-06-05 |
 | 0033 | Tooling and convention baseline | accepted | 2026-06-08 |
 | 0034 | Enforce comment quality at write time with a PreToolUse hook | accepted | 2026-06-10 |
-| 0035 | Harden the autonomous apply loop: learnings staging-file, instruction-only circuit breaker, cross-section thrash detection | accepted | 2026-06-21 |
 | 0036 | Capability-surface selection: where a new capability belongs | accepted | 2026-06-26 |
-| 0037 | Shared named-methodology references for cross-skill guidance | proposed | 2026-06-27 |
-| 0038 | Living `draft.md` as the single design surface, projected into homes after agreement | proposed | 2026-06-17 |
+| 0037 | Shared named-methodology references for cross-skill guidance | accepted | 2026-06-27 |
+| 0038 | Living `draft.md` as the single design surface, projected into homes after agreement | accepted | 2026-06-17 |
 | 0039 | Delegate docstring-format enforcement to pydoclint; make comment policy reach every session | accepted | 2026-07-03 |
 | 0040 | STE response style replaces caveman mode | accepted | 2026-08-10 |
 | 0041 | MkDocs Material for the Generated Spec Site | accepted | 2026-08-21 |
 | 0042 | PR Gate Enforces Finalization with a Shared Health Check | accepted | 2026-08-21 |
 | 0045 | Separate question-driven spikes from delivery verification | accepted | 2026-09-03 |
+| 0046 | Complete the live-artifact workflow across CLI and skills | proposed | 2026-09-03 |
 
 ### Use Gherkin instead of custom WHEN/THEN format
 
@@ -396,13 +401,7 @@ Grimoire needs to insert and update content in files that the user also edits (A
 
 Grimoire needs to run `grimoire check` before commits and validate `Change:` trailers. Should it use Claude Code's hook system, git's native hooks, or both?
 
-**Outcome:** Chosen option: "Dual hooks", because Claude Code hooks provide richer integration (post-commit feedback, structured output) while git hooks catch commits from any tool. The git hook is a simple shell script that runs `grimoire check --changed`. The Claude hook adds Change trailer validation for active grimoire changes.
-
-### Contract-first external API testing strategy
-
-When grimoire-managed code depends on external APIs, tests need to handle those dependencies. Should grimoire prescribe a testing strategy for external API boundaries, and if so, what approach?
-
-**Outcome:** Chosen option: "Contract-first", because it provides a consistent strategy that works with grimoire's existing `schema.yml` data documentation. The plan skill mandates mocking at the HTTP boundary only (never mock internal code or client wrappers). Fixtures must match the documented contract in `schema.yml`. The verify skill detects contract drift — changes to external API documentation without corresponding test updates.
+**Outcome:** Chosen option: "Dual hooks", because Claude Code hooks provide richer integration while git hooks catch commits from any tool. Both pre-commit paths run only `grimoire check lint format doc_style --changed`; final verification owns broad checks and test suites. The Claude hook also validates Change trailers for active grimoire changes.
 
 ### Use W3C Design Tokens (DTCG) format for brand guidelines
 
@@ -536,7 +535,7 @@ Concrete changes shipped together:
 
 ADR 0030 made codebase-memory-mcp a **hard requirement** and decided to **replace area docs with per-area `conventions/` files**. Implementation of the artifact-model redesign (ADR 0031) reversed both halves of that decision:
 
-- A hard MCP requirement would mean projects without the server installed cannot use grimoire at all. In practice the value of grimoire (drafting, planning, review, red-green apply) does not depend on the graph being present — only the *structure-lookup* steps do, and those degrade gracefully to reading source files.
+- A hard MCP requirement would mean projects without the server installed cannot use grimoire at all. In practice the value of grimoire (drafting, planning, review, and section delivery) does not depend on the graph being present — only the *structure-lookup* steps do, and those degrade gracefully to reading source files.
 - The separate `conventions/<area>.md` split never shipped. What ships is **intent-focused area docs** (Purpose, Boundaries, Conventions) — a single per-area doc that captures what the graph can't know, with structure (symbols, key files, reusable code) queried live from the graph rather than frozen into tables.
 
 ADR 0030 therefore describes a model the codebase does not implement. It needs to be superseded so the decision register matches reality.
@@ -592,28 +591,6 @@ Mechanics:
 - `grimoire-lint-ok` pragma on the comment suppresses that one finding — the agent can keep a genuinely-needed comment by saying so explicitly.
 - Behavior controlled by `project.comment_lint: block | warn | off`; absent or `off` is a no-op. `grimoire init` writes the hook and sets `block`, and `grimoire update` adds it to already-initialised projects. This is why it appears only in grimoire-enabled projects — it ships through `init`/`update`, like the existing hooks (see 0012).
 - `block` → deny the call (exit 2) with the offending lines on stderr; the write never lands and the agent retries. `warn` → allow, advisory. `off` → no-op.
-
-### Harden the autonomous apply loop: learnings staging-file, instruction-only circuit breaker, cross-section thrash detection
-
-`grimoire-apply` autonomous mode is a spec-driven implementation loop — the same family as spec-kit / Kiro, and already ahead of the classic Ralph loop on the two things that matter most: a real verification gate (red-green + baseline) and anti-drift (fixed approved `tasks.md`, "do not re-plan"). Those are keepers.
-
-Against current loop SOTA it has three gaps that surface as cost and quality risk in long autonomous runs:
-
-1. **No loop-level ceiling.** A per-task 3-attempt cap exists; nothing bounds the *run*. Reported failure mode (`RESEARCH.md:25`): loop until token budget is exhausted. Field cautionary tales: a stuck retry burning hours of spend with no cost cap; a compaction spiral issuing ~250K API calls/day before detection.
-2. **Learnings don't compound.** Only the last handoff note is re-read; scaffolding is deleted at finalize. The universal pattern (Ralph `fix_plan.md`/`AGENT.md`, persistent project rules) is a note fed back each iteration so the next attempt can't blindly repeat a dead end.
-3. **No cross-section thrash signal, and a gameable gate.** The 3-attempt cap is per-task; two sections cycling the same error in a row should halt the whole run. And the red-green gate is reward-hackable — weaken or delete a test and it goes green without solving anything.
-
-**Outcome:** Chosen option: **Option 3 (instruction-only hardening)**, because it closes all three gaps as markdown — staying within ADR 0010 — while preserving the verification gate and anti-drift that already beat Ralph.
-
-Rejected:
-- **Option 1** — statelessness is a context-rot *mitigation*, not a goal. It only pays off when a task overflows one context, which grimoire treats as an anti-pattern (oversized change → split the spec). The right tenet is **"one task sized to one context": stateful within a task, reset between tasks** — the existing fresh-subagent-per-section already realizes the "reset between" half.
-- **Option 2** — larger scope, touches code; deferred. The cost/wall-clock caps genuinely need code to be airtight; v1 ships them as honest *soft* caps with a follow-up.
-
-The learnings file carries two sections with two lifecycles:
-- **Failure-mode notes** — transient. Appended after a failed attempt, read before any retry, pruned the moment a task goes green, never promoted.
-- **Discovered facts** — durable. Staged with their destination home, reconciled into that one home at finalize (an area doc / decision / constraint / schema / feature — never `AGENTS.md`), then cleared.
-
-Compounding learnings is the antidote to thrash: cross-section detection reads the failure trail and trips the breaker when one section's error class repeats the prior section's. Caps live under `llm.coding.limits` in `.grimoire/config.yaml` (`max_sections_without_checkpoint: 5`, `consecutive_blocked: 2`, `max_cost_usd: null`, `max_wallclock_min: null` — null = unbounded unless set). The human checkpoint sits at the PR/merge boundary, not inline (the verification gap is structural).
 
 ### Capability-surface selection: where a new capability belongs
 
@@ -714,7 +691,7 @@ Concrete changes shipped together:
   the doc.
 - **Projection happens at the start of `grimoire-plan`, after the design is agreed** (amended;
   originally `grimoire-draft`). The fine fact-to-home routing (admission test + jurisdiction)
-  and the principles gate run there, generating features/constraints/MADRs/`data.yml`/manifest
+  and the principles gate run there, editing features, constraints, MADRs, and schema directly in their live homes and creating the manifest
   live in their real locations. The coarse routing (is this a grimoire change at all?) stays up
   front in draft.
 - **Complexity is an output.** Up front there is only a binary triviality gate (typo/config
@@ -722,8 +699,8 @@ Concrete changes shipped together:
 - **Refactors mandate a current-state map.** For `kind: refactor`, the design starts by
   mapping how the touched system works today with `file:line` breadcrumbs, using the
   codebase graph (`index_repository` first if needed), plus a severity-ranked gaps list.
-- **Ephemeral, git-backed.** `draft.md` is retained read-only through plan → … → apply as
-  the agreed reference, then deleted when `grimoire-apply` clears the change folder. Git
+- **Ephemeral, git-backed.** `draft.md` is retained read-only through plan → … → PR as
+  the agreed reference, then deleted during Apply finalization. Git
   history preserves it — "deleted" ≠ lost.
 - **Decisions still project to separate MADRs.** The inline ledger is a thinking convenience;
   at projection each novel decision becomes a sequential MADR (novelty gate unchanged),
@@ -779,7 +756,7 @@ Grimoire applies test-first delivery rules to work whose behavior, contract, roo
 
 This conflates learning with delivery. It encourages invented fixtures and assertions while repeatedly starting expensive test infrastructure.
 
-This decision supersedes [0044]. It refines [0014] for unobserved provider contracts and [0035] for failed delivery attempts.
+This decision supersedes [0014](../decisions/0014-contract-first-api-testing.md), [0035](../decisions/0035-harden-autonomous-apply-loop.md), and [0044](../decisions/0044-plan-review-timing-and-verification.md). It retains authoritative provider fixtures, apply working memory, soft run limits, cross-section thrash detection, and the reward-hack guard. It replaces their per-task red-green and autonomous retry rules.
 
 **Outcome:** Chosen option: **separate engineering spikes from section-level delivery and final verification**, because exploration and delivery require different evidence.
 
@@ -790,6 +767,8 @@ Every spike ends as answered, disproved, blocked, or inconclusive. Its findings 
 Within a change or bug, `n` is the next unused positive integer. A standalone response starts at `S1`.
 
 Active-change findings live in `learnings.md`. Bug findings live in `triage.md`. Standalone findings remain in the response unless directed elsewhere.
+
+Apply working memory also retains transient failure notes and durable discovered facts. Configured cost and wall-clock limits remain soft limits. Repeated failure classes across sections still stop autonomous delivery. Tests cannot be weakened or deleted to force confirmation.
 
 An answered spike may refine affected unchecked implementation mechanics. It cannot silently change approved behavior, scope, or architecture.
 
@@ -805,7 +784,24 @@ Full configured suites run once before delivery and once during final verificati
 
 Unknown provider responses are explored before provider contract tests are written. Detailed provider-test mechanics live only in `testing-contracts.md`.
 
+### Complete the live-artifact workflow across CLI and skills
+
+ADR 0031 replaced change-folder specification copies with live branch edits and Git history. Several CLI commands and workflow skills still implement the removed storage model. Manifest states, schema projection, alternate workflow entry points, and finalization also express competing ownership rules.
+
+**Outcome:** Chosen option: **complete the live-artifact migration and remove copy-based behavior**, because compatibility would retain the duplicate state ADR 0031 removed.
+
+- Planned changes use Draft → Plan → optional Review → Apply → Verify → PR.
+- Draft designs only. Plan projects features, decisions, constraints, and schema changes directly into durable live homes.
+- Active change folders contain ephemeral coordination artifacts only.
+- Manifest states are `draft`, `approved`, and `implementing`. Folder removal represents finalization; `accepted` remains an ADR status.
+- `grimoire validate` validates live durable artifacts and active coordination.
+- `grimoire list` and `grimoire status` report coordination without claiming copied specifications.
+- `grimoire diff` is removed. Native Git owns branch and working-tree diffs.
+- Alternate workflow skills produce findings or route into the standard lifecycle. They do not create durable artifacts before Plan.
+
 
 ## Active Work
 
 Changes currently in progress.
+
+- **align-workflow-guidance**: Align workflow guidance (implementing — 7/7 tasks)

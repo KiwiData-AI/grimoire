@@ -122,7 +122,7 @@ Grimoire routes your request to its one correct home (an admission test keeps ea
 - **"A tester found a problem"** → `/grimoire:bug-report` → `/grimoire:bug-triage` → routed fix
 - **"We do not know the provider response shape"** → `/grimoire:spike` (one question, bounded probes, referenced evidence)
 
-A `.feature` is allowed only if it has an external actor, is observable without reading code/logs, uses domain language, and survives a reimplementation. Security controls, NFRs, and observability guarantees are invariants → they live in the constraints register. You design all this on one living `draft.md`; it is **projected** into its homes — `.feature` files (with security tags like `@security`, `@auth`, `@pii`, `@pci-dss` when applicable), constraint entries, decision records, `data.yml` for schema changes, and a manifest — at the **start of Plan**, so Draft's one job is to design the change.
+A `.feature` is allowed only if it has an external actor, is observable without reading code/logs, uses domain language, and survives a reimplementation. Security controls, NFRs, and observability guarantees are invariants → they live in the constraints register. You design all this on one living `draft.md`; Plan projects it into live feature files, constraint entries, decision records, `.grimoire/docs/data/schema.yml`, and a manifest. Draft's one job is design.
 
 ### 2. Plan — Project the design, then generate concrete tasks
 
@@ -140,7 +140,7 @@ Personas validate the change before any code is written:
 - **Senior engineer** — simplicity, code reuse, architecture fit, task quality
 - **Security engineer** — STRIDE threat analysis, OWASP Top 10 / CWE classification, compliance verification (PCI-DSS, HIPAA, GDPR, SOC2 when configured), input validation, auth boundaries, vulnerable dependencies, secrets
 - **QA engineer** — testability, negative scenarios, edge cases, observability, regression risk
-- **Data engineer** — schema design, migration safety, index coverage (when `data.yml` present)
+- **Data engineer** — live schema design, migration safety, and index coverage when data changes
 - **Principles auditor** — flags duplicate homes (DRY), second ways to do a thing (one right way), reinvented wheels, speculative complexity (KISS), and any `.feature` that is really a constraint
 
 Issues flagged as **blocker** or **suggestion**. Security findings tagged with OWASP category and CWE ID. Skip for small/low-risk changes.
@@ -184,7 +184,7 @@ Artifacts are edited **live on the feature branch** the whole time — no promot
 
 ### 6. PR
 
-`grimoire pr` generates a PR description from the branch diff, features, decisions, and task progress. Optional `--review` runs an LLM review of the actual diff. `--create` creates via `gh` or `glab`.
+`grimoire pr` finalizes an active change when needed, then generates a PR description from Git history and changed live artifacts. `--create` creates via `gh` or `glab`.
 
 There is no archive step. Features, decisions, constraints, and schema were edited live on the branch; the PR diff *is* the change, and git history + the `Change: <id>` commit trailer are the record.
 
@@ -401,7 +401,7 @@ Developer runs `/grimoire:bug 0042` after triage establishes a reliable reproduc
    ✓ 31 passed
 ```
 
-Skill also drafts the missing scenario into `features/checkout/place-order.feature` (under a `# pending tester sign-off` comment) and appends a tester verification checklist to `report.md`:
+If the bug exposes a missing actor-visible requirement, the fix routes through Draft and Plan. The bug workflow appends a tester verification checklist to `report.md`:
 
 ```
 .grimoire/bugs/0042-place-order-timeout/report.md (verification section)
@@ -433,7 +433,7 @@ PR #312: Add bulk export endpoint
   Data lens        ✓ schema unchanged
 ```
 
-Output is structured Markdown ready to paste as a PR comment, or wired through `gh pr comment 312 --body-file review.md`. Each finding includes file:line, severity, and a suggested change — same format the post-implementation review uses on your own diffs (`grimoire pr --review`), so reviewers and authors share one mental model.
+Output is structured Markdown ready to paste as a PR comment. Each finding includes file:line, severity, and a suggested change. Verify uses the same review engine for the author's complete diff.
 
 </details>
 
@@ -546,7 +546,7 @@ When configured, `grimoire docs` regenerates `.grimoire/site/` — one page per 
 
 The index embeds the overview's Configured Tools table, so publishing the built site publishes your config/tooling summary — review before hosting publicly.
 
-### Pre-Commit Pipeline
+### Check Pipeline
 
 ```
 grimoire check
@@ -565,9 +565,9 @@ grimoire check
   9 passed, 0 failed, 1 skipped
 ```
 
-Auto-detected during `grimoire init`. Any tool can use `name: llm` with a `prompt:` for AI-powered review. Also sets up enforcement hooks for Claude Code (`.claude/hooks.json`) and git (`.git/hooks/pre-commit`).
+Auto-detected during `grimoire init`. Any tool can use `name: llm` with a `prompt:` for AI-powered review. Generated editor and commit hooks run only cheap lint, format, and doc-style checks. Unit and BDD suites remain baseline and final-verification boundaries.
 
-> ⚠️ **Security: `.grimoire/config.yaml` is trusted code.** `grimoire check` and `grimoire health` execute the shell commands defined in your config's tool steps (`command:` / `check_command:`), and the installed pre-commit hook runs `grimoire check` automatically on every commit. This is the same trust model as `npm` scripts, `Makefile`s, or git hooks — the config can run any command on your machine. **Do not run `grimoire check`/`health`, commit, or let an AI agent commit in a freshly cloned untrusted repository** until you have reviewed its `.grimoire/config.yaml`. Grimoire never sends your code anywhere: the only network calls are an npm version check (your package name only; opt out with `GRIMOIRE_NO_UPDATE_CHECK=1`) and piping diffs to the LLM CLI *you* configured.
+> ⚠️ **Security: `.grimoire/config.yaml` is trusted code.** `grimoire check` and `grimoire health` execute the shell commands defined in your config's tool steps (`command:` / `check_command:`), and the installed pre-commit hook runs the configured lint, format, and doc-style steps automatically on every commit. This is the same trust model as `npm` scripts, `Makefile`s, or git hooks — the config can run any command on your machine. **Do not run `grimoire check`/`health`, commit, or let an AI agent commit in a freshly cloned untrusted repository** until you have reviewed its `.grimoire/config.yaml`. Grimoire never sends your code anywhere: the only network calls are an npm version check (your package name only; opt out with `GRIMOIRE_NO_UPDATE_CHECK=1`) and piping diffs to the LLM CLI *you* configured.
 
 ### Test Quality
 
@@ -638,13 +638,7 @@ grimoire health
 
 ### Contract Testing
 
-The plan, apply, and verify skills enforce a contract-first approach for external APIs:
-
-- **Observe provider responses first** — do not invent response subsets, fixtures, or assertions
-- **Provider fixtures must match `schema.yml`** — each fixture comes from an authoritative observed response
-- **Repository orchestration may stub its owned adapter-result type** — that stub is not provider-contract evidence
-- **Contract drift detection** — verify flags when external API changes don't have matching test updates
-- **Client code reads only documented fields** — prevents coupling to undocumented API behavior
+External API work follows the authoritative [testing and contract reference](skills/references/testing-contracts.md). Unknown provider behavior routes to a spike before delivery tests are planned.
 
 ### Response Style (STE)
 
@@ -658,13 +652,9 @@ Brevity-with-clarity response style based on ASD-STE100 (Simplified Technical En
 
 For Claude Code, the `ste` plugin (in this repo's marketplace, `plugins/ste`) enforces the same style with a session hook plus per-turn reinforcement — install it with `/plugin marketplace add KiwiData-AI/grimoire` then `/plugin install ste@grimoire`. `grimoire init` and `grimoire update` print these commands when `integrations.ste_plugin` is enabled.
 
-### Conflict Detection
-
-`grimoire list` detects when multiple active changes modify the same feature file and flags the conflict.
-
 ### Debt Register
 
-The refactor skill maintains `.grimoire/debt-register.yml` — a persistent record of tech debt items with severity, Fowler quadrant classification (deliberate/inadvertent × prudent/reckless), fingerprint-based dedup, and aging signals. Formal exceptions live in `.grimoire/debt-exceptions.yml` with optional expiry dates.
+The refactor skill maintains `.grimoire/docs/debt-register.yml` — a persistent record of tech debt items with severity, Fowler quadrant classification, fingerprint-based dedup, and aging signals. Formal exceptions live in `.grimoire/debt-exceptions.yml` with optional expiry dates.
 
 ### Multi-LLM Support
 
@@ -692,7 +682,7 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 
 | Skill | Purpose |
 |-------|---------|
-| `/grimoire:draft` | Draft features and/or decisions collaboratively |
+| `/grimoire:draft` | Design one change collaboratively on `draft.md` |
 | `/grimoire:plan` | Generate detailed implementation tasks from specs |
 | `/grimoire:spike` | Investigate one engineering question with bounded probes and referenced evidence |
 | `/grimoire:review` | Multi-perspective design review (PM, engineer, security, QA, data, principles) |
@@ -752,7 +742,6 @@ grimoire init --agent copilot                   # .github/copilot-instructions.m
 | `grimoire pr --review` | Run post-implementation LLM review of diff |
 | `grimoire test-quality [files]` | Analyze test files for quality issues |
 | `grimoire trace <file[:line]>` | Trace file to originating grimoire change |
-| `grimoire diff <id>` | Compare proposed change specs against the baseline |
 | `grimoire docs [-o <path>]` | Generate human-readable project overview |
 | `grimoire health` | Project health score |
 | `grimoire health --badges <file>` | Write shields.io badges into a file (e.g., README.md) |
@@ -867,8 +856,7 @@ Issues and pull requests welcome at [github.com/KiwiData-AI/grimoire](https://gi
 
 **Before opening a PR:**
 
-- `npm run build && npm test && npm run lint` — all green
-- `grimoire check` — pre-commit pipeline green
+- Run `/grimoire:verify` once after implementation. It owns deterministic checks and the final configured suites.
 - Clear actor-visible behavior has a Gherkin scenario. Internal work uses its appropriate test, check, constraint, or decision without manufactured Gherkin.
 - Commit messages include a `Change:` trailer when the work is part of a tracked change
 - For dependency adds/upgrades: lockfile committed, no floating version ranges in `package.json` (see Security model above)
@@ -915,7 +903,7 @@ Skills are pure markdown — instructions for the AI, not executable code.
 
 1. Create `src/commands/<name>.ts` — thin wrapper that parses args and calls core
 2. Create `src/core/<name>.ts` — business logic
-3. Register in `src/cli/index.ts`
+3. Register in `src/cli/program.ts`
 
 ### Adding a New Tool Detection
 

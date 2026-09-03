@@ -1,12 +1,14 @@
 # Features
-> Last updated: 2026-09-01
+> Last updated: 2026-09-03
 
 ## Purpose
 Gherkin specifications for grimoire's own behavior. Each `.feature` file describes how grimoire works — these are the contracts the CLI, skills, and workflows must honor.
 
 ## Boundaries
 - `features/` is the single home for every spec. Changes are made live on the feature branch by editing these files directly; git history is the record of what changed — there is no separate proposed/baseline copy and no archive.
-- Features are reference docs for humans and AI agents; they are not executed. `grimoire validate` parses them for structure but does not run them as tests.
+- Executable specifications run through the configured BDD runner.
+- `@manual` specifications use declared characterization or unit contracts instead of BDD step definitions.
+- `grimoire validate` checks Gherkin structure; Verify owns execution and contract confirmation.
 - Specs are grouped by area subdirectory — pick the directory matching the feature's primary user concern (e.g. `features/cli/` for CLI command behavior, `features/workflow/` for the skill pipeline, `features/bug/` for bug-handling skills).
 - Gherkin is optional. Use it only for clear actor-visible behavior that remains meaningful after reimplementation.
 - Prefer extending an existing feature when the actor and capability already match.

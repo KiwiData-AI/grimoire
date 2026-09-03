@@ -475,18 +475,6 @@ items:
     first_detected: 2026-05-22
     last_detected: 2026-05-22
 
-  - id: debt-026
-    category: structural_bloat
-    severity: low
-    location: src/core/archive.ts:17
-    title: archiveChange complexity 12
-    metrics: { complexity: 12 }
-    effort: small
-    causes: evolution
-    status: open
-    first_detected: 2026-05-22
-    last_detected: 2026-05-22
-
   - id: debt-027
     category: structural_bloat
     severity: low
@@ -547,18 +535,6 @@ items:
     first_detected: 2026-05-22
     last_detected: 2026-05-22
 
-  - id: debt-032
-    category: structural_bloat
-    severity: low
-    location: src/core/diff.ts:35
-    title: diffChange complexity 13
-    metrics: { complexity: 13 }
-    effort: small
-    causes: evolution
-    status: open
-    first_detected: 2026-05-22
-    last_detected: 2026-05-22
-
   - id: debt-033
     category: structural_bloat
     severity: low
@@ -601,30 +577,6 @@ items:
     location: src/core/health.ts:517
     title: writeBadges complexity 13
     metrics: { complexity: 13 }
-    effort: small
-    causes: evolution
-    status: open
-    first_detected: 2026-05-22
-    last_detected: 2026-05-22
-
-  - id: debt-037
-    category: structural_bloat
-    severity: low
-    location: src/core/map.ts:196
-    title: runJscpd complexity 12
-    metrics: { complexity: 12 }
-    effort: small
-    causes: evolution
-    status: open
-    first_detected: 2026-05-22
-    last_detected: 2026-05-22
-
-  - id: debt-038
-    category: structural_bloat
-    severity: low
-    location: src/core/map.ts:232
-    title: Arrow function complexity 12 in generateMap
-    metrics: { complexity: 12 }
     effort: small
     causes: evolution
     status: open

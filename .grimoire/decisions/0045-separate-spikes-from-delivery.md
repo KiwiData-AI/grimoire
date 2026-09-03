@@ -12,7 +12,7 @@ Grimoire applies test-first delivery rules to work whose behavior, contract, roo
 
 This conflates learning with delivery. It encourages invented fixtures and assertions while repeatedly starting expensive test infrastructure.
 
-This decision supersedes [0044]. It refines [0014] for unobserved provider contracts and [0035] for failed delivery attempts.
+This decision supersedes [0014](0014-contract-first-api-testing.md), [0035](0035-harden-autonomous-apply-loop.md), and [0044](0044-plan-review-timing-and-verification.md). It retains authoritative provider fixtures, apply working memory, soft run limits, cross-section thrash detection, and the reward-hack guard. It replaces their per-task red-green and autonomous retry rules.
 
 ## Decision Drivers
 
@@ -41,6 +41,8 @@ Every spike ends as answered, disproved, blocked, or inconclusive. Its findings 
 Within a change or bug, `n` is the next unused positive integer. A standalone response starts at `S1`.
 
 Active-change findings live in `learnings.md`. Bug findings live in `triage.md`. Standalone findings remain in the response unless directed elsewhere.
+
+Apply working memory also retains transient failure notes and durable discovered facts. Configured cost and wall-clock limits remain soft limits. Repeated failure classes across sections still stop autonomous delivery. Tests cannot be weakened or deleted to force confirmation.
 
 An answered spike may refine affected unchecked implementation mechanics. It cannot silently change approved behavior, scope, or architecture.
 

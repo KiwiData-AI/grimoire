@@ -1,10 +1,12 @@
 ---
-status: accepted
+status: superseded by 0045
 date: 2026-06-21
 decision-makers: [fred]
 ---
 
 # Harden the autonomous apply loop: learnings staging-file, instruction-only circuit breaker, cross-section thrash detection
+
+Superseded by [0045](0045-separate-spikes-from-delivery.md), which retains working memory and circuit breakers while replacing per-task red-green delivery.
 
 ## Context and Problem Statement
 

@@ -96,6 +96,8 @@ Validate every section dependency before dispatch. Require one `depends-on` comm
 
 Start a fresh implementation context for each substantial section. The section agent loads its context block and implements every unchecked task directly. Task checkboxes are the resume state. Write one `<!-- SESSION: ... -->` handoff under the last task before leaving the section.
 
+Set the manifest status to `implementing` before dispatching the first incomplete section.
+
 Read each activity's review marker before editing:
 
 - A `structure-before` activity pauses once for production-shape approval, then proceeds with direct autonomous implementation.
@@ -137,7 +139,7 @@ Start a fresh implementation context for each substantial section. One context c
 **Loading order:**
 1. `tasks.md` — your checklist (load once at start, find the current section)
 2. Read the `<!-- context: ... -->` block for the current section
-3. Load each file listed in the context block — this includes relevant `.grimoire/docs/conventions/<area>.md` files for directories touched by the diff (placement/naming guidance)
+3. Load each file listed in the context block, including relevant `.grimoire/docs/<area>.md` intent and placement guidance
 4. If a listed file doesn't exist, it may need to be created as part of the task — that's fine
 
 **If the context window fills up** (degraded output quality, forgotten context, repeated mistakes):
@@ -203,14 +205,14 @@ ends at "tests green" without finalizing leaves the change unfinished;
    no durable verified work is available for that commit. Run the pre-cleanup
    identity check from `../references/health-check.md` §A before continuing.
 3. Flip this change's proposed decisions to `accepted` and set the date.
-4. Apply `data.yml` entries to `.grimoire/docs/data/schema.yml` when present.
+4. Confirm any planned schema changes already exist in `.grimoire/docs/data/schema.yml` and match the verified implementation.
 5. Reconcile each durable fact in `learnings.md` into its named durable home.
    Discard failure-mode notes.
 6. Record every deferred task in `.grimoire/docs/debt-register.yml`. Each open
    task requires an explicit deferral note and a `category: deferred_task` entry
    containing the change-id. An unexplained open task blocks finalization.
 7. Remove `.grimoire/changes/<change-id>/`, including its design, manifest,
-   tasks, baseline, data delta, and working-memory files.
+   tasks, baseline, and working-memory files.
 8. Run `grimoire docs` after removal. It regenerates
    `.grimoire/docs/OVERVIEW.md` from the durable live state. When
    `tools.spec_site` is configured, the same command must regenerate and build
@@ -284,7 +286,7 @@ Present a brief summary:
 - If implementation reveals that a scenario is wrong or missing, STOP and go back to draft. Don't silently change features.
 - Keep changes minimal and focused — only implement what's in tasks.md
 - If blocked, flag it rather than working around it
-- Commit frequently — one commit per logical task is ideal. Every commit during apply **MUST** include a `Change: <change-id>` git trailer for audit traceability. Use `/grimoire:commit` or manually add the trailer.
+- Any ordinary mid-process commit must contain a coherent verified increment and a `Change: <change-id>` trailer.
 - Existing tests must keep passing. A grimoire change that breaks existing behavior is not complete.
 
 ## Done

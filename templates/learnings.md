@@ -15,8 +15,8 @@
 <!--
   Transient. One line per dead end: what was tried and why it failed, so the next
   attempt does not repeat it. This is the antidote to thrashing — a stuck retry
-  MUST read this section first. Pruned per task: delete a task's entries the
-  moment that task goes green. Never promoted anywhere.
+  MUST read this section first. Pruned per section: delete the section's entries
+  when its section confirmation passes. Never promoted anywhere.
 -->
 
 Format: `- <task-id> · tried <approach> · failed: <observed error / why>`

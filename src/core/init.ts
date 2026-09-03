@@ -122,16 +122,15 @@ function printNextSteps(isExistingProject: boolean, full: boolean): void {
   console.log("  features/              Gherkin feature files (behavioral specs)");
   console.log("  .grimoire/decisions/   MADR decision records (architectural specs)");
   console.log("  .grimoire/docs/        Project docs, data schema, and context");
-  console.log("  .grimoire/changes/     Changes in progress");
-  console.log("  .grimoire/archive/     Completed changes\n");
+  console.log("  .grimoire/changes/     Ephemeral coordination for active changes\n");
   console.log("Next steps:");
   if (isExistingProject) {
-    console.log("  1. Install codebase-memory-mcp (required for code discovery):");
+    console.log("  1. Install codebase-memory-mcp (recommended for code discovery):");
     console.log("     macOS / Linux: curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash");
-    console.log("  2. Run /grimoire:discover in your agent to generate conventions files and data schema");
+    console.log("  2. Run /grimoire:discover in your agent to generate intent-focused area docs and data schema");
     console.log("  3. Run /grimoire:audit in your agent to document existing features and decisions\n");
   } else {
-    console.log("  Run /grimoire:draft in your agent to write your first feature spec\n");
+    console.log("  Run /grimoire:draft in your agent to design your first change\n");
   }
   if (!full) {
     console.log(chalk.dim("  Run `grimoire configure` to set compliance, design tool, LLM models, bug trackers, and testing tools.\n"));

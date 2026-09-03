@@ -39,15 +39,12 @@ If the report cannot establish expected behavior and a reliable reproduction, al
 
 **Scenario exists** → The spec is right, the code is wrong. This is a pure implementation bug. Skip to step 3.
 
-**No scenario covers this behavior** → The bug reveals a gap in the specs. This is a missing scenario. Before fixing:
-1. Write a new scenario (or add to an existing feature) that describes the correct behavior
-2. Add it directly to `features/` (not through a full grimoire change — this is a gap fill, not new functionality)
-3. Note in a comment or commit message that this scenario was added to cover a discovered bug
+**No scenario covers this behavior** → Apply the Gherkin admission rule. An actor-visible requirement gap routes to `grimoire-draft`. An internal defect uses a named unit reproduction without manufacturing Gherkin.
 
 **Scenario is wrong** → Rare, but possible. The spec itself describes incorrect behavior. Flag this to the user — it may need a grimoire draft to update the feature properly.
 
 ### 2b. Capture Test Baseline
-Before you write the reproduction test, run the configured suites once and note which tests are **already** failing. A bug fix has no change folder, so record this inline — in the repro test's note and the eventual commit — and present pre-existing failures to the user. This is what lets step 4/7's "no regressions" mean something: a failure already red here is not yours. Capture this *before* the repro test exists, so the repro's intended red isn't mistaken for a pre-existing failure. Skippable if no test command is configured (say so). Full protocol: `../references/test-baseline.md`.
+Before you write the reproduction test, run the configured suites once and note which tests are **already** failing. A bug fix has no change folder, so present the baseline to the user and retain it in the eventual commit context. This is what lets step 4/7's "no regressions" mean something. Capture it before the repro test exists. Full protocol: `../references/test-baseline.md`.
 
 ### 3. Write a Reproduction Test
 Before touching any production code:
@@ -60,23 +57,16 @@ Before touching any production code:
 
 This is non-negotiable. A bug fix without a reproduction test is a guess that might work. A failing test is proof you understand the problem.
 
-### 4. Document the Bug
-Create a brief record in the test or commit. No separate tracking file needed — the test IS the documentation.
+### 4. Name the Reproduction
+Use a specific test or scenario name that makes the failed behavior obvious. Keep rationale in the commit message, not a source comment.
 
-The reproduction test should make the bug obvious:
+Example scenario:
 ```gherkin
 # Bug: users with special characters in email can't reset password
 Scenario: Password reset with plus-sign email
   Given a user exists with email "test+alias@example.com"
   When they request a password reset
   Then they should receive a reset email
-```
-
-Or as a unit test comment:
-```python
-def test_password_reset_special_chars():
-    """Bug: email addresses with + were being URL-encoded in the reset
-    link, causing lookup failures. Reported 2026-04-05."""
 ```
 
 The commit message should reference the bug:
@@ -125,7 +115,7 @@ Now — and only now — modify production code. **Apply `../references/code-qua
 - No new defensive guards inside the trust boundary — fix the real bug, don't paper over it with `if x is None` / `try-except`.
 - Specific names — no `data` / `result` / `temp` when a concrete name fits.
 - No new abstraction layer for a one-line bug fix.
-- Comments only for non-obvious *why* — one short note linking the bug + reproduction test is enough.
+- Comments follow `AGENTS.md`; never link source comments to a bug, task, or test artifact.
 
 Then:
 
@@ -201,7 +191,7 @@ Report to the user:
 - **Never game the regression test.** An agent must never weaken or delete a test without explicit user direction.
 - **The test is the source of truth, not your self-review.** When the same agent writes a fix and then reviews it, the same wrong assumption rides into both steps — "looks correct" is not evidence. The red→green of the named regression test (and the configured suites) is the proof. Don't declare a bug fixed on a code re-read; declare it fixed when the mechanical gate flips and stays green.
 - **Small fixes only.** If the bug fix requires significant architectural changes, it's not a bug fix — route to `grimoire-draft` for a proper change.
-- **Don't over-document.** The test is the documentation. A one-line comment in the test explaining the bug is enough. Don't create tracking files, bug reports, or manifests for a bug fix.
+- **Don't over-document.** A specific test name and commit message are enough. Don't create tracking files, bug reports, or manifests for a bug fix.
 - **The feature file is truth.** If a scenario describes behavior the user now says is wrong, that's a spec change, not a bug. Handle it through `grimoire-draft`.
 - **One bug, one fix.** Don't bundle "while I'm in here" improvements with a bug fix. Fix the bug, nothing more.
 - **Don't reflexively branch.** A bug related to in-flight work belongs on the in-flight branch — splitting it into a separate PR fragments the change and breaks the `Change:` trailer audit trail. Branch only when the bug is genuinely a separate concern. See step 5.

@@ -181,13 +181,13 @@ The end-to-end flow for a planned change is six stages, each owned by a skill:
 
 **Draft** (`/grimoire:draft`) → **Plan** (`/grimoire:plan`) → **Review** (`/grimoire:review`, optional) → **Apply** (`/grimoire:apply`) → **Verify** (`/grimoire:verify`) → **PR** (`/grimoire:pr`).
 
-Draft's single job is to design the change on `draft.md`. **Projection** — turning that agreed design into features, constraints, MADRs, `data.yml`, and the manifest — is the **first step of Plan**, not the end of Draft.
+Draft's single job is to design the change on `draft.md`. **Projection** — turning that agreed design into live features, constraints, MADRs, schema edits, and the manifest — is the **first step of Plan**, not the end of Draft.
 
 Each skill's SKILL.md is the authoritative home for that stage's mechanics; the README "Workflow" section is the narrative walkthrough. Do not re-derive stage steps here — invoke the skill. The operational invariants that bind every stage:
 
-- **Manifest status tracks progress:** the manifest is created at plan's projection step; `approved` once the design is agreed and projected, `implementing` during apply, `accepted` at PR.
+- **Manifest status tracks progress:** the manifest is created at Plan's projection step with `approved`, then Apply sets `implementing`. Apply finalization removes it.
 - **Live on the branch.** Features, decisions, constraints, and schema are edited directly on the feature branch — no copy-into-change-folder, no promote step.
-- **No archive step.** The PR diff *is* the change; git history plus the `Change: <id>` commit trailer are the record. PR finalize just flips decision status to `accepted` and removes the ephemeral change folder.
+- **No archive step.** The PR diff *is* the change; git history plus the `Change: <id>` commit trailer are the record. Apply finalization accepts proposed decisions and removes the ephemeral change folder; PR invokes it when needed.
 - **Never create a PR with `gh pr create` directly** while `.grimoire/changes/` contains an active change — route through `/grimoire:pr` so finalization happens.
 - **Planning assigns review timing.** `structure-before` pauses once for costly shapes. `slice-after` runs autonomously until the consolidated pre-commit review. Optional per-file review remains harness-level behavior.
 - **Testing lifecycle has one home.** Use `skills/references/testing-lifecycle.md` for spike classification, delivery cadence, section confirmation, and final verification.
@@ -241,7 +241,7 @@ Every manifest has a `status` field in YAML frontmatter (the manifest is created
 - `approved` — design agreed and projected, ready for implementation
 - `implementing` — tasks are being worked on
 
-Update the status as the change progresses. The CLI reads this to report change state. There is no `complete`/archive state — finalize removes the ephemeral change folder once the PR is opened; git history is the record.
+Update the status as the change progresses. The CLI reads this to report change state. There is no `complete`/archive state — Apply finalization removes the ephemeral change folder before PR creation; git history is the record.
 
 ### Change IDs
 - Kebab-case, verb-led: `add-two-factor-auth`, `update-login-flow`, `remove-legacy-api`

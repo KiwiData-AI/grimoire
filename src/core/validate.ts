@@ -55,28 +55,22 @@ export async function validateChange(
   const root = await findProjectRoot();
   const results: ValidationResult[] = [];
 
+  results.push(...(await validateFeatureFiles(join(root, "features"), options)));
+  results.push(...(await validateDecisionFiles(join(root, ".grimoire", "decisions"), options)));
+
   if (changeId) {
     const changePath = resolveChangePath(root, changeId);
-    await validateSingleChange(changePath, changeId, results, options);
+    await validateManifestFile(changePath, changeId, results, options);
   } else {
     const changesDir = join(root, ".grimoire", "changes");
     try {
       const entries = await readdir(changesDir, { withFileTypes: true });
       const changes = entries.filter((e) => e.isDirectory());
-      if (changes.length === 0) {
-        console.log("No active changes to validate.");
-        return { results, errorCount: 0, warnCount: 0 };
-      }
       for (const change of changes) {
-        await validateSingleChange(join(changesDir, change.name), change.name, results, options);
+        await validateManifestFile(join(changesDir, change.name), change.name, results, options);
       }
-    } catch (err: unknown) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        console.log("No active changes to validate.");
-      } else {
-        console.log("No .grimoire/changes/ directory found. Run grimoire init first.");
-      }
-      return { results, errorCount: 0, warnCount: 0 };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }
 
@@ -93,40 +87,44 @@ export async function validateChange(
 }
 
 async function validateFeatureFiles(
-  changePath: string,
+  featuresPath: string,
   options: ValidateOptions,
 ): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
+  let featureFiles: string[];
   try {
-    const featureFiles = await findFiles(join(changePath, "features"), ".feature");
-    for (const file of featureFiles) {
-      const result = validateFeatureFile(file, await readFile(file, "utf-8"), options.strict);
-      if (result.errors.length > 0 || result.warnings.length > 0) results.push(result);
-    }
-  } catch {
-    // No features dir
+    featureFiles = await findFiles(featuresPath, ".feature");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return results;
+    throw error;
+  }
+  for (const file of featureFiles) {
+    const result = validateFeatureFile(file, await readFile(file, "utf-8"), options.strict);
+    if (result.errors.length > 0 || result.warnings.length > 0) results.push(result);
   }
   return results;
 }
 
 async function validateDecisionFiles(
-  changePath: string,
+  decisionsPath: string,
   options: ValidateOptions,
 ): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
+  let decisionFiles: string[];
   try {
-    const decisionFiles = await findFiles(join(changePath, "decisions"), ".md");
-    for (const file of decisionFiles) {
-      const result = validateDecisionFile(file, await readFile(file, "utf-8"), options.strict);
-      if (result.errors.length > 0 || result.warnings.length > 0) results.push(result);
-    }
-  } catch {
-    // No decisions dir
+    decisionFiles = await findFiles(decisionsPath, ".md");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return results;
+    throw error;
+  }
+  for (const file of decisionFiles) {
+    const result = validateDecisionFile(file, await readFile(file, "utf-8"), options.strict);
+    if (result.errors.length > 0 || result.warnings.length > 0) results.push(result);
   }
   return results;
 }
 
-async function validateSingleChange(
+async function validateManifestFile(
   changePath: string,
   changeId: string,
   results: ValidationResult[],
@@ -138,12 +136,10 @@ async function validateSingleChange(
     if (manifestResult.errors.length > 0 || manifestResult.warnings.length > 0) {
       results.push(manifestResult);
     }
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     results.push({ file: `${changeId}/manifest.md`, errors: ["Manifest file missing"], warnings: [] });
   }
-
-  results.push(...(await validateFeatureFiles(changePath, options)));
-  results.push(...(await validateDecisionFiles(changePath, options)));
 }
 
 function parseGherkin(content: string): GherkinDocument | null {
@@ -269,7 +265,6 @@ const VALID_MANIFEST_STATUSES = [
   "draft",
   "approved",
   "implementing",
-  "complete",
 ];
 
 function validateManifestFrontmatter(

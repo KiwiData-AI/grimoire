@@ -16,7 +16,7 @@ Markdown skill definitions that provide Grimoire's AI-driven workflow. Skills ar
 
 ### Structure
 - Every SKILL.md follows a consistent shape: title, triggers (when it activates), prerequisites (what must already exist), a numbered workflow, and an "Important"/constraints section. See `skills/grimoire-draft/SKILL.md` as an exemplar.
-- Skills form a pipeline where each trusts the previous one's output: `branch-guard → draft → design-consult → design → plan → review → apply → commit → pr → pr-review`. `grimoire-spike` resolves engineering unknowns before delivery. Onboarding, bug-handling, and dependency skills sit alongside the main pipeline.
+- The planned-change pipeline is `draft → plan → optional review → apply → verify → PR`. Design consultation and design output precede Draft when needed. `grimoire-spike` resolves engineering unknowns before delivery.
 - `grimoire-precommit-review` remains available standalone and is invoked inside `grimoire-verify` during apply.
 - Reference links use a relative path, e.g. `See ../references/review-personas.md`.
 

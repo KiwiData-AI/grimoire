@@ -351,20 +351,40 @@ describe("runHealth", () => {
       expect(drift.items.some((i: any) => i.message.includes("pr.ts"))).toBe(false);
     });
 
-    it("flags a terminal decision that is still present", async () => {
+    it("preserves superseded and deprecated decisions without a deletion finding", async () => {
       mockReaddir.mockImplementation(async (path: any) => {
-        if (String(path).includes("decisions")) return ["0002-use-pg.md"] as any;
+        if (String(path).includes("decisions")) {
+          return ["0002-use-pg.md", "0003-use-sqlite.md", "0004-retire-cache.md", "0005-replacement.md"] as any;
+        }
         throw new Error("ENOENT");
       });
       mockReadFileOrNull.mockImplementation(async (path: string) => {
         if (path.includes("0002")) {
           return "---\nstatus: superseded by 0005\n---\n# Use PG";
         }
+        if (path.includes("0003")) return "---\nstatus: accepted\n---\n# Use SQLite";
+        if (path.includes("0004")) return "---\nstatus: deprecated\n---\n# Retire Cache";
+        if (path.includes("0005")) return "---\nstatus: accepted\n---\n# Replacement\n\nSupersedes [0002](0002-use-pg.md).";
         return null;
       });
 
       const drift = await driftMetric();
-      const item = drift.items.find((i: any) => i.message.includes("0002-use-pg.md"));
+      expect(drift.items.some((i: any) => /delete.*decision|terminal decision/i.test(i.action + i.message))).toBe(false);
+    });
+
+    it("flags a superseded decision whose replacement lacks a backlink", async () => {
+      mockReaddir.mockImplementation(async (path: any) => {
+        if (String(path).includes("decisions")) return ["0002-use-pg.md", "0005-use-sqlite.md"] as any;
+        throw new Error("ENOENT");
+      });
+      mockReadFileOrNull.mockImplementation(async (path: string) => {
+        if (path.includes("0002")) return "---\nstatus: superseded by 0005\n---\n# Use PG";
+        if (path.includes("0005")) return "---\nstatus: accepted\n---\n# Use SQLite";
+        return null;
+      });
+
+      const drift = await driftMetric();
+      const item = drift.items.find((i: any) => i.message.includes("0005") && i.message.includes("backlink"));
       expect(item).toBeDefined();
       expect(item.severity).toBe("review");
     });

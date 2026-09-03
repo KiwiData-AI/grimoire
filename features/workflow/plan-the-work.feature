@@ -56,6 +56,12 @@ Feature: Turn an approved spec into a plan
     And the work uses the matching internal test or decision record
     And planning continues without treating missing Gherkin as a gap
 
+  Scenario: Planning edits schema documentation in its durable home
+    Given an approved change that modifies the data model
+    When I ask grimoire to project and plan the work
+    Then the schema documentation is edited live on the feature branch
+    And no change-local schema copy is created
+
   Scenario: Planning orders actual section dependencies
     Given an approved change whose sections reference code and artifacts from other sections
     When I ask grimoire to plan the work

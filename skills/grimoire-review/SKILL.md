@@ -23,7 +23,7 @@ Use `../references/testing-lifecycle.md` to validate spike classification, secti
 - No tasks.md exists → `grimoire-plan` first
 - Level 1 change → skip review entirely, proceed to `grimoire-apply`
 - User says "skip review" → proceed to `grimoire-apply`
-- Reviewing the diff after coding (own change) → `grimoire-pr` post-impl review
+- Reviewing the complete implementation after coding → `grimoire-verify`
 - Reviewing a teammate's PR → `grimoire-pr-review`
 - Reviewing your own staged but uncommitted diff → `grimoire-precommit-review`
 
@@ -44,14 +44,13 @@ This step is optional. The user can skip it by saying "skip review" or "go strai
 - If only one, confirm it
 
 ### 2. Gather Context
-Read every artifact present for the change — see `../references/artifact-map.md` for what each is and the grimoire-docs-first / staleness discipline:
+Read every artifact present for the change — see `../references/artifact-map.md` for what each is and the docs-and-graph discipline:
 - `manifest.md` — change summary, scope, **and Prior Art section** (build-vs-buy rationale)
 - Changed or referenced `.feature` files, when present — behavioral specifications
 - Changed or referenced decision records, when present — architectural choices
 - `tasks.md` — implementation plan
-- `data.yml` — proposed schema changes (if present)
 - `.grimoire/config.yaml` for project context (language, tools, conventions, `comment_style`, `compliance`)
-- `.grimoire/docs/data/schema.yml` for current data baseline (if exists)
+- `.grimoire/docs/data/schema.yml` for current and proposed schema state (if changed)
 - `.grimoire/docs/context.yml` for deployment environment, related services, infrastructure (if exists) — informs security review (cross-service auth), engineering review (deployment constraints), and data review (infrastructure availability)
 - Relevant `.grimoire/docs/` area docs if they exist
 - Skim the areas of the codebase the tasks reference
@@ -106,7 +105,7 @@ Persona scope for design review:
 - 4.2 Senior Engineer — feasibility, simplicity, build-vs-buy, contract compatibility, quality attributes
 - 4.3 Security Engineer — STRIDE on the design + compliance (skip §4.3 "Code-level scan" — no code yet)
 - 4.4 QA Engineer — testability and edge cases (skip if purely internal)
-- 4.5 Data Engineer — schema/migration design (skip if no data.yml and no models touched)
+- 4.5 Data Engineer — schema/migration design (skip if no live schema or model changes)
 - 4.6 Code Style Reviewer — **skip** (no code yet; runs only on diff reviews)
 - 4.7 Adversarial User — engage per matrix; criteria in `../references/adversarial-personas.md`
 - 4.8 Contrarian — runs last when any persona produced a blocker; calibrates other personas' findings post-hoc

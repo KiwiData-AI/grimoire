@@ -263,7 +263,7 @@ async function checkConventionsDrift(root: string): Promise<Metric> {
 
 // --- Spec-process drift ---
 // Mechanical repo-wide checks: stale change folders, unproven constraint rows,
-// terminal ADRs, decision references in code, broken doc links, archive trees.
+// decision supersession integrity, decision references in code, broken doc links, archive trees.
 
 type DriftSeverity = "fix-now" | "review" | "info";
 
@@ -280,7 +280,7 @@ async function checkSpecDrift(root: string): Promise<Metric> {
   const groups = await Promise.all([
     findStaleChanges(root, trailers?.ids ?? new Set<string>()),
     findUnprovenConstraints(root),
-    findTerminalDecisions(root),
+    findSupersessionIssues(root),
     findDecisionReferences(root),
     findBrokenDocLinks(root),
     findArchiveTrees(root),
@@ -467,7 +467,7 @@ async function fileWithBasename(root: string, name: string): Promise<boolean> {
   }
 }
 
-async function findTerminalDecisions(root: string): Promise<SpecDriftItem[]> {
+async function findSupersessionIssues(root: string): Promise<SpecDriftItem[]> {
   const dir = join(root, ".grimoire", "decisions");
   let files: string[];
   try {
@@ -477,16 +477,36 @@ async function findTerminalDecisions(root: string): Promise<SpecDriftItem[]> {
     return [];
   }
 
-  const items: SpecDriftItem[] = [];
+  const decisions = new Map<string, string>();
   for (const file of files) {
     const content = await readFileOrNull(join(dir, file));
-    if (!content) continue;
-    const status = String(matter(content).data.status ?? "").toLowerCase();
-    if (status.includes("superseded") || status.includes("deprecated")) {
+    if (content) decisions.set(file, content);
+  }
+
+  const items: SpecDriftItem[] = [];
+  for (const [file, content] of decisions) {
+    const status = String(matter(content).data.status ?? "");
+    const supersession = status.match(/^superseded by\s+(\d+)$/i);
+    if (!supersession) continue;
+
+    const replacementNumber = supersession[1].padStart(4, "0");
+    const replacement = [...decisions.keys()].find((name) => name.startsWith(`${replacementNumber}-`));
+    if (!replacement) {
       items.push({
         severity: "review",
-        message: `${file}: status "${status}" — terminal decision still present`,
-        action: "delete the file; git history keeps the record",
+        message: `${file}: replacement decision ${replacementNumber} is missing`,
+        action: "restore the replacement decision or correct the superseded status",
+      });
+      continue;
+    }
+
+    const sourceNumber = file.slice(0, file.indexOf("-"));
+    const replacementContent = decisions.get(replacement)!;
+    if (!new RegExp(`(?:supersed(?:es|ing)|replac(?:es|ing))[^\\n]*\\b${sourceNumber}\\b`, "i").test(replacementContent)) {
+      items.push({
+        severity: "review",
+        message: `${replacement}: missing backlink to superseded decision ${sourceNumber}`,
+        action: `add the supersession backlink to ${replacement}`,
       });
     }
   }
@@ -1009,4 +1029,3 @@ async function readAllFiles(dirs: string[]): Promise<string[]> {
   }
   return contents;
 }
-

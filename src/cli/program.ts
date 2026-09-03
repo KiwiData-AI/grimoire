@@ -13,7 +13,6 @@ import { docsCommand } from "../commands/docs.js";
 import { healthCommand } from "../commands/health.js";
 import { prCommand } from "../commands/pr.js";
 import { testQualityCommand } from "../commands/test-quality.js";
-import { diffCommand } from "../commands/diff.js";
 import { ciCommand } from "../commands/ci.js";
 import { branchCheckCommand } from "../commands/branch-check.js";
 import { lintCommentsCommand } from "../commands/comment-lint.js";
@@ -43,7 +42,6 @@ export function buildProgram(): Command {
   program.addCommand(healthCommand);
   program.addCommand(prCommand);
   program.addCommand(testQualityCommand);
-  program.addCommand(diffCommand);
   program.addCommand(ciCommand);
   program.addCommand(branchCheckCommand);
   program.addCommand(lintCommentsCommand);

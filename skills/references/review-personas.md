@@ -242,7 +242,7 @@ Evaluate:
 - **Scope creep** *(PR/pre-commit)*: Files changed outside the scope implied by the change-id or manifest. Formatting-only changes to unrelated files = noise.
 - **Error handling**: Errors handled at boundaries? Internal code shouldn't be littered with defensive checks; external inputs must be validated.
 - **Tests**: New behaviors have tests? Tests make real assertions (not just `assert true` / mock everything)? Check `./testing-contracts.md` if framework matches.
-- **Contract compatibility**: If `data.yml` / `schema.yml` exists, does the design / diff change request/response shape for a documented API? Contract change without updated contract test = **blocker**.
+- **Contract compatibility**: Does the live schema diff change a documented API request or response shape? Contract changes without updated contract tests are blockers.
 - **Dependencies**: New packages not mentioned in tasks? Version bumps not noted?
 - **Task alignment** *(PR/pre-commit, if `tasks.md` exists)*: Does the diff complete the tasks as written? Any task marked done but no corresponding code?
 - **Surface area**: New public APIs/exports/interfaces beyond what's needed? Fewer public functions with fewer parameters is better.
@@ -323,9 +323,7 @@ Evaluate (every check anchored to behavior the spec / feature already defines):
 
 Skip unless change touches migrations, models, schema, or external API clients.
 
-Read:
-- `.grimoire/changes/<change-id>/data.yml` — proposed schema changes (design)
-- `.grimoire/docs/data/schema.yml` — current baseline
+Read `.grimoire/docs/data/schema.yml` and its branch diff for the current and proposed schema.
 
 Evaluate:
 - **Migrations — name the deployment consequence, don't mandate zero-downtime**: State plainly what the change costs to ship — does this ALTER **lock the table** (a downtime-incurring change)? Is it **backward-incompatible** (old app versions break mid-deploy)? Is it **irreversible**? Zero-downtime is *not* assumed — many projects accept a maintenance window. Surface the cost as a decision for the human ("this rename locks `users` and breaks rolling deploy — confirm a downtime window is acceptable, or split expand→contract to avoid it"), **not** an automatic blocker. **Expand–Contract / Parallel Change** (add new → backfill → switch reads → drop old) is the *option* offered when the project wants zero-downtime, never a requirement. **A downtime-incurring or backward-incompatible migration MUST be flagged in the PR / merge-request body** (a one-line `⚠️ incurs downtime` / `breaking schema change` note) so it's visible at merge — surfacing it only in the review is not enough.
@@ -333,7 +331,7 @@ Evaluate:
 - **Naming**: New fields follow existing schema conventions?
 - **Data minimization (PII)**: New columns holding personal data — each field necessary, purpose-bound, retention-limited, encrypted at rest if sensitive? Excess PII storage = finding. Pairs with the Security persona's LINDDUN Data-disclosure check (§4.3).
 - **Backward / forward compatibility (named outcome, not forced)**: State *whether* the change is backward-compatible (old readers survive) and forward-compatible (old code + new schema holds during deploy). Report the outcome so breaking is a *conscious* choice, not a surprise — the project decides if it's acceptable; don't force compatibility. If broken, it rides the same PR / merge-request flag as a downtime change.
-- **Breaking contract**: `data.yml` vs `schema.yml` — removed/renamed/retyped response fields or new required request fields = **blocker** unless migration path documented. (This is the silent-break exception: breaking a *documented consumer contract* without noting it harms other people's code — distinct from a self-contained downtime choice above.)
+- **Breaking contract**: Removed, renamed, or retyped response fields and new required request fields are blockers unless a migration path is documented. This is the silent-break exception for documented consumer contracts.
 - **Transactions**: Multi-step writes wrapped in a transaction?
 - **External APIs** *(design)*: New API dependency — `schema_ref` pointing to a stable spec? Fallback if API unavailable?
 

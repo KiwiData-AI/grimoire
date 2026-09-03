@@ -43,7 +43,7 @@ Produces the drift portion of the `grimoire health` report.
 |---|-------|------|-----|-----------------|----------|
 | 1 | Stale change folders: change-id appears in merged `Change:` trailers on main, or 0 tasks done for >30 days (manifest frontmatter date). Same git read also reports `Change:` trailer coverage on main as a % | mechanical | list `.grimoire/changes/*/`; `git log main --format="%(trailers:key=Change,valueonly)"`; read manifest date + tasks.md checkboxes | folder should be removed / change re-triaged | fix-now (merged) / review (stalled) / info (coverage %) |
 | 2 | Constraint register: verification cells containing "TODO"; named test ids that no longer exist (criteria: Policies) | mechanical | grep the register for `TODO`; grep the repo for each named class/method — no hit = stale citation | proven-only rule violated / stale citation | fix-now |
-| 3 | ADR corpus: terminal (superseded/deprecated) files lingering; one-way supersession links; count creep since last report; files failing the non-obvious bar (criteria: Policies) | mechanical (lingering, links, count) / judgment (non-obvious bar) | grep decision frontmatter/status lines; read both ADRs of each supersession pair; count files. Bar: read the ADR and reason | prune-candidates list | review (info: count creep) |
+| 3 | ADR corpus: Preserve superseded and deprecated decisions; require two-way supersession links; report count creep and files failing the non-obvious bar (criteria: Policies) | mechanical (links, count) / judgment (non-obvious bar) | grep decision frontmatter/status lines; read both ADRs of each supersession pair; count files. Bar: read the ADR and reason | broken-link and review list | review (info: count creep) |
 | 4 | ADR/change-id references in code comments or docs | mechanical | grep the repo for `ADR-`, `decisions/0`, active change-ids — outside `.grimoire/decisions/` and change folders | sweep list | review |
 | 5 | Feature files: scenarios whose endpoints/surfaces no longer exist; untagged scenarios silently excluded by the tag filter; inventory of `@not-implemented` scenarios with age | judgment | read scenarios against the current code surface; reason about each, don't pattern-match | stale-spec list | review (info: `@not-implemented` inventory) |
 | 6 | Docs (`OVERVIEW.md`, area docs): links to files that no longer exist | mechanical | resolve every relative link in `.grimoire/docs/*.md`; check the target exists | broken-link list | review |
@@ -63,5 +63,5 @@ The report is `grimoire health`'s output. There is no separate report file. Judg
 
 The criteria behind four rows are normative rules whose single home is AGENTS.md (Conventions). This file cites them and does not restate them:
 
-- **ADR bar** — governs §A#3 and §B#3's non-obvious bar.
-- **Proven-only constraints register** — governs §A#4 and §B#2.
+- **ADR bar** — governs §A#4 and §B#3's non-obvious bar.
+- **Proven-only constraints register** — governs §A#5 and §B#2.

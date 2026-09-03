@@ -10,8 +10,8 @@ metadata:
 # grimoire-draft
 
 Design a change on **one living document** (`draft.md`), iterating with the user until the
-design is agreed. `grimoire-plan` then **projects** that design into its durable homes
-(features, constraints, decisions) — draft itself does not write them.
+design is agreed. `grimoire-plan` then **projects** that design directly into its durable live homes
+(features, constraints, decisions, and schema) — draft itself does not write them.
 
 The core idea: spread-out artifacts hinder the thinking. So you do all the designing in a
 single coherent doc — diagram/sketch, a decision ledger, pseudo-code, an open-question
@@ -52,9 +52,7 @@ If unclear, ask one question. Do not default to "draft a feature".
 Complexity is an **output** of design, not an input — you cannot score it honestly before
 the design exists. Up front, make only one binary call:
 
-- **Trivial** — config, typo, copy change, single-file fix, dependency bump. Skip the
-  `draft.md` loop: make the change directly, record a minimal `manifest.md` (Why + file
-  list), done.
+- **Trivial** — config, typo, copy change, single-file fix, dependency bump. Skip Grimoire and make the direct change without planned-change artifacts.
 - **Non-trivial** — anything else. Build a `draft.md` and design the change (steps 3–7).
 
 The full **complexity level (1–4)** is scored at **projection** (`grimoire-plan`'s first step), once the design
@@ -64,7 +62,7 @@ research and elicit; depth grows with the change, it is not pre-allocated.
 
 | Level | Label | Signals | Drives (recorded at projection) |
 |-------|-------|---------|---------------------------------|
-| 1 | Trivial | Config, typo, copy, single-file fix | handled by the gate above — no `draft.md` |
+| 1 | Trivial | Config, typo, copy, single-file fix | handled directly — no planned-change artifacts |
 | 2 | Simple | Single capability, ≤3 files, no architecture/data changes | Plan: coarser tasks · Review: Senior Engineer only |
 | 3 | Moderate | Multiple capabilities, architecture decisions, data/dep changes | Plan: fine-grained · Review: all relevant personas · manifest carries Assumptions + Pre-Mortem |
 | 4 | Complex | Cross-cutting, multiple services, security-sensitive, new infra | Plan: fine-grained · Review: all personas mandatory (`grimoire-review` not optional) · Assumptions + Pre-Mortem |
@@ -154,21 +152,20 @@ Do NOT hand off to `grimoire-plan` without explicit user approval of the design.
 
 ### 7. Hand off — projection happens in plan
 
-Draft ends when the design on `draft.md` is agreed. **Projection — turning the design into its
-durable homes (features, constraints, MADRs, `data.yml`, manifest) — is now the first step of
+Draft ends when the design on `draft.md` is agreed. **Projection — turning the design into
+live features, constraints, MADRs, and schema, plus an ephemeral manifest — is now the first step of
 `grimoire-plan`**, co-located with the planning that consumes those homes. A two-phase draft
 (design *then* project) was one job too many; draft now does one thing — design the change —
 and hands the agreed `draft.md` to plan.
 
 So draft does **not** write `features/`, `.grimoire/docs/constraints.md`,
-`.grimoire/decisions/`, `data.yml`, or the full `manifest.md`. What it leaves for plan:
+`.grimoire/decisions/`, `.grimoire/docs/data/schema.yml`, or the full `manifest.md`. What it leaves for plan:
 
 - `draft.md` — the agreed design: the Decisions ledger (Y-statements), Decided/Open, Sketches,
   Constraints, and Cut sections. This is the single source plan projects from.
 - The change folder and the feature branch.
 
-**Exception — trivial changes** (the step-2 triviality gate) skip plan entirely: draft makes
-the change directly and records the minimal `manifest.md` (Why + file list) itself.
+Trivial changes exit Grimoire at the step-2 gate and create no change folder or manifest.
 
 ## Important
 - ONE change at a time. Don't combine unrelated changes.

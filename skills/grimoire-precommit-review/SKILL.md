@@ -13,6 +13,8 @@ Review your own uncommitted diff before you commit. Applies the shared persona e
 
 This is the single general code and best-practice review before `grimoire-commit`. Apply the single-pass convergence policy in `../references/review-personas.md` §2e with one accepted correction batch. Designed to be fast — default scope is the senior engineer + security quick scan + code style, with the full persona stack opt-in.
 
+Use `../references/testing-lifecycle.md` for correction confirmations and final-suite ownership.
+
 ## Triggers
 - User asks to review their own change before committing
 - Loose match: "review my changes", "review staged", "review before commit", "precommit review", "check my diff", "review what I'm about to commit"
@@ -65,10 +67,10 @@ ls .grimoire/changes/
 
 For the linked change, read:
 - `manifest.md` (Why, Non-goals, complexity)
-- All `.feature` files in the change
-- Decision records
+- Changed live `.feature` files
+- Changed live decision records and constraints
 - `tasks.md`
-- `data.yml` (if present)
+- `.grimoire/docs/data/schema.yml` when changed
 
 Cross-check filenames in the diff against `tasks.md` references — surface mismatches as a senior-engineer finding.
 
@@ -79,11 +81,7 @@ Cross-check filenames in the diff against `tasks.md` references — surface mism
 - Relevant `.grimoire/docs/<area>.md` for directories touched by the diff
 - Repo root: `AGENTS.md`, `CLAUDE.md`, `.editorconfig`, lint/format config files (for the code-style persona)
 
-**Doc freshness check:** For each area doc loaded, check its `last_updated` date against `git log -1 --format=%ci <directory>`. Collect all stale docs (doc older than the directory's most recent commit).
-
-If stale docs exist: invoke `grimoire-discover` in **targeted refresh** mode for those directories before continuing. Pass the directory list directly — discover will update only those area docs and their `last_updated` entries in `index.yml`. Do not skip this step or defer it to the user — stale docs produce wrong findings in the review (e.g., flagging a utility as missing when it was added last week).
-
-In hook mode (`GRIMOIRE_HOOK=1`): skip the refresh (too slow for a blocking hook). Log stale doc names to `.grimoire/.stale-docs` and continue with existing docs.
+Area docs describe intent and placement. Query the graph or read source for current symbols. Refresh an area doc only when its purpose, boundaries, placement, or conventions changed.
 
 **Coverage gap scan:** After loading area docs (and after any refresh), scan the diff for new behaviors with no Gherkin coverage:
 - New routes, URL patterns, or endpoints added (`urlpatterns`, `router.add`, `app.get`, etc.)
@@ -188,7 +186,7 @@ If invoked from a git pre-commit hook (env var `GRIMOIRE_HOOK=1` or argument `--
 - Suppress the briefing block (too noisy for hook output)
 - Print only blockers (suggestions to a side file: `.grimoire/.last-precommit-suggestions.md`)
 - Exit code 1 if blockers exist and `block_on: blocker`; exit 0 otherwise
-- Wire-up is manual: user adds `grimoire precommit-review --hook` to `.git/hooks/pre-commit`. Don't auto-install — the existing `grimoire init` already wires `grimoire check --changed`, and LLM-driven review is opt-in (slower, costs tokens)
+- Wire-up is manual: user adds `grimoire precommit-review --hook` to `.git/hooks/pre-commit`. Don't auto-install — `grimoire init` wires only lightweight lint, format, and doc-style checks, and LLM-driven review is opt-in (slower, costs tokens)
 
 This skill does not currently ship a CLI command; hook mode is provided as a convention so a future CLI wrapper can implement it without breaking the skill contract.
 

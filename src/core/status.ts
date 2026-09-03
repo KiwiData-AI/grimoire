@@ -3,7 +3,6 @@ import { join } from "node:path";
 import chalk from "chalk";
 import { matter } from "../utils/frontmatter.js";
 import { findProjectRoot, resolveChangePath } from "../utils/paths.js";
-import fg from "fast-glob";
 
 interface StatusOptions {
   json: boolean;
@@ -13,11 +12,9 @@ interface ChangeStatus {
   id: string;
   status: string;
   branch: string | null;
-  stage: "draft" | "planned" | "applying" | "complete";
+  stage: "draft" | "planned" | "applying" | "ready";
   artifacts: {
     manifest: boolean;
-    features: string[];
-    decisions: string[];
     tasks: TaskStatus | null;
   };
 }
@@ -35,8 +32,8 @@ async function readManifestStatus(changePath: string, status: ChangeStatus): Pro
     const fm = matter(manifestContent).data as { status?: string; branch?: string };
     if (fm.status) status.status = fm.status;
     if (fm.branch) status.branch = fm.branch;
-  } catch {
-    // no manifest
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 }
 
@@ -49,9 +46,9 @@ async function parseTasksStatus(changePath: string, status: ChangeStatus): Promi
     status.artifacts.tasks = { total: taskLines.length, completed, pending };
     status.stage = "planned";
     if (completed > 0 && completed < taskLines.length) status.stage = "applying";
-    if (completed === taskLines.length && taskLines.length > 0) status.stage = "complete";
-  } catch {
-    // no tasks
+    if (completed === taskLines.length && taskLines.length > 0) status.stage = "ready";
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 }
 
@@ -63,8 +60,6 @@ function printChangeStatus(status: ChangeStatus): void {
 
   console.log("Artifacts:");
   console.log(`  Manifest:  ${status.artifacts.manifest ? chalk.green("yes") : chalk.red("missing")}`);
-  console.log(`  Features:  ${status.artifacts.features.length > 0 ? status.artifacts.features.join(", ") : chalk.dim("none")}`);
-  console.log(`  Decisions: ${status.artifacts.decisions.length > 0 ? status.artifacts.decisions.join(", ") : chalk.dim("none")}`);
 
   if (status.artifacts.tasks) {
     const t = status.artifacts.tasks;
@@ -90,21 +85,10 @@ export async function getChangeStatus(
     status: "draft",
     branch: null,
     stage: "draft",
-    artifacts: { manifest: false, features: [], decisions: [], tasks: null },
+    artifacts: { manifest: false, tasks: null },
   };
 
   await readManifestStatus(changePath, status);
-
-  try {
-    const [features, decisions] = await Promise.all([
-      fg("features/**/*.feature", { cwd: changePath }),
-      fg("decisions/**/*.md", { cwd: changePath }),
-    ]);
-    status.artifacts.features = features;
-    status.artifacts.decisions = decisions;
-  } catch {
-    // no features/decisions
-  }
 
   await parseTasksStatus(changePath, status);
 
@@ -124,8 +108,8 @@ function stageLabel(stage: string): string {
       return chalk.blue("planned");
     case "applying":
       return chalk.cyan("applying");
-    case "complete":
-      return chalk.green("complete");
+    case "ready":
+      return chalk.green("ready");
     default:
       return stage;
   }

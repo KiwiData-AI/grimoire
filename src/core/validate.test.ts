@@ -23,14 +23,16 @@ vi.mock("../utils/fs.js", async () => {
   };
 });
 
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { findFiles } from "../utils/fs.js";
 
 const mockReadFile = vi.mocked(readFile);
+const mockReaddir = vi.mocked(readdir);
 const mockFindFiles = vi.mocked(findFiles);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockReaddir.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
   mockFindFiles.mockResolvedValue([]);
 });
 
@@ -315,6 +317,34 @@ date: 2026-01-15
 });
 
 describe("manifest validation", () => {
+  it.each(["draft", "approved", "implementing"])("accepts the %s manifest status", async (status) => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return VALID_MANIFEST.replace("status: draft", `status: ${status}`);
+      }
+      throw new Error("not found");
+    });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await validateChange("test", { strict: false, json: true });
+    expect(result.errorCount).toBe(0);
+  });
+
+  it.each(["complete", "accepted"])("rejects the retired %s manifest status", async (status) => {
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).includes("manifest.md")) {
+        return VALID_MANIFEST.replace("status: draft", `status: ${status}`);
+      }
+      throw new Error("not found");
+    });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await validateChange("test", { strict: false, json: true });
+    expect(result.results[0].errors).toEqual([
+      'Invalid status "' + status + '" — must be one of: draft, approved, implementing',
+    ]);
+  });
+
   it("detects invalid manifest status", async () => {
     mockReadFile.mockImplementation(async (path: any) => {
       if (path.includes("manifest.md")) return "---\nstatus: yolo\n---\n## Why\nBecause.\n## Feature Changes\n- something";
@@ -363,7 +393,7 @@ describe("manifest validation", () => {
   });
 
   it("detects missing manifest", async () => {
-    mockReadFile.mockRejectedValue(new Error("ENOENT"));
+    mockReadFile.mockRejectedValue(Object.assign(new Error("not found"), { code: "ENOENT" }));
 
     vi.spyOn(console, "log").mockImplementation(() => {});
     const result = await validateChange("test", { strict: false, json: true });
@@ -423,8 +453,6 @@ describe("manifest validation", () => {
   });
 
   it("validates all changes when no changeId provided", async () => {
-    const { readdir } = await import("node:fs/promises");
-    const mockReaddir = vi.mocked(readdir);
     mockReaddir.mockResolvedValue([
       { name: "change-a", isDirectory: () => true },
     ] as any);
@@ -439,21 +467,99 @@ describe("manifest validation", () => {
     expect(result.errorCount).toBe(0);
   });
 
-  it("reports no active changes when the changes directory is absent", async () => {
-    const { readdir } = await import("node:fs/promises");
-    const mockReaddir = vi.mocked(readdir);
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  it("validates malformed live specifications without an active change", async () => {
+    mockFindFiles.mockImplementation(async (dir: string, ext: string) => {
+      if (dir === "/fake/root/features" && ext === ".feature") {
+        return ["/fake/root/features/broken.feature"];
+      }
+      return [];
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("broken.feature")) return "not gherkin";
+      throw new Error("not found");
+    });
 
-    mockReaddir.mockResolvedValue([]);
-    const emptyResult = await validateChange(undefined, { strict: false, json: true });
-    const emptyOutput = log.mock.calls[0][0];
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await validateChange(undefined, { strict: false, json: true });
 
-    log.mockClear();
-    mockReaddir.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-    const absentResult = await validateChange(undefined, { strict: false, json: true });
+    expect(result.errorCount).toBe(1);
+    expect(result.results[0].file).toBe("/fake/root/features/broken.feature");
+  });
 
-    expect(absentResult).toEqual(emptyResult);
-    expect(log).toHaveBeenCalledWith(emptyOutput);
-    expect(emptyOutput).toBe("No active changes to validate.");
+  it("does not suppress active coordination read failures", async () => {
+    const failure = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    mockReaddir.mockRejectedValue(failure);
+
+    await expect(validateChange(undefined, { strict: false, json: true })).rejects.toBe(failure);
+  });
+
+  it.each([
+    ["features", "/fake/root/features"],
+    ["decisions", "/fake/root/.grimoire/decisions"],
+  ])("does not suppress live %s read failures", async (_kind, failingPath) => {
+    const failure = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    mockFindFiles.mockImplementation(async (path: string) => {
+      if (path === failingPath) throw failure;
+      return [];
+    });
+
+    await expect(validateChange(undefined, { strict: false, json: true })).rejects.toBe(failure);
+  });
+
+  it("does not report an unreadable manifest as missing", async () => {
+    const failure = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    mockReadFile.mockRejectedValue(failure);
+
+    await expect(validateChange("change-a", { strict: false, json: true })).rejects.toBe(failure);
+  });
+
+  it("validates every active manifest and both live specification homes", async () => {
+    mockReaddir.mockResolvedValue([
+      { name: "change-a", isDirectory: () => true },
+      { name: "change-b", isDirectory: () => true },
+    ] as any);
+    mockFindFiles.mockImplementation(async (dir: string, ext: string) => {
+      if (dir === "/fake/root/features" && ext === ".feature") {
+        return ["/fake/root/features/example.feature"];
+      }
+      if (dir === "/fake/root/.grimoire/decisions" && ext === ".md") {
+        return ["/fake/root/.grimoire/decisions/0001-example.md"];
+      }
+      return [];
+    });
+    mockReadFile.mockImplementation(async (path: any) => {
+      const file = String(path);
+      if (file.endsWith("manifest.md")) return VALID_MANIFEST;
+      if (file.endsWith(".feature")) {
+        return "Feature: Valid\n  Scenario: Works\n    When it runs\n    Then it passes\n";
+      }
+      if (file.endsWith(".md")) {
+        return "---\nstatus: accepted\ndate: 2026-01-01\n---\n## Context and Problem Statement\nX\n## Considered Options\nX\n## Decision Outcome\nX";
+      }
+      throw new Error("not found");
+    });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await validateChange(undefined, { strict: false, json: true });
+
+    expect(result.errorCount).toBe(0);
+    expect(mockReadFile).toHaveBeenCalledWith("/fake/root/.grimoire/changes/change-a/manifest.md", "utf-8");
+    expect(mockReadFile).toHaveBeenCalledWith("/fake/root/.grimoire/changes/change-b/manifest.md", "utf-8");
+    expect(mockFindFiles).toHaveBeenCalledWith("/fake/root/features", ".feature");
+    expect(mockFindFiles).toHaveBeenCalledWith("/fake/root/.grimoire/decisions", ".md");
+  });
+
+  it("validates a selected manifest with the same live specifications", async () => {
+    mockFindFiles.mockResolvedValue([]);
+    mockReadFile.mockImplementation(async (path: any) => {
+      if (String(path).endsWith("manifest.md")) return VALID_MANIFEST;
+      throw new Error("not found");
+    });
+
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    await validateChange("change-a", { strict: false, json: true });
+
+    expect(mockFindFiles).toHaveBeenCalledWith("/fake/root/features", ".feature");
+    expect(mockFindFiles).toHaveBeenCalledWith("/fake/root/.grimoire/decisions", ".md");
   });
 });

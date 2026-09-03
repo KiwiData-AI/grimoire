@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
 
 const skill = (name: string) =>
   readFile(resolve("skills", name, "SKILL.md"), "utf-8");
@@ -22,6 +23,188 @@ function expectOrdered(content: string, clauses: string[]): void {
 }
 
 describe("skill contracts", () => {
+  const activeWorkflowFiles = [
+    "AGENTS.md",
+    "README.md",
+    "skills/grimoire-draft/SKILL.md",
+    "skills/grimoire-plan/SKILL.md",
+    "skills/grimoire-review/SKILL.md",
+    "skills/grimoire-apply/SKILL.md",
+    "skills/grimoire-verify/SKILL.md",
+    "skills/grimoire-pr/SKILL.md",
+    "skills/grimoire-remove/SKILL.md",
+    "skills/grimoire-audit/SKILL.md",
+    "skills/grimoire-refactor/SKILL.md",
+    "skills/grimoire-bug/SKILL.md",
+    "skills/grimoire-bug-triage/SKILL.md",
+    "skills/grimoire-pr-review/SKILL.md",
+    "skills/grimoire-precommit-review/SKILL.md",
+    "skills/grimoire-discover/SKILL.md",
+    "skills/references/artifact-map.md",
+    "skills/references/health-check.md",
+    "skills/references/pattern-guard.md",
+    "skills/references/review-personas.md",
+    "skills/references/refactor-scan-categories.md",
+    "skills/references/testing-lifecycle.md",
+    "skills/references/testing-contracts.md",
+    "templates/constraints.md",
+    "templates/learnings.md",
+  ];
+
+  const readActiveWorkflow = () =>
+    Promise.all(activeWorkflowFiles.map((name) => rootFile(name).then(normalize)));
+
+  it("keeps active workflow guidance on one live-artifact lifecycle", async () => {
+    const [files, draftSkill, planSkill, applySkill, verifySkill, prSkill] =
+      await Promise.all([
+        readActiveWorkflow(),
+        skill("grimoire-draft").then(normalize),
+        skill("grimoire-plan").then(normalize),
+        skill("grimoire-apply").then(normalize),
+        skill("grimoire-verify").then(normalize),
+        skill("grimoire-pr").then(normalize),
+      ]);
+
+    for (const content of files) {
+      expect(content).not.toMatch(
+        /\.grimoire\/changes\/(?:<change-id>|<id>)\/(?:features|decisions|data\.yml)/,
+      );
+      expect(content).not.toContain("manifest status to `accepted`");
+      expect(content).not.toContain("manifest status to `complete`");
+    }
+
+    expect(draftSkill).toContain("draft itself does not write them");
+    expect(draftSkill).not.toContain("record a minimal `manifest.md`");
+    expect(planSkill).toContain("directly into their durable live homes");
+    expect(planSkill).toContain("status `approved`");
+    expect(applySkill).toContain("Set the manifest status to `implementing`");
+    expect(verifySkill).toContain("owns Grimoire alignment, deterministic checks, pre-commit review, and final suites");
+    expect(prSkill).toContain("execute `grimoire-apply` §7");
+  });
+
+  it("routes alternate workflows through their stage owners", async () => {
+    const [auditSkill, refactorSkill, triageSkill, removeSkill] = await Promise.all([
+      skill("grimoire-audit").then(normalize),
+      skill("grimoire-refactor").then(normalize),
+      skill("grimoire-bug-triage").then(normalize),
+      skill("grimoire-remove").then(normalize),
+    ]);
+
+    for (const findingsSkill of [auditSkill, refactorSkill]) {
+      expect(findingsSkill).toContain("grimoire-draft");
+      expect(findingsSkill).toContain("grimoire-plan");
+      expect(findingsSkill).not.toContain("Draft `.feature` files");
+    }
+    expect(triageSkill).toContain("Triage produces evidence, not planned-change artifacts.");
+    expect(triageSkill).not.toContain("Generate a draft manifest stub");
+    expect(removeSkill).toContain("Block removal while active dependents remain");
+    expect(removeSkill).toContain("Obtain explicit approval for the deletion scope");
+    expect(removeSkill).toContain("route the approved removal through `grimoire-draft` and `grimoire-plan`");
+    expect(removeSkill).not.toContain("Proposed feature files");
+    expect(removeSkill).not.toContain("Create `tasks.md`");
+  });
+
+  it("keeps testing, spikes, and provider mechanics in their authoritative references", async () => {
+    const files = await readActiveWorkflow();
+    const [lifecycle, contracts] = await Promise.all([
+      reference("testing-lifecycle.md").then(normalize),
+      reference("testing-contracts.md").then(normalize),
+    ]);
+
+    expect(lifecycle).toContain("unknown");
+    expect(lifecycle).toContain("findings-only spike");
+    expect(contracts).toContain("authoritative observed provider response");
+    for (const content of files) {
+      expect(content).not.toContain("Every task follows the same cycle");
+      expect(content).not.toContain("Run the full suite after every");
+    }
+  });
+
+  it("keeps intent docs semantic and health checks historical", async () => {
+    const [artifactMap, discoverSkill, precommitSkill, health, categories, refactorSkill, constraints, learnings] =
+      await Promise.all([
+        reference("artifact-map.md").then(normalize),
+        skill("grimoire-discover").then(normalize),
+        skill("grimoire-precommit-review").then(normalize),
+        reference("health-check.md").then(normalize),
+        reference("refactor-scan-categories.md").then(normalize),
+        skill("grimoire-refactor").then(normalize),
+        rootFile("templates/constraints.md").then(normalize),
+        rootFile("templates/learnings.md").then(normalize),
+      ]);
+
+    for (const content of [artifactMap, discoverSkill, precommitSkill]) {
+      expect(content).not.toContain("git log -1 --format=%ci");
+      expect(content).not.toContain("staleness gate");
+    }
+    expect(health).toContain("Preserve superseded and deprecated decisions");
+    expect(health).toContain("two-way supersession links");
+    expect(health).toContain("§A#4");
+    expect(health).toContain("§A#5");
+    for (const category of [
+      "hotspot",
+      "structural_bloat",
+      "data_structure",
+      "circular_dependency",
+      "dependency_staleness",
+      "broken_promise",
+      "duplication",
+      "reinvented_platform",
+      "dead_code",
+      "test_debt",
+      "pattern_divergence",
+      "comment_noise",
+      "deferred_task",
+    ]) {
+      expect(categories).toContain(`\`${category}\``);
+      expect(refactorSkill).toContain(`\`${category}\``);
+    }
+    expect(constraints).toContain("A row may be added only when its verification already passes.");
+    expect(constraints).not.toContain("TODO: unit-invariant test");
+    expect(learnings).toContain("section confirmation passes");
+    expect(learnings).not.toContain("moment that task goes green");
+  });
+
+  it("aligns narrative, generated guidance, repository data, and release metadata", async () => {
+    const [readme, setup, cli, context, debt, features, marketplace, packageJson, packageLock] =
+      await Promise.all([
+        rootFile("README.md").then(normalize),
+        rootFile("docs/guide/setup.md").then(normalize),
+        rootFile("docs/reference/cli.md").then(normalize),
+        rootFile(".grimoire/docs/context.yml").then(normalize),
+        rootFile(".grimoire/docs/debt-register.yml"),
+        rootFile(".grimoire/docs/features.md").then(normalize),
+        rootFile(".claude-plugin/marketplace.json").then(normalize),
+        rootFile("package.json").then(JSON.parse),
+        rootFile("package-lock.json").then(JSON.parse),
+      ]);
+
+    expect(readme).not.toContain("`grimoire diff <id>`");
+    expect(readme).not.toContain("`data.yml`");
+    expect(readme).toContain("pre-commit hook runs the configured lint, format, and doc-style steps");
+    expect(setup).toContain(".grimoire/config.yaml");
+    expect(setup).not.toContain(".grimoire/config.yml");
+    expect(cli).not.toContain("## `grimoire diff`");
+    expect(context).not.toContain("used_by: [map, health]");
+    const debtItems = parseYaml(debt).items;
+    const openLocations = debtItems
+      .filter((item: { status: string }) => item.status === "open")
+      .map((item: { location: string }) => item.location);
+    for (const removed of ["src/core/archive.ts", "src/core/map.ts", "src/core/diff.ts"]) {
+      expect(openLocations.some((location: string) => location.startsWith(removed))).toBe(false);
+    }
+    expect(features).toContain("Executable specifications run through the configured BDD runner.");
+    expect(features).toContain(
+      "`@manual` specifications use declared characterization or unit contracts",
+    );
+    expect(marketplace).toContain("question-driven spikes");
+    expect(marketplace).toContain("verification-boundary delivery");
+    expect(marketplace).not.toContain("red-green development for AI agents");
+    expect(packageJson.version).toBe("0.4.1");
+    expect(packageLock.version).toBe("0.4.1");
+    expect(packageLock.packages[""].version).toBe("0.4.1");
+  });
+
   it("plans substantial sections with lifecycle-owned confirmation", async () => {
     const [planSkill, reviewSkill, lifecycle] = await Promise.all([
       skill("grimoire-plan").then(normalize),
@@ -340,7 +523,7 @@ describe("skill contracts", () => {
     expectOrdered(applySkill, [
       "Verify branch history contains at least one ordinary commit whose body has `Change: <change-id>`.",
       "The qualifying commit must contain durable verified work only and must contain no path under `.grimoire/changes/<change-id>/`.",
-      "Remove `.grimoire/changes/<change-id>/`, including its design, manifest, tasks, baseline, data delta, and working-memory files.",
+      "Remove `.grimoire/changes/<change-id>/`, including its design, manifest, tasks, baseline, and working-memory files.",
     ]);
     expect(commitSkill).toContain(
       "That commit contains durable verified work only and no active change-folder scaffolding.",
@@ -352,7 +535,7 @@ describe("skill contracts", () => {
 
     expectOrdered(applySkill, [
       "Record every deferred task in `.grimoire/docs/debt-register.yml`.",
-      "Remove `.grimoire/changes/<change-id>/`, including its design, manifest, tasks, baseline, data delta, and working-memory files.",
+      "Remove `.grimoire/changes/<change-id>/`, including its design, manifest, tasks, baseline, and working-memory files.",
       "Run `grimoire docs` after removal.",
       "Stage the complete intended durable final state in the ordinary Git index.",
       "Run the applicable post-cleanup health checks",
@@ -488,9 +671,8 @@ describe("skill contracts", () => {
     expect(quality).not.toContain("per file, per task");
     expect(quality).not.toContain("re-run tests");
     expect(quality).not.toContain("This gate exists");
-    expect(refactorSkill).toContain(
-      "Do not rerun configured suites after each incremental move.",
-    );
+    expect(refactorSkill).toContain("../references/testing-lifecycle.md");
+    expect(refactorSkill).not.toContain("Capture a baseline first, then keep it.");
   });
 
   it("identifies release 0.4.1 in package metadata", async () => {

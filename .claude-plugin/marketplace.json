@@ -7,7 +7,7 @@
     {
       "name": "grimoire",
       "source": "./",
-      "description": "BDD-powered AI coding assistant — Gherkin specs, MADR decisions, and red-green development for AI agents"
+      "description": "Spec-driven AI coding with question-driven spikes, Gherkin and MADR artifacts, and verification-boundary delivery"
     },
     {
       "name": "ste",

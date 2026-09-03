@@ -10,7 +10,6 @@ export { detectTools } from "./core/detect.js";
 export { traceFile } from "./core/trace.js";
 export { generateDocs } from "./core/docs.js";
 export { runHealth } from "./core/health.js";
-export { diffChange, type DiffResult } from "./core/diff.js";
 export { runCi } from "./core/ci.js";
 export { analyzeTestQuality, type TestQualityReport } from "./core/test-quality.js";
 export { checkDocStyle, type DocStyleReport } from "./core/doc-style.js";

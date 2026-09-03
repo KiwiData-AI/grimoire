@@ -1,6 +1,6 @@
 # Spikes, Section Delivery, and Final Verification
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Scope:** Portable Grimoire planning, implementation, review, and verification.
 

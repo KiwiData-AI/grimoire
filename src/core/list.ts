@@ -13,17 +13,17 @@ interface ChangeInfo {
   stage: string;
   hasManifest: boolean;
   hasTasks: boolean;
-  hasFeatures: boolean;
-  hasDecisions: boolean;
-  featureFiles: string[];
+  hasDraft: boolean;
+  hasLearnings: boolean;
 }
 
 async function buildChangeInfo(changePath: string, changeName: string): Promise<ChangeInfo> {
-  const hasManifest = await fileExists(join(changePath, "manifest.md"));
-  const hasTasks = await fileExists(join(changePath, "tasks.md"));
-  const featureFiles = await fg("features/**/*.feature", { cwd: changePath });
-  const hasFeatures = featureFiles.length > 0;
-  const hasDecisions = await dirHasFiles(join(changePath, "decisions"), ".md");
+  const [hasManifest, hasTasks, hasDraft, hasLearnings] = await Promise.all([
+    fileExists(join(changePath, "manifest.md")),
+    fileExists(join(changePath, "tasks.md")),
+    fileExists(join(changePath, "draft.md")),
+    fileExists(join(changePath, "learnings.md")),
+  ]);
 
   let status = "draft";
   let branch: string | null = null;
@@ -41,30 +41,22 @@ async function buildChangeInfo(changePath: string, changeName: string): Promise<
     stage: hasTasks ? "planned" : "draft",
     hasManifest,
     hasTasks,
-    hasFeatures,
-    hasDecisions,
-    featureFiles,
+    hasDraft,
+    hasLearnings,
   };
 }
 
-function printChangeListOutput(results: ChangeInfo[], conflicts: Conflict[]): void {
+function printChangeListOutput(results: ChangeInfo[]): void {
   console.log(chalk.bold("Active changes:\n"));
   for (const r of results) {
     const artifacts = [
       r.hasManifest ? "manifest" : null,
-      r.hasFeatures ? "features" : null,
-      r.hasDecisions ? "decisions" : null,
       r.hasTasks ? "tasks" : null,
+      r.hasDraft ? "draft" : null,
+      r.hasLearnings ? "learnings" : null,
     ].filter(Boolean).join(", ");
     const branchInfo = r.branch ? ` ${chalk.dim(`→ ${r.branch}`)}` : "";
     console.log(`  ${chalk.cyan(r.id)} ${chalk.dim(`[${r.status}]`)} — ${artifacts}${branchInfo}`);
-  }
-  if (conflicts.length > 0) {
-    console.log(chalk.bold.yellow("\nConflicts detected:\n"));
-    for (const c of conflicts) {
-      console.log(`  ${chalk.yellow("!")} ${chalk.bold(c.file)} is touched by: ${c.changes.join(", ")}`);
-    }
-    console.log(chalk.dim("\n  These changes modify the same feature file. Coordinate before applying."));
   }
 }
 
@@ -72,58 +64,33 @@ export async function listChanges(json: boolean): Promise<void> {
   const root = await findProjectRoot();
   const changesDir = join(root, ".grimoire", "changes");
 
+  let entries;
   try {
-    const entries = await readdir(changesDir, { withFileTypes: true });
-    const changes = entries.filter((e) => e.isDirectory());
-
-    if (changes.length === 0) {
-      if (json) console.log(JSON.stringify([]));
-      else console.log("No active changes.");
-      return;
-    }
-
-    const results: ChangeInfo[] = [];
-    for (const change of changes) {
-      results.push(await buildChangeInfo(join(changesDir, change.name), change.name));
-    }
-
-    const conflicts = detectConflicts(results);
-
-    if (json) {
-      console.log(JSON.stringify({ changes: results, conflicts }, null, 2));
-    } else {
-      printChangeListOutput(results, conflicts);
-    }
-  } catch {
-    if (json) console.log(JSON.stringify({ changes: [], conflicts: [] }));
+    entries = await readdir(changesDir, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (json) console.log(JSON.stringify({ changes: [] }));
     else console.log("No .grimoire/changes/ directory. Run grimoire init first.");
+    return;
   }
-}
 
-interface Conflict {
-  file: string;
-  changes: string[];
-}
+  const changes = entries.filter((entry) => entry.isDirectory());
+  if (changes.length === 0) {
+    if (json) console.log(JSON.stringify([]));
+    else console.log("No active changes.");
+    return;
+  }
 
-function detectConflicts(changes: ChangeInfo[]): Conflict[] {
-  const fileToChanges = new Map<string, string[]>();
-
+  const results: ChangeInfo[] = [];
   for (const change of changes) {
-    for (const file of change.featureFiles) {
-      const existing = fileToChanges.get(file) || [];
-      existing.push(change.id);
-      fileToChanges.set(file, existing);
-    }
+    results.push(await buildChangeInfo(join(changesDir, change.name), change.name));
   }
 
-  const conflicts: Conflict[] = [];
-  for (const [file, changeIds] of fileToChanges) {
-    if (changeIds.length > 1) {
-      conflicts.push({ file, changes: changeIds });
-    }
+  if (json) {
+    console.log(JSON.stringify({ changes: results }, null, 2));
+  } else {
+    printChangeListOutput(results);
   }
-
-  return conflicts;
 }
 
 export async function listFeatures(json: boolean): Promise<void> {
@@ -168,14 +135,5 @@ export async function listDecisions(json: boolean): Promise<void> {
       const title = titleMatch ? titleMatch[1] : d;
       console.log(`  ${chalk.dim(d.replace(".grimoire/decisions/", ""))} ${title}`);
     }
-  }
-}
-
-async function dirHasFiles(dir: string, ext: string): Promise<boolean> {
-  try {
-    const entries = await readdir(dir, { recursive: true });
-    return entries.some((e) => e.endsWith(ext));
-  } catch {
-    return false;
   }
 }

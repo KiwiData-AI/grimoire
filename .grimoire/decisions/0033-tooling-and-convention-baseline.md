@@ -12,6 +12,11 @@ The grimoire CLI makes a handful of tooling and convention choices that are the 
 
 This record consolidates them. It exists so the conventions are written down once, not to justify a trade-off. Only the **load-bearing rules** (the parts that govern where future code goes) are kept; the alternatives-considered narrative lives in git history.
 
+## Considered Options
+
+1. Retain one decision record for each standard tool and convention.
+2. Consolidate the standard choices into one tooling baseline.
+
 ## Decision Outcome
 
 | Choice | Pick | Why (industry default) |
