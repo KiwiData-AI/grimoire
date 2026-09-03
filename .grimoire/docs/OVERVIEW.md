@@ -329,7 +329,7 @@ Key decisions recorded as MADR (Markdown Any Decision Records).
 | 0041 | MkDocs Material for the Generated Spec Site | accepted | 2026-08-21 |
 | 0042 | PR Gate Enforces Finalization with a Shared Health Check | accepted | 2026-08-21 |
 | 0045 | Separate question-driven spikes from delivery verification | accepted | 2026-09-03 |
-| 0046 | Complete the live-artifact workflow across CLI and skills | proposed | 2026-09-03 |
+| 0046 | Complete the live-artifact workflow across CLI and skills | accepted | 2026-09-03 |
 
 ### Use Gherkin instead of custom WHEN/THEN format
 
@@ -803,5 +803,3 @@ ADR 0031 replaced change-folder specification copies with live branch edits and 
 ## Active Work
 
 Changes currently in progress.
-
-- **align-workflow-guidance**: Align workflow guidance (implementing — 7/7 tasks)
