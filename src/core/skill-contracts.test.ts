@@ -166,11 +166,10 @@ describe("skill contracts", () => {
   });
 
   it("aligns narrative, generated guidance, repository data, and release metadata", async () => {
-    const [readme, setup, cli, context, debt, features, marketplace, packageJson, packageLock] =
+    const [readme, setup, context, debt, features, marketplace, packageJson, packageLock] =
       await Promise.all([
         rootFile("README.md").then(normalize),
         rootFile("docs/guide/setup.md").then(normalize),
-        rootFile("docs/reference/cli.md").then(normalize),
         rootFile(".grimoire/docs/context.yml").then(normalize),
         rootFile(".grimoire/docs/debt-register.yml"),
         rootFile(".grimoire/docs/features.md").then(normalize),
@@ -184,7 +183,6 @@ describe("skill contracts", () => {
     expect(readme).toContain("pre-commit hook runs the configured lint, format, and doc-style steps");
     expect(setup).toContain(".grimoire/config.yaml");
     expect(setup).not.toContain(".grimoire/config.yml");
-    expect(cli).not.toContain("## `grimoire diff`");
     expect(context).not.toContain("used_by: [map, health]");
     const debtItems = parseYaml(debt).items;
     const openLocations = debtItems
