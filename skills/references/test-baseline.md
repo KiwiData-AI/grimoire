@@ -1,12 +1,12 @@
 # Test Baseline Reference
 
-Loaded by skills that mutate code (`grimoire-apply`, `grimoire-bug`, `grimoire-refactor`) and the skill that checks for regressions (`grimoire-verify`).
+Loaded by skills that mutate code (`grimoire-apply`, `grimoire-bug`, `grimoire-refactor`) and the skill that checks for regressions (`grimoire-verify`). Lifecycle cadence lives in `testing-lifecycle.md`.
 
 ## Why
 
 "That's a pre-existing failure" is unfalsifiable if you never recorded what was failing *before* you started. Without a baseline, verify diffs against nothing — a regression you introduced and a failure that was already red look identical, and the user finds out at the end instead of signing off at the start.
 
-The fix is cheap: you already run the suite when you pick up a change. **Capture which tests were already failing, save it, and let the user accept it before any code is touched.** Verify then flags only *new* failures as regressions.
+Run configured suites once before delivery and once during final verification. Capture which tests were already failing, save them, and let the user accept them before code is touched. Verify then flags only new failures as regressions.
 
 This is not a new gate. It's saving the result of a run you already do.
 

@@ -1,6 +1,6 @@
 {
   "name": "grimoire",
-  "description": "BDD-powered AI coding assistant — Gherkin specs, MADR decisions, and red-green development for AI agents",
+  "description": "Spec-driven AI coding with question-driven spikes, section confirmation, and final-boundary verification",
   "version": "0.1.5",
   "author": "Kiwi Data",
   "homepage": "https://github.com/KiwiData-AI/grimoire",

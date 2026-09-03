@@ -9,7 +9,7 @@ metadata:
 
 # grimoire-bug
 
-Disciplined bug fix workflow: reproduce first, then fix. Every bug gets a failing test before any code changes.
+Disciplined bug fix workflow for understood defects. It keeps one observed failing reproduction before production changes and one passing reproduction afterward. Use `../references/testing-lifecycle.md` for mode selection and suite cadence.
 
 ## Triggers
 - User reports a bug, defect, or unexpected behavior
@@ -18,6 +18,7 @@ Disciplined bug fix workflow: reproduce first, then fix. Every bug gets a failin
 
 ## Routing
 - Tester/non-developer reporting a bug → `grimoire-bug-report`
+- Expected behavior, root cause, reliable reproduction, or implementation direction is unknown → `grimoire-spike` before delivery
 - Feature request disguised as a bug → `grimoire-draft`
 - Performance issue → handle directly (profiling, not repro test)
 - Configuration error → just fix the config
@@ -30,7 +31,7 @@ Get enough information to reproduce:
 - **What should happen** — the expected behavior
 - **How to trigger it** — steps to reproduce
 
-If the user's report is vague, ask one clarifying question. Don't start fixing until you can describe the reproduction steps.
+If the report cannot establish expected behavior and a reliable reproduction, allocate a referenced spike. Do not invent a regression contract.
 
 ### 2. Classify the Bug
 
@@ -131,17 +132,17 @@ Then:
 1. Make the smallest change that fixes the failing test
 2. **Hallucination check:** Before running tests, verify every external function/method the fix calls actually exists: `search_graph(name_pattern="<name>")` for each new call. If not found: locate the correct function or stop and flag to user. (Full instructions in `../references/pattern-guard.md` Step 6. Skip if graph not indexed.)
 3. Run the reproduction test — it should pass
-4. Run ALL existing tests — no *new* failures vs the step 2b baseline. A test already failing in the baseline is pre-existing and accepted; a test failing now that wasn't then is a regression you introduced — fix it.
+4. Defer all configured suites to final verification. Use focused reruns only to diagnose a failure already observed there.
 5. If the fix is more than a few lines, pause and consider whether the approach is the simplest one
-6. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix and re-run tests.
+6. Apply the quick writing self-check in `../references/code-quality.md`. Correct issues directly without adding another reproduction run.
 
 **Escalation guard:** If the fix requires changes to more than 3 files, introduces new abstractions, modifies data models, or crosses service boundaries — STOP. This is not a bug fix, it's a change that needs design. Tell the user: "This fix is larger than a typical bug fix. I recommend routing to `grimoire-draft` to handle this as a proper change with specs and a plan." The user can override.
 
 ### 7. Verify
-- Reproduction test passes (`config.tools.bdd_test`)
-- No *new* failures vs the step 2b baseline — pre-existing failures stay pre-existing; anything newly red is the fix's fault
-- All existing unit/integration tests pass (`config.tools.unit_test`), baseline-failures aside
-- If a new scenario was added in step 2, it passes with the fix
+- The permanent reproduction has one observed failing run before production changes.
+- The same reproduction has one passing run afterward.
+- Final verification runs configured suites once and compares them with the baseline.
+- Focused reruns diagnose only observed final-suite failures.
 
 ### 8. Tester Verification Checklist
 
@@ -189,12 +190,15 @@ Report to the user:
 ## References
 
 **Before writing the fix**, read both:
-- `../references/code-quality.md` — anti-slop rules to apply *while writing*: reuse before write, trust callers, names reveal intent, branching budget, function size, no premature abstraction, comments only for non-obvious why. Includes a seven-point quality gate to run before declaring the fix done.
+- `../references/code-quality.md` — writing guidance for reuse, caller trust, names, branching, function size, abstraction, and comments.
 - `../references/pattern-guard.md` Step 6 only — after writing the fix, verify every new external function call exists in the graph via `search_graph`. Skip the full pattern brief (over-constrains bug fixes). Skip entirely if graph not indexed.
 - `../references/test-baseline.md` — capture which tests were already failing before the fix (step 2b), so "no regressions" means "no *new* failures," not "zero failures."
 
 ## Important
 - **Reproduce before you fix.** No exceptions. If you can't reproduce it, you don't understand it, and your fix is a guess.
+- **Unknown defects enter spike mode.** Do not write a regression test until expected behavior, reliable reproduction, and direction are understood.
+- **Corrected expectations preserve reproduction proof.** When the user corrects an implementation-specific expectation, write the corrected reproduction before changing production code, observe it fail for the corrected reason, then make that reproduction pass.
+- **Never game the regression test.** An agent must never weaken or delete a test without explicit user direction.
 - **The test is the source of truth, not your self-review.** When the same agent writes a fix and then reviews it, the same wrong assumption rides into both steps — "looks correct" is not evidence. The red→green of the named regression test (and the configured suites) is the proof. Don't declare a bug fixed on a code re-read; declare it fixed when the mechanical gate flips and stays green.
 - **Small fixes only.** If the bug fix requires significant architectural changes, it's not a bug fix — route to `grimoire-draft` for a proper change.
 - **Don't over-document.** The test is the documentation. A one-line comment in the test explaining the bug is enough. Don't create tracking files, bug reports, or manifests for a bug fix.

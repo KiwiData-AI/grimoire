@@ -11,6 +11,8 @@ metadata:
 
 Systematically find, prioritize, and plan tech debt reduction. Combines automated scanning with LLM analysis to produce a prioritized debt register, then feeds approved items into the standard grimoire pipeline (draft → plan → apply).
 
+Use `../references/testing-lifecycle.md` for unknown-work routing, section confirmation, and final verification cadence.
+
 ## Triggers
 - User asks about tech debt, code quality, refactoring opportunities, or simplification
 - User wants to reduce complexity, lines of code, or structural bloat
@@ -22,6 +24,7 @@ Systematically find, prioritize, and plan tech debt reduction. Combines automate
 - Removing a feature → `grimoire-remove`
 - Fixing a bug → `grimoire-bug`
 - Documenting existing code → `grimoire-discover`
+- Current behavior, a dependency contract, or the safe refactoring direction is unknown → `grimoire-spike`
 
 ## Prerequisites
 - A grimoire-initialized project (`.grimoire/` exists)
@@ -211,8 +214,8 @@ For each item the user approves to fix:
 4. Hand off to `/grimoire:plan` for task generation, then `/grimoire:apply` for implementation
 
 **Refactoring-specific guidance for the plan/apply stages:**
-- **Capture a baseline first, then keep it.** Apply records which tests were already failing at change start (`baseline.md`, see `../references/test-baseline.md`). For a refactor this is the whole safety net: "passing" means *no new failures vs the baseline*, not "zero failures." A test red before you started is pre-existing and accepted; a test you turn red is the refactor breaking behavior — and that means it's not a refactoring. Diff against the baseline after each incremental move.
-- **Prefer incremental moves over big-bang rewrites.** Move one function at a time, run tests after each move.
+- **Capture a baseline first, then keep it.** Apply records which tests were already failing at change start (`baseline.md`, see `../references/test-baseline.md`). Final verification compares the completed refactor with that baseline. Do not rerun configured suites after each incremental move.
+- **Prefer incremental moves over big-bang rewrites.** Move coherent pieces within one substantial section, then use its single confirmation.
 - **Add tests before refactoring if test debt is part of the item.** You need a safety net before restructuring.
 - **Update imports incrementally.** When moving code to a new module, re-export from the old location first, then update consumers, then remove the re-export.
 - **Update area docs after refactoring.** File paths and reusable code locations will have changed.

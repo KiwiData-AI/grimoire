@@ -46,7 +46,7 @@ Count attempts per discrete problem (one failing test, one failing check, one br
 
 1. **Stop.** Do not attempt #4.
 2. **Diagnose.** State the pattern: what you tried each time, what failed each time, what's different and what's the same.
-3. **Escalate.** Present the diagnosis to the user and ask how to proceed. Don't silently switch to a different approach without saying so.
+3. **Spike.** Record a findings-only `S<n>` lesson, present it, and require human direction before attempt four.
 
 A "different attempt" means a fundamentally different approach — not the same fix with minor tweaks. If attempt 2 makes the same type of change as attempt 1, it counts as the same attempt.
 
@@ -75,7 +75,7 @@ This applies especially to test failures. "The test failed" is not a diagnosis. 
 
 ### Loop-level breaker (autonomous apply)
 
-The attempt budget above is per-problem. Autonomous `grimoire-apply` adds a run-level circuit breaker and cross-section thrash detection on top of it — see `grimoire-apply` SKILL.md. Don't duplicate the per-problem rules there; the breaker is the loop-scale backstop, this protocol is the per-problem one.
+The attempt budget above is per-problem. Lifecycle mode selection and findings-only escalation live in `skills/references/testing-lifecycle.md`. Autonomous `grimoire-apply` adds only the run-level circuit breaker and cross-section thrash detection.
 
 ## When to Use Grimoire
 
@@ -106,6 +106,9 @@ Trade-offs, choices, and structural decisions belong in MADR records. Security, 
 ```
 User has a request
 │
+├─ "We need to investigate an unknown behavior / contract / cause / approach"
+│  → /grimoire:spike → one question, bounded probes, referenced evidence
+│
 ├─ "Something is broken / not working right"
 │  │
 │  ├─ Reporter is a tester / non-developer?
@@ -113,10 +116,11 @@ User has a request
 │  │
 │  ├─ Developer picking up a bug report?
 │  │  → /grimoire:bug-triage → validate, reject with evidence, or request info
-│  │    If validated → /grimoire:bug for the fix (repro test first)
+│  │    If validated and understood → /grimoire:bug for the fix (repro test first)
+│  │    If cause or reliable reproduction is unknown → /grimoire:spike first
 │  │
 │  └─ Developer found it themselves?
-│     → /grimoire:bug → reproduce first, write failing test, then fix
+│     → /grimoire:bug when understood; /grimoire:spike first when unknown
 │
 ├─ "What could break? What are we missing?"
 │  → /grimoire:bug-explore → exploratory testing, gap analysis, edge cases
@@ -186,6 +190,7 @@ Each skill's SKILL.md is the authoritative home for that stage's mechanics; the 
 - **No archive step.** The PR diff *is* the change; git history plus the `Change: <id>` commit trailer are the record. PR finalize just flips decision status to `accepted` and removes the ephemeral change folder.
 - **Never create a PR with `gh pr create` directly** while `.grimoire/changes/` contains an active change — route through `/grimoire:pr` so finalization happens.
 - **Planning assigns review timing.** `structure-before` pauses once for costly shapes. `slice-after` runs autonomously until the consolidated pre-commit review. Optional per-file review remains harness-level behavior.
+- **Testing lifecycle has one home.** Use `skills/references/testing-lifecycle.md` for spike classification, delivery cadence, section confirmation, and final verification.
 
 ### IMPORTANT: tasks.md Is the Plan
 
@@ -199,11 +204,11 @@ This matters because:
 - Re-planning wastes time and may diverge from what was agreed
 - `tasks.md` supports resume — a new session should pick up where the last one left off, not start over
 
-Apply user-directed implementation corrections immediately. Record one implementation lesson only when remaining work changes. Update only affected unchecked tasks, rerun affected tactical tests, and continue. Do not add a checkpoint, report, approval, persona rerun, or plan-wide reconciliation.
+Apply user-directed implementation corrections immediately. Record one implementation lesson only when remaining work changes. Update only affected unchecked tasks and preserve the section confirmation boundary. Do not add a checkpoint, report, approval, persona rerun, or plan-wide reconciliation.
 
-Mark each task `[x]` as soon as its exact tactical command passes. Task checkboxes record runtime progress and resume state.
+Mark covered tasks `[x]` together when their section confirmation passes or is deferred by policy. Task checkboxes record runtime progress and resume state.
 
-An agent must ask for user direction before changing implementation direction. Agents never create active-section drift autonomously. Existing permission gates, red-green discipline, retry limits, and circuit breakers remain unchanged.
+An agent must ask for user direction before changing implementation direction. Agents never create active-section drift autonomously. Existing permission gates, lifecycle rules, retry limits, and circuit breakers remain unchanged.
 
 If an agent suspects a task detail is wrong, ask the user before changing direction. If execution is genuinely impossible, flag the blocker with a specific explanation. Do not silently rewrite or reorder tasks.
 

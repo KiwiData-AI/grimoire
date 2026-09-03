@@ -34,13 +34,20 @@ Feature: Turn an approved spec into a plan
     And slice-after activities join one consolidated pre-commit review
     And I review the complete timing strategy before I approve the plan
 
-  Scenario: Planning creates tactical red-green feature tasks
+  Scenario: Planning creates section-level delivery tasks
     Given an approved change with testable behavior
     When I ask grimoire to plan the work
-    Then each task contains its test and production implementation
-    And each task names one exact command for both red and green
-    And the command selects only the new or changed tests
-    And the command uses a verified test-runner accelerator when available
+    Then each substantial section contains its known tests and production implementation
+    And each section names at most one simple confirmation command after implementation
+    And planning defers the confirmation when it requires database or container startup
+    And comprehensive testing remains a final verification gate
+
+  Scenario: Planning preserves an unresolved implementation question
+    Given an approved change with an unresolved implementation assumption
+    When I ask grimoire to plan the work
+    Then the plan records a referenced spike with one question and required evidence
+    And it does not invent downstream tasks, schemas, fixtures, endpoints, or assertions
+    And evidence from the spike may refine only affected unchecked task mechanics
 
   Scenario: Planning does not manufacture Gherkin for internal work
     Given an approved optimization or implementation change with no actor-visible behavior

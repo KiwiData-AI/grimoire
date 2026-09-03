@@ -11,6 +11,8 @@ metadata:
 
 Multi-perspective LLM review of a completed design before coding begins. Applies the shared persona engine in `../references/review-personas.md` to the specs (manifest, features, decisions, tasks) — no diff exists yet.
 
+Use `../references/testing-lifecycle.md` to validate spike classification, section confirmation, bug reproduction, and final verification cadence.
+
 ## Triggers
 - User has a planned Grimoire change with an approved manifest and tasks
 - User asks to review a design before implementing
@@ -58,8 +60,9 @@ Before persona evaluation, validate the plan's executable shape in the same init
 
 - Validate activity-level review timing. Every implementation activity has one `structure-before` or `slice-after` marker immediately beneath its checkbox.
 - Confirm the plan normally has one or two substantial implementation sections. Require a specific outcome, dependency, or context-boundary justification beyond two.
-- Confirm every task is one vertical test-and-production slice with one exact tactical red-green command.
-- Confirm each tactical command selects only new or changed tests and uses only runner accelerators verified from project configuration or existing commands.
+- Confirm each planned delivery section writes known tests before production code and has at most one section confirmation.
+- Confirm the section confirmation is cheap, runs after implementation, and is deferred for database or container startup.
+- Confirm unresolved behavior, contracts, causes, reproductions, or directions use an `S<n>` spike without invented downstream mechanics.
 - Confirm final verification is absent from task sections.
 - Reject manufactured Gherkin for internal nuances, refactors, optimizations, contracts, benchmarks, constraints, or architectural decisions.
 - When multiple sections exist, check dependency completeness, backward-only order, cycle freedom, and task order.

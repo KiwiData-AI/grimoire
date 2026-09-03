@@ -11,6 +11,8 @@ metadata:
 
 Triage bug reports from any source. Investigate, classify the root cause, decide what to do, and route to the right owner. Not every bug is a code defect — triage must distinguish between code, infrastructure, configuration, data, third-party, and documentation issues so the right team acts on it.
 
+Use `../references/testing-lifecycle.md` when investigation reveals an unknown cause, reliable reproduction, contract, or implementation direction.
+
 ## Triggers
 - User wants to triage a bug report
 - User says "triage this bug", "look at this bug report", "is this a real bug?"
@@ -20,6 +22,7 @@ Triage bug reports from any source. Investigate, classify the root cause, decide
 ## Routing
 - No bug report exists and user is a tester → `grimoire-bug-report` first
 - Developer found a simple bug themselves → `grimoire-bug` directly (skip triage for obvious code defects)
+- Cause, reliable reproduction, provider contract, or direction remains unknown → `grimoire-spike`; record the lesson in `triage.md`
 - Bug needs architectural fix → after triage, route to `grimoire-draft` (not `grimoire-bug`)
 
 ## Prerequisites
@@ -202,7 +205,7 @@ Depends on classification:
 **Code defect (small fix)** → `grimoire-bug` takes over:
 1. The triage response becomes context for the fix
 2. The developer already has root cause understanding from investigation
-3. `grimoire-bug` runs: write repro test → fix → verify
+3. If reproduction and direction are understood, `grimoire-bug` runs one observed red-green reproduction. Otherwise, run a referenced spike first.
 4. When complete, update bug report status to `fixed` and reference the fix commit
 5. If an external ticket exists, update it (add fix commit, transition to resolved)
 

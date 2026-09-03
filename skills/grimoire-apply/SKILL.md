@@ -1,6 +1,6 @@
 ---
 name: grimoire-apply
-description: Implement tasks from a planned grimoire change, test-first at the right level (BDD scenario, unit-invariant, or characterization). Use when tasks.md exists and is ready for implementation.
+description: Implement understood planned work with tests written first, one section confirmation, and one final verification.
 compatibility: Designed for Claude Code (or similar products)
 metadata:
   author: kiwi-data
@@ -9,9 +9,11 @@ metadata:
 
 # grimoire-apply
 
-Implement tasks from a planned grimoire change using **test-first discipline at the right level**: write the failing test first, then the production code that makes it pass. A task is not complete until its test passes.
+Implement understood tasks from a planned change. Use `../references/testing-lifecycle.md` for spike routing, test ordering, section confirmation, and final verification.
 
-**Red-green is the discipline; the test vehicle matches the artifact the task came from** (set by `grimoire-plan` as each task's `verify:` tag):
+For planned delivery, write all known section tests before production code. Do not run tests only to observe red. Mark every covered task complete together after confirmation passes or is deferred.
+
+The test vehicle matches the source artifact:
 
 | `verify:` | Task came from | Test vehicle |
 |-----------|----------------|--------------|
@@ -48,6 +50,7 @@ This applies to all LLMs: Claude, Codex, Cursor, Copilot, etc. The task list is 
 
 ## Routing
 - No tasks.md exists → `grimoire-plan` first
+- Behavior, a contract, a root cause, a reliable reproduction, or implementation direction is unknown → `grimoire-spike`
 - Agent suspects a task detail is wrong → ask the user before changing direction
 - User directs an active-section correction → apply it without mid-section plan maintenance
 - Task is genuinely impossible → flag the blocker; do NOT silently re-plan or skip
@@ -111,14 +114,15 @@ Optional per-file review is harness behavior. It does not create Grimoire metada
 Create `.grimoire/changes/<change-id>/learnings.md` from `templates/learnings.md` when needed. It remains ephemeral and is removed at finalization.
 
 - **Failure-mode notes:** record each failed approach before a retry. Read these notes before another attempt. Prune a task's notes when it turns green.
-- **Implementation lessons:** Record one implementation lesson only when the correction changes remaining work. Update only affected unchecked tasks. Rerun affected tactical tests. Do not add a checkpoint, report, approval, persona rerun, or plan-wide reconciliation.
+- **Implementation lessons:** Record one implementation lesson only when remaining work changes. Update only affected unchecked tasks. Preserve the section confirmation boundary. Do not add a checkpoint, report, approval, persona rerun, or plan-wide reconciliation.
+- **Spike lessons:** Record question-driven evidence using the `S<n>` format from `../references/testing-lifecycle.md`.
 - **Discovered facts:** stage durable project facts with their authoritative destination. Reconcile them during finalization. Never write them into `AGENTS.md`.
 
 User direction may correct implementation mechanics. Apply the correction immediately without evaluating it against completed task prose. An agent that suspects a detail is wrong asks the user before changing direction. Existing operation permission gates remain unchanged.
 
 ### Stuck Detection and Circuit Breakers
 
-Track failed attempts per task. Attempt one uses the direct planned approach. Before attempts two or three, read failure-mode notes and choose a fundamentally different approach. After three failed attempts, mark the task blocked, report all approaches and the persistent error, then stop for user direction. Never weaken or delete a test to force green.
+Track failed attempts per problem. Attempt one uses the direct planned approach. Before attempts two or three, read failure-mode notes and choose a fundamentally different approach. After three failed delivery attempts, stop delivery and create a findings-only spike. Present all approaches, the persistent error, and the unresolved question. Require human direction before attempt four. Never weaken or delete a test to force confirmation.
 
 Between sections, stop when two consecutive sections are blocked or the same failure class repeats across sections. Honor configured cost and wall-clock limits as soft limits. Preserve all existing branch, permission, destructive-operation, and specification-conflict gates.
 
@@ -141,62 +145,27 @@ Start a fresh implementation context for each substantial section. One context c
 2. Summarize progress in `tasks.md` (mark completed tasks, add handoff note)
 3. Tell the user: "Context is getting large. I've updated tasks.md with progress. A fresh session can resume from here."
 
-### 5. Implement Tasks
-Work through `tasks.md` sequentially. Read the task's exact tactical red-green command. Every task follows the same cycle: test → red → code → green → next. The test vehicle follows the task's `verify:` tag.
+### 5. Implement Each Section
 
-**For each task:**
-1. Announce which task you're working on
-   - Read the task's `verify:` tag — it decides the test vehicle. `scenario` → write/extend step definitions for the named scenario. `unit-invariant` → write a unit/integration test asserting the constraint. `characterization` → write a unit test pinning current/intended behavior. If a `unit-invariant` task has no matching constraint in `.grimoire/docs/constraints.md`, STOP and flag — don't invent a scenario to fill the gap.
-   - **Pattern brief** (before writing anything): classify code type → `search_graph` for 3–5 peers (excluding last 60 days) → `get_code_snippet` → extract modal pattern across the four critical seams (error handling, dependency access, abstraction depth, return shape) → write a 5–8 rule brief. Skip if graph not indexed or < 3 peers. Full instructions in `../references/pattern-guard.md`.
-2. Write the test FIRST, at the task's level (step definitions for `scenario`; unit/integration test for `unit-invariant`/`characterization`). **Generate test data, don't ask for it and don't hand-invent it** — build records through the project's data factory / property-based tool (`../references/testing-contracts.md` §Test Data Generation; detect it from `config.tools` / existing test imports), overriding only the fields this case pins. AI-authored literal data is a last resort, only when the user explicitly asked for it or no factory exists and a specific crafted value is needed — and note why when you do.
-3. Run that command before production changes. Red is proven only when the selected test fails because the requested behavior is absent. Collection, import, fixture, syntax, and infrastructure failures do not prove red. Diagnose those failures before continuing.
-4. If the test passes immediately, STOP. The test is broken — it is not testing missing behavior. Fix it so a real assertion fails without production code. Common causes:
-   - Empty step definition body (passes by default)
-   - Assertion against a mock/fixture that already satisfies the condition
-   - Step wired to wrong function or missing the actual check
-   - Overly broad assertion that matches anything
-5. Once confirmed red: write the production code to make it pass. **While writing — not after — apply the rules in `../references/code-quality.md` and the pattern brief from step 1. Do not write the slop version first and clean up later.** Inline rules:
-   - **Reuse first — search before write.** Before writing any new function or class, run two searches: `search_graph(semantic_query=["<concept>", "<verb>", "<domain_noun>"])` to find it by concept, then `search_graph(name_pattern="<likely_prefix_or_suffix>")` to find it by name. If either returns something that does the job → call it. If something almost fits → use it directly; don't generalize for a hypothetical second caller. Write new code only when both searches return nothing usable. No one-line wrappers. No re-implementations. Full instructions: `../references/pattern-guard.md` Step 1b.
-   - **Trust your callers.** No `if x is None` / `isinstance` / `try-except` guards inside the trust boundary. Validate at edges (user input, external APIs, file/network) only.
-   - **Names reveal intent.** No `data` / `result` / `temp` / `info` / `obj` when a specific name fits. Booleans read as yes/no questions (`is_expired`, `has_admin_role`).
-   - **Branching budget ~7.** If a function has more `if` / `else` / `case` / `&&` than that, split or drop dead guards.
-   - **Function size ~30 lines.** One job per function. If the name needs "and", split.
-   - **No premature abstraction (YAGNI).** Three near-identical copies is fine. No new `BaseX` / factory / strategy / config object for a single caller.
-   - **Guardrails — the floor YAGNI never cuts below.** Simplicity stops at safety. Never drop, in the name of less code: input validation at a trust boundary, error handling that prevents data loss, a security control (authn/authz, output escaping, secret handling — see `../references/security-compliance.md`), an accessibility basic, or anything the task explicitly requested. Edge validation (above) is *required* code, not defensive slop — the trust-your-callers rule governs the interior only. Non-trivial logic (a branch, loop, parser, money/security path) leaves one runnable check behind (`../references/testing-contracts.md`); a lazy version without its check is unfinished, not done.
-   - **Comments: terse, self-contained, no essays** (`../references/code-quality.md` §7). Default to none; add only a one-line non-obvious *why*. Terse voice — drop "this function", filler, restated types. **Self-contained:** never name an external artifact that moves independently — no feature/scenario/`.feature`, MADR/ADR number, change-id, ticket/PR, test name, or tag code (`LOG-OBS-003`) in a comment; describe the behavior, not where it's specced. **No paragraphs:** summary is 1–2 lines, then the `comment_style` params if the project requires them — no prose block before them. No comments restating the code (`# loop over users`). If removing it wouldn't confuse a future reader, don't write it.
-6. Run the same command after production changes. It must pass before task completion.
-7. If still red, fix the production code (not the test)
-8. **Hallucination check:** Before running tests, verify every external function/method your new code calls actually exists in the graph: `search_graph(name_pattern="<name>")` for each. If not found: find the correct function or stop and flag to user. Do not run tests against calls to non-existent functions. (Full instructions in `../references/pattern-guard.md` Step 6.)
-9. **Test quality check:** Before marking done, verify your step definitions have strong assertions:
-   - Every Then step has a specific `assert` or `expect` with an exact expected value (not `assert True`, not `toBeDefined()`)
-   - No empty function bodies (`pass`, `...`, or no-op)
-   - Assertions check behavior, not just types or existence — "response status is 302 and redirect URL is /dashboard/" not "response is not None"
-   - If you wrote a test that would pass against a null/trivial implementation, strengthen it
-10. **Code quality check:** Walk the seven-point checklist in `../references/code-quality.md` against every file you changed. Any fail → fix code, re-run tests, re-check. Do not mark `[x]` while a check fails.
-11. **Reconcile task working memory:** prune this task's failure-mode notes from `learnings.md` — it's green, they've served their purpose. If you learned a durable project fact while implementing (a build flag, a convention, an undocumented contract, an architectural constraint), append it to the **Discovered facts** section with its destination home — don't write it into `AGENTS.md` and don't leave it only in context.
-12. Mark complete: `- [ ]` → `- [x]` as soon as the tactical command passes.
-13. Record the red-green result and current checkbox state in the section handoff, then move to the next task.
+Follow `../references/testing-lifecycle.md`.
 
-**This is strict red-green BDD.** A test that has never been red has never proven it can catch a failure. The red step is NOT a formality — it is the proof that the test works. If you skip it or the test passes immediately, you have a false positive that provides zero safety.
+1. Announce the section. Read each activity's `verify:` tag and choose its planned test vehicle.
+2. If behavior, a contract, a cause, a reliable reproduction, or direction is unknown, stop delivery and route to `grimoire-spike`.
+3. Write all known section tests before production code. Do not run tests only to observe red.
+4. Implement every covered activity in dependency order. Apply `../references/code-quality.md` while writing.
+5. Verify imports and external calls before confirmation. Use the code graph when available and `rg` plus the actual module otherwise.
+6. Check test assertions for exact outcomes, no empty bodies, and no trivial or circular assertions.
+7. Run at most one planned section confirmation after all covered implementation is complete. Defer it when it requires database or container startup.
+8. If confirmation fails, diagnose that observed failure. Record each failed approach before a retry and honor the three-attempt breaker.
+9. Mark every covered task complete together when confirmation passes or is explicitly deferred.
+10. Prune covered failure notes and record the confirmation result in the section handoff.
 
-**User-directed test corrections:** When the user corrects an implementation-specific test expectation, update the test before changing production code. Run the corrected test against the current production code and confirm it fails. Only then change production code to make the corrected test pass.
+User-directed corrections update tests before production code when the correction changes an expected outcome. Preserve the section confirmation boundary. An agent must never weaken or delete a test without explicit user direction.
 
-**Never game the gate (reward-hack guard).** When a test won't pass, fix the production code unless the user corrected its implementation-specific expectation. An agent must never weaken or delete a test without explicit user direction. Deleting a test, loosening an assertion to match wrong output, narrowing what it checks, or skipping/`xfail`-ing it to get a green run is **stop-and-flag**, not a valid completion. A user-directed expectation correction authorizes only that correction and still requires red-green proof. The gate is the convergence signal; gaming it produces plausible-wrong code faster.
-
-**Step definition rules:**
-- Organize by domain concept, not by feature file
-- Shared steps go in the project's common step location (check existing test setup)
-- Step definitions are the translation layer between Gherkin and code
-- Keep them thin — delegate to helper/support code
-- Every Given/When/Then step in a proposed `.feature` file MUST have a corresponding step definition
-
-**Architecture tasks:**
-- Follow the decision record's chosen option
-- Implement consequences noted in the ADR
-- If the ADR has a Confirmation section, write a test or check that validates it
+Architecture activities follow the decision record's chosen option and Confirmation criteria.
 
 ### 6. Verify
-Invoke `grimoire-verify` once after every implementation activity is complete. Review and final configured suites belong to that procedure. They are not task checkboxes or separate apply gates.
+Invoke `grimoire-verify` once after all implementation sections are complete. Review and final configured suites belong to that procedure. They are not task checkboxes or separate apply gates.
 
 Do not proceed to finalization until `grimoire-verify` reports no new failures against `baseline.md`.
 
@@ -300,17 +269,17 @@ Present a brief summary:
 
 ## References
 
-**Before writing code**, read all three:
-- `../references/pattern-guard.md` — run before each task: (1) classify code type, (1b) reuse discovery — two `search_graph` calls (semantic_query by concept + name_pattern by likely name) to find existing code to call instead of writing new code, (2) find 3–5 peers, extract modal pattern across four seams (error handling, dependency, abstraction depth, return shape), write a pattern brief. Apply the brief while writing. Run hallucination check after writing (verify called functions exist in graph). Skip if graph not indexed.
-- `../references/code-quality.md` — anti-slop rules to apply *while writing*: reuse before write, trust callers, names reveal intent, branching budget, function size, no premature abstraction, zero comments by default (only non-obvious *why*, never *what*). Includes a seven-point quality gate to run before marking each task `[x]`.
-- `../references/testing-contracts.md` — verify-before-using rules (imports, packages, APIs), mocking strategy (HTTP boundary not client), fixture management, contract tests, and step definition quality checks.
+**Before writing code**, read all five:
+- `../references/testing-lifecycle.md` — authoritative mode selection, spike exits, delivery cadence, section confirmation, and final verification cadence.
+- `../references/pattern-guard.md` — reuse discovery and call validation. Skip graph-specific work when the graph is unavailable.
+- `../references/code-quality.md` — writing guidance for reuse, branching, naming, trust boundaries, abstractions, and comments.
+- `../references/testing-contracts.md` — provider fixtures, owned orchestration stubs, test data, and assertion quality.
 - `../references/test-baseline.md` — capture which tests were already failing at change start, save to `baseline.md`, get user acceptance; verify diffs against it so only new failures count as regressions.
 
 ## Important
-- **Tests are not optional.** Every task produces production code and a passing test at its declared verification level.
-- **Red-green is mandatory, not aspirational.** A test must fail before it passes. If it doesn't fail, it's not a real test. Fix it before moving on.
-- **Code-before-test is the most common bypass.** "I'll add the test after" / "let me see it work first" are the *Code before the test* rationalization in `../references/red-flags.md`. If you wrote code before the test, delete the code and start from red.
-- **A test that always passes is worse than no test.** It gives false confidence. If you can't make a step definition fail, you don't understand what it's testing.
+- **Tests are not optional.** Write every known section test before planned production code.
+- **Do not manufacture red.** Planned delivery does not run tests only to observe failure. Understood bug fixes retain their observed reproduction.
+- **Unknown work is not delivery.** Route unresolved behavior, contracts, causes, reproductions, or directions to `grimoire-spike`.
 - The feature file is the spec. If a test fails, fix the code, not the feature.
 - If implementation reveals that a scenario is wrong or missing, STOP and go back to draft. Don't silently change features.
 - Keep changes minimal and focused — only implement what's in tasks.md

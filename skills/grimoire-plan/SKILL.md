@@ -11,6 +11,8 @@ metadata:
 
 Plan opens by **projecting** the agreed `draft.md` into its durable homes (features, constraints, decisions, `data.yml`, manifest), then derives implementation tasks from them. The output must be detailed enough that any LLM can execute the tasks without further planning.
 
+Use `../references/testing-lifecycle.md` for spike classification, delivery cadence, section confirmation, and final verification.
+
 ## Triggers
 - User has approved a grimoire draft and wants to plan implementation
 - User asks to create tasks or plan work for a grimoire change
@@ -18,6 +20,7 @@ Plan opens by **projecting** the agreed `draft.md` into its durable homes (featu
 
 ## Routing
 - No approved change exists → `grimoire-draft` first
+- A behavior, contract, cause, reproduction, or implementation direction is unknown → add a referenced `S<n>` spike and leave affected mechanics unresolved
 - Change is Level 1 (trivial) → plan is optional; suggest applying directly with minimal tasks
 - User wants to review the design → `grimoire-review` (after plan, before apply)
 
@@ -136,7 +139,7 @@ github_api:
         status: { type: integer }
 ```
 
-**Contract documentation is mandatory for external APIs.** Every endpoint must document `request` (what you send), `response` (fields you read, `required: true` for those your code depends on), and `error_response` (the error shape you handle). The task-generation step below turns this into contract tests. If you don't know the exact shape, reference `schema_ref` and document the subset your client uses — that subset is the contract. No data impact → skip `data.yml` entirely.
+**Contract documentation is mandatory for external APIs.** Every endpoint must document `request`, `response`, and `error_response` shapes observed from an authoritative source or system. When the exact provider response is unknown, add a referenced spike and do not invent a subset, fixture, schema, endpoint, or assertion. No data impact → skip `data.yml` entirely. Provider-test mechanics live in `../references/testing-contracts.md`.
 
 **Manifest (`manifest.md`).** Generate it from `draft.md` as the durable plan glue: `complexity` (just scored), Why + Non-goals, the artifact list (added/modified/removed features, decisions, constraints), and a **Prior Art** section summarizing the build-vs-buy research captured in `draft.md` (what was found/evaluated, why adopt/build/hybrid; if building, what's borrowed). **Level 3–4** also carry **Assumptions** (what must be true; mark evidence vs. unvalidated; flag unvalidated ones on the critical path) and a **Pre-Mortem** (2–5 plausible failure modes 6 months out, with mitigations or "accepted"). These come straight from the `draft.md` Decided/Open and Cut sections.
 
@@ -208,7 +211,7 @@ Level 1-2 changes with minor gaps may proceed; level 3-4 with multiple gaps shou
 **If no real gaps**, proceed directly to task generation.
 
 ### 4. Generate Tasks
-Create `.grimoire/changes/<change-id>/tasks.md`. **Every task is one vertical checkbox containing its test and production change.** The test level matches the artifact the task derives from. Within the checkbox, the failing test comes first.
+Create `.grimoire/changes/<change-id>/tasks.md`. Every delivery activity is one vertical checkbox containing its known tests and production change. The test level matches the source artifact. Write all known section tests before production code. Do not invent downstream mechanics for unresolved work; emit an `S<n>` spike using `../references/testing-lifecycle.md`.
 
 **Build an executable section order before task approval.** Default to one substantial implementation section. Use a second section only for a distinct outcome or context boundary. Every section beyond two requires a specific outcome, dependency, or context-boundary justification. Never create sections for technical layers, error cases, tests, verification, pattern establishment, or repetition alone.
 
@@ -226,7 +229,7 @@ dependency comment:
 
 Use `none` only when the section has no prerequisites. A dependency may reference
 only an earlier section ID. Within each section, order tasks so no task requires
-a later task. Keep test-first order inside each dependency layer.
+a later task. Keep tests before production work inside each dependency layer.
 
 Validate the complete graph before presenting the plan. Collect missing
 dependency metadata, unknown section IDs, forward dependencies, and cycles.
@@ -269,6 +272,8 @@ The user reviews and approves this complete table with the task list. Do not beg
 | a constraint in `constraints.md` (security/NFR/observability) | `unit-invariant` | unit/integration test asserting the invariant |
 | an internal protocol / service-to-service contract (internal RPC, queue/event shape, module API between your own components) | `unit-invariant` | contract/integration test asserting the wire shape both ends agree on |
 | an ADR consequence, refactor, or internal change with no spec | `characterization` | unit / characterization test |
+
+`@manual` workflow scenarios use characterization tests for deterministic skill contracts. Do not create undefined Cucumber steps for them.
 
 **Do not plan a `.feature` scenario task for a constraint, an internal protocol, or an internal change.** Constraints and internal protocols get `unit-invariant` tests (a contract test for a protocol asserts the payload/event shape both ends agree on); other internal changes get `characterization` tests. Forcing Gherkin onto a non-behavioral concern is the antipattern that fills feature files with slop (one right way: external actor-observable behavior → scenario, everything else — invariants, internal protocols, refactors → unit/contract test). If a `.feature` in the change actually describes an internal protocol (slop that slipped past draft), flag it and route the task to `unit-invariant`, don't write step definitions for it.
 
@@ -334,7 +339,10 @@ Good task (specific enough to execute):
       <!-- review: structure-before -->
       - Test: assert POST `/verify-totp/` returns status 302 and redirects to `/dashboard/`.
       - Implement: add `VerifyTOTPView` validation and authenticated-session behavior.
-      - Red/green: `python manage.py test auth.tests.TestTotpLogin.test_valid --keepdb`.
+
+### Section confirmation
+
+`python manage.py test auth.tests.TestTotpLogin.test_valid --keepdb`
 ```
 
 **From feature scenarios:**
@@ -361,22 +369,22 @@ Good task (specific enough to execute):
 - Each modified field → migration task (specify: is it safe to run live? nullable? default?)
 - Each removed field → migration task with data cleanup if needed
 - Each new external API → client wrapper task referencing `schema_ref` for the full contract
-- Each new or modified external API → **contract validation test task** that asserts the client's request/response shapes match the contract documented in `data.yml` / `schema.yml`. The test should:
+- Each new or modified external API with authoritative observed responses → **contract validation test task** that asserts the client's request/response shapes match the observed contract documented in `data.yml` / `schema.yml`. Unknown responses remain a spike. The test should:
   - Validate that every `required: true` response field is read and typed correctly in the client
   - Validate that request payloads match the documented shape (required fields present, types correct)
   - Validate error response handling matches the documented `error_response` shape
-  - Use a recorded/fixture response (not a live call) so the test runs locally without network access
+  - Use an authoritative recorded/fixture response so the test runs locally without network access
 - Each modified external API client (existing API, changed usage) → **contract regression test** that catches if the client drifts from the documented contract. If the client starts reading a new field or stops sending a required field, the test must fail.
 - Data tasks come BEFORE feature implementation tasks — the models must exist before code that uses them
 - Order: schema/model changes → migrations → contract tests → seed data (if any) → then feature code
 
-**Mocking strategy for external services:**
-Follow the rules in `../references/testing-contracts.md`. Key points: mock at HTTP boundary (not client), fixtures must match `schema.yml`, include error fixtures. Each contract test task must specify: (1) which HTTP mocking library, (2) which fixture file, (3) what the fixture contains (from `schema.yml`).
+**Integration boundaries:**
+Follow `../references/testing-contracts.md`. Provider contract fixtures require authoritative observed responses. Repository orchestration may stub its owned adapter-result type without claiming provider-contract coverage.
 
 **Test data:** Do not add tasks that ask the user for sample data or example scenarios. Per `../references/testing-contracts.md` (Test Data Generation), every test task that needs data must name the generation source — the project's existing data factory / property-based tool (`factory_boy`, `@faker-js/faker`, `model_bakery`, `Hypothesis`, `fast-check`, etc., detected from `config.tools` / existing test imports), and which fields the scenario pins vs. lets the factory fill. AI-authored literal data is a last resort: only plan it when the user explicitly asked for generated data, or no factory exists and a specific crafted value is needed — and say which in the task. If the project has no data-factory tooling and the change clearly needs one, surface adopting it as a build-vs-buy line, don't smuggle the dependency into an implementation task.
 
 **From manifest Assumptions:**
-- Each unvalidated assumption on the critical path → a verification task (spike, proof-of-concept, or integration test that confirms the assumption holds)
+- Each unvalidated assumption on the critical path → a referenced spike with one question, required evidence, a probe boundary, and affected unchecked tasks
 - If an assumption turns out to be wrong during planning, flag it to the user — it may invalidate the change
 
 **From manifest Pre-Mortem:**
@@ -400,7 +408,7 @@ Follow the rules in `../references/testing-contracts.md`. Key points: mock at HT
 - If `grimoire health`/mcp shows existing clones in the area you're touching, tasks should consolidate rather than add more
 - Add a "Reuse" section at the top of tasks.md listing specific functions/classes to import instead of rewriting
 
-**Tactical red-green command:** Each checkbox contains the test change, production change, and one exact tactical command used for red and green. The tactical command selects only new or changed tests and uses only a runner accelerator verified from project configuration or existing commands. Examples include Django `--keepdb` and pytest-django `--reuse-db` only when the repository proves support. Final verification is absent from task sections; apply invokes `grimoire-verify` once after implementation.
+**Section confirmation:** Each substantial section names one optional post-section confirmation. It must be the cheapest meaningful command that shows the section loads or its primary path works. Defer it when it requires database or container startup. Do not plan a red run, broad suite, lint bundle, coverage run, or comprehensive feature command for section completion. Final verification is absent from task sections; apply invokes `grimoire-verify` once after implementation.
 
 ### 5. Task Format
 The tasks file starts with a context block so any LLM can orient without re-reading every artifact. Each task section includes a `<!-- context: ... -->` block listing the exact files an agent should load before working on that section. This is critical for reducing context rot — each task or task group can run in a fresh session that loads only what it needs.
@@ -432,13 +440,15 @@ The tasks file starts with a context block so any LLM can orient without re-read
       <!-- review: structure-before -->
       - Test: <specific new or changed test and exact assertion>.
       - Implement: <specific production symbols and behavior>.
-      - Red/green: `<exact command selecting only this new or changed test, with a verified accelerator when available>`.
 
 - [ ] 1.2 (verify: characterization) Complete `<internal outcome>` in `<exact test and production paths>`.
       <!-- review: slice-after -->
       - Test: <specific characterization test and exact assertion>.
       - Implement: <specific production symbols and behavior>.
-      - Red/green: `<exact command selecting only this new or changed test>`.
+
+### Section confirmation
+
+`<one cheap command, or "deferred: requires database/container startup">`
 ```
 
 **Context blocks are mandatory.** Every task section must have a `<!-- context: ... -->` listing the files needed. This serves two purposes:
@@ -452,8 +462,8 @@ Before presenting to the user, verify the plan:
 - [ ] Every test task describes what to assert (no "write a test")
 - [ ] Every implementation task describes what to create/modify (no "add the code")
 - [ ] Each task combines its test and production change in one vertical checkbox.
-- [ ] Each task has one exact tactical command used for red and green.
-- [ ] Each tactical command selects only new or changed tests and uses only verified runner accelerators.
+- [ ] Each section has at most one cheap confirmation command after implementation, or a policy-based deferral.
+- [ ] No planned-change task requires an observed red run.
 - [ ] No task or section runs final verification or a full configured suite.
 - [ ] The technical spine orders only independent sections: dependencies → data/schema → API/contract → logic → UI → verification.
 - [ ] Actual section dependencies were derived from referenced code and artifacts; sections are topologically sorted, with the technical spine used only to break ties.

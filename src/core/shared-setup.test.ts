@@ -1,5 +1,13 @@
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-import { buildSteDirective, buildCommentStyleDirective, SKILL_NAMES } from "./shared-setup.js";
+import {
+  buildSteDirective,
+  buildCommentStyleDirective,
+  installSkillFiles,
+  SKILL_NAMES,
+} from "./shared-setup.js";
 import { pydoclintTool, applyDocStyleTool, buildMinimalConfig } from "./init-config.js";
 
 describe("buildSteDirective", () => {
@@ -101,5 +109,37 @@ describe("SKILL_NAMES", () => {
     expect(commitIndex).toBeGreaterThanOrEqual(0);
     expect(designIndex).toBe(commitIndex + 1);
     expect(consultIndex).toBe(designIndex + 1);
+  });
+
+  it("includes grimoire-spike", () => {
+    expect(SKILL_NAMES).toContain("grimoire-spike");
+  });
+
+  it("installs grimoire-spike for Claude, OpenCode, and Codex", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "grimoire-skills-"));
+
+    try {
+      await installSkillFiles(
+        projectRoot,
+        process.cwd(),
+        ["grimoire-spike"],
+        "created",
+        ["claude", "opencode", "codex"],
+      );
+
+      for (const skillRoot of [
+        ".claude/skills",
+        ".opencode/skills",
+        ".agents/skills",
+      ]) {
+        const installed = await readFile(
+          join(projectRoot, skillRoot, "grimoire-spike", "SKILL.md"),
+          "utf-8",
+        );
+        expect(installed).toContain("# grimoire-spike");
+      }
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+    }
   });
 });
