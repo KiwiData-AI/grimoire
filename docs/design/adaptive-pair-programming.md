@@ -72,6 +72,8 @@ After all sections, apply invokes one `grimoire-verify` procedure:
 
 Focused reruns after a final-suite failure diagnose only that observed failure.
 
+Generated editor and commit hooks provide cheap lint, format, and doc-style feedback. They do not run configured unit or BDD suites.
+
 ## Session and Resume Rules
 
 Each substantial section uses a fresh implementation context. Task checkboxes remain the resume state. A section handoff records confirmation evidence and facts needed later.
@@ -85,6 +87,7 @@ Failure-mode notes prevent repeated approaches. Implementation lessons carry use
 - Planned tests precede production code without a mechanical red run.
 - Each section has at most one section confirmation.
 - Baseline and final configured suites run once each.
+- Generated hooks exclude configured unit and BDD suites.
 - Apply invokes one `grimoire-verify` procedure.
 - Verify runs one pre-commit review and one final suite run.
 - Provider contract fixtures use observed evidence.

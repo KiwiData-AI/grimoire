@@ -162,6 +162,8 @@ Planned delivery does not run tests only to observe red. Unknown work routes to 
 
 After all activities, apply invokes one `grimoire-verify` procedure. Verify runs deterministic checks, one pre-commit review, accepted section corrections, and one final suite run against the baseline. Focused reruns diagnose only observed final-suite failures.
 
+Generated commit hooks run only lint, format, and doc-style checks. Unit and BDD suites remain at the verification boundary.
+
 Artifacts are edited **live on the feature branch** the whole time — no promote step. Finalize just flips decision status to `accepted` and removes the ephemeral change folder.
 
 **Session management:** Each substantial section runs in a fresh implementation context. `tasks.md` checkboxes preserve resume state.

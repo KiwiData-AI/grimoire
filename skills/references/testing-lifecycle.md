@@ -72,6 +72,8 @@ After pre-commit review corrections, run only the affected section confirmation 
 
 Final verification owns deterministic quality checks, the consolidated pre-commit review, final configured suites, and baseline comparison.
 
+Generated editor and commit hooks may run only cheap writing checks such as lint, format, and doc style. They must not run configured unit or BDD suites.
+
 ## Provider contracts
 
 Provider response contracts require evidence from an authoritative observed source or system. Repository-owned orchestration may stub its repository-owned adapter-result type. See `testing-contracts.md` for provider-test mechanics.

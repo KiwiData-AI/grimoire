@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-03
 decision-makers: [Fred]
 ---

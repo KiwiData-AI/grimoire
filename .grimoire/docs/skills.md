@@ -27,6 +27,7 @@ Markdown skill definitions that provide Grimoire's AI-driven workflow. Skills ar
 - Understood bug fixes retain one observed red-green reproduction.
 - Apply captures the baseline, implements substantial sections, then invokes one `grimoire-verify` procedure.
 - Verify runs deterministic checks, one pre-commit review, accepted section corrections, and one final suite run.
+- Generated commit hooks run only lint, format, and doc-style checks.
 - Optional harness-level per-file review remains outside portable Grimoire task state.
 - `skills/references/testing-lifecycle.md` is the authoritative lifecycle policy.
 

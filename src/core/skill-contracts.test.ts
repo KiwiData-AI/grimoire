@@ -110,12 +110,14 @@ describe("skill contracts", () => {
   });
 
   it("separates planned delivery, bug reproduction, and final verification", async () => {
-    const [lifecycle, applySkill, bugSkill, verifySkill, baseline] = await Promise.all([
+    const [lifecycle, applySkill, bugSkill, verifySkill, baseline, health, hooks] = await Promise.all([
       reference("testing-lifecycle.md").then(normalize),
       skill("grimoire-apply").then(normalize),
       skill("grimoire-bug").then(normalize),
       skill("grimoire-verify").then(normalize),
       reference("test-baseline.md").then(normalize),
+      reference("health-check.md").then(normalize),
+      rootFile("src/core/hooks.ts").then(normalize),
     ]);
 
     expectOrdered(lifecycle, [
@@ -145,12 +147,18 @@ describe("skill contracts", () => {
     expect(verifySkill).toContain(
       "For a feature tagged `@manual`, use its declared characterization or unit contract",
     );
+    expect(health).toContain(
+      "`@manual` scenarios have a declared characterization or unit contract",
+    );
     expect(bugSkill).toContain(
       "Correct issues directly without adding another reproduction run.",
     );
     expect(bugSkill).not.toContain("fix and re-run tests");
     expect(baseline).toContain("once before delivery");
     expect(baseline).toContain("once during final verification");
+    expect(lifecycle).toContain("They must not run configured unit or BDD suites.");
+    expect(hooks).toContain("grimoire check lint format doc_style --changed");
+    expect(hooks).not.toContain('CURRENT_GIT_CHECK = "grimoire check --changed');
   });
 
   it("stops failed delivery and preserves user steering", async () => {
