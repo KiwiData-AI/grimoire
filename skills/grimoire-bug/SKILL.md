@@ -52,6 +52,7 @@ Before touching any production code:
 1. Write a step definition (or unit test if no BDD scenario applies) that exercises the exact bug conditions
 2. Run it — **it MUST FAIL**, reproducing the bug
 3. If it passes, your test doesn't actually reproduce the bug. Fix the test until it fails for the right reason.
+4. Apply the diagnosis gate in `../references/testing-lifecycle.md` to the reproduction failure before another test execution.
 
 **Name it after the bug.** This repro test stays as the permanent regression test — name it so the bug is obvious (`test_password_reset_special_chars`; scenario "Password reset with plus-sign email"). One bug → one named regression test. This is how the same bug doesn't come back: a future change that reintroduces it goes red on a test that names the defect.
 
@@ -132,7 +133,7 @@ Then:
 - The permanent reproduction has one observed failing run before production changes.
 - The same reproduction has one passing run afterward.
 - Final verification runs configured suites once and compares them with the baseline.
-- Focused reruns diagnose only observed final-suite failures.
+- Apply the diagnosis gate in `../references/testing-lifecycle.md` to final-suite failures before any focused rerun.
 
 ### 8. Tester Verification Checklist
 

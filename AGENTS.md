@@ -69,9 +69,9 @@ Don't use side-effect actions (commits, test runs, check runs) as the primary va
 
 ### Diagnose before fixing
 
-After any failure, state what you observe before proposing a fix. One sentence: what failed, where, and why. If you can't state the why, you're not ready to fix it.
+After any failure, inspect the complete observed result and relevant code before proposing a fix or rerun. Use `skills/references/testing-lifecycle.md` for the diagnosis gate.
 
-This applies especially to test failures. "The test failed" is not a diagnosis. "The test expected `302` but got `200` because the redirect middleware isn't registered in the test client" is.
+Separate observations, hypotheses, and proven conclusions. State that the cause is unknown when the evidence does not prove it. An honest unknown with targeted diagnostic actions is useful progress.
 
 ### Loop-level breaker (autonomous apply)
 

@@ -71,6 +71,34 @@ Feature: Build understood work test-first
     And it compares every failure with the accepted baseline
     And it blocks finalization for any new failure
 
+  Scenario: A failed test is diagnosed before another test runs
+    Given a test has failed during a grimoire workflow
+    When grimoire investigates the failure
+    Then it inspects the assertion, complete observed result, expected contract, and relevant code path
+    And any diagnostic rerun must resolve at least one explicit unknown about the root cause
+    And it selects the narrowest deterministic test that can resolve that unknown
+
+  Scenario: Partial evidence remains a hypothesis
+    Given an investigation has evidence supporting a possible root cause
+    But material alternative causes remain untested
+    When grimoire reports the diagnosis
+    Then it separates observations, hypotheses, and proven conclusions
+    And it does not present the possible cause as proven
+
+  Scenario: An unknown cause produces a useful diagnostic plan
+    Given the available evidence does not establish why a test failed
+    When grimoire reports the diagnosis
+    Then it states that the cause is unknown
+    And it presents the observations already established
+    And each proposed diagnostic action identifies the root-cause unknown it would resolve
+
+  Scenario: An unavailable prerequisite stops dependent verification
+    Given test output proves a required service or prerequisite is unavailable
+    When grimoire diagnoses the failure
+    Then it reports the unavailable prerequisite as the observed blocker
+    And it does not run another dependent test or broader suite
+    And it waits for restoration or my direction before continuing dependent verification
+
   Scenario: Finalization preserves deferred tasks
     Given a completed change has deferred tasks
     When grimoire finalizes the change
