@@ -158,7 +158,7 @@ Follow `../references/testing-lifecycle.md`.
 5. Verify imports and external calls before confirmation. Use the code graph when available and `rg` plus the actual module otherwise.
 6. Check test assertions for exact outcomes, no empty bodies, and no trivial or circular assertions.
 7. Run at most one planned section confirmation after all covered implementation is complete. Defer it when it requires database or container startup.
-8. If confirmation fails, diagnose that observed failure. Record each failed approach before a retry and honor the three-attempt breaker.
+8. If confirmation fails, apply the diagnosis gate in `../references/testing-lifecycle.md` before any rerun. Record each failed approach before a retry and honor the three-attempt breaker.
 9. Mark every covered task complete together when confirmation passes or is explicitly deferred.
 10. Prune covered failure notes and record the confirmation result in the section handoff.
 

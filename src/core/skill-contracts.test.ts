@@ -198,9 +198,9 @@ describe("skill contracts", () => {
     expect(marketplace).toContain("question-driven spikes");
     expect(marketplace).toContain("verification-boundary delivery");
     expect(marketplace).not.toContain("red-green development for AI agents");
-    expect(packageJson.version).toBe("0.4.1");
-    expect(packageLock.version).toBe("0.4.1");
-    expect(packageLock.packages[""].version).toBe("0.4.1");
+    expect(packageJson.version).toBe("0.4.2");
+    expect(packageLock.version).toBe("0.4.2");
+    expect(packageLock.packages[""].version).toBe("0.4.2");
   });
 
   it("plans substantial sections with lifecycle-owned confirmation", async () => {
@@ -324,7 +324,9 @@ describe("skill contracts", () => {
     expect(applySkill).toContain("Mark every covered task complete together");
     expect(bugSkill).toContain("one observed failing reproduction");
     expect(bugSkill).toContain("one passing reproduction afterward");
-    expect(verifySkill).toContain("Focused reruns diagnose only an observed final-suite failure");
+    expect(verifySkill).toContain(
+      "diagnosis gate in `../references/testing-lifecycle.md` to every final-suite failure",
+    );
     expect(verifySkill).toContain(
       "For a feature tagged `@manual`, use its declared characterization or unit contract",
     );
@@ -340,6 +342,54 @@ describe("skill contracts", () => {
     expect(lifecycle).toContain("They must not run configured unit or BDD suites.");
     expect(hooks).toContain("grimoire check lint format doc_style --changed");
     expect(hooks).not.toContain('CURRENT_GIT_CHECK = "grimoire check --changed');
+  });
+
+  it("requires evidence-based diagnosis before another test run", async () => {
+    const [lifecycle, agents, applySkill, bugSkill, verifySkill] = await Promise.all([
+      reference("testing-lifecycle.md").then(normalize),
+      rootFile("AGENTS.md").then(normalize),
+      skill("grimoire-apply").then(normalize),
+      skill("grimoire-bug").then(normalize),
+      skill("grimoire-verify").then(normalize),
+    ]);
+
+    expectOrdered(lifecycle, [
+      "After any test or deterministic-check failure",
+      "Before another test execution",
+    ]);
+    expect(lifecycle).toContain(
+      "Before another test execution, name at least one explicit root-cause unknown that the existing evidence cannot resolve.",
+    );
+    expect(lifecycle).toContain(
+      "The diagnostic test must resolve that unknown.",
+    );
+    expect(lifecycle).toContain(
+      "Select the narrowest deterministic test that can resolve that unknown.",
+    );
+    expect(lifecycle).toContain(
+      "When no authoritative artifact establishes the expected outcome, ask the user before changing code or tests.",
+    );
+    expect(lifecycle).toContain(
+      "Partial or incomparable evidence supports a hypothesis only until sufficient comparable evidence eliminates material alternatives.",
+    );
+    expect(lifecycle).toContain(
+      "An unknown cause is a successful diagnosis outcome when it includes established observations and targeted diagnostic actions.",
+    );
+    expect(lifecycle).toContain(
+      "Each proposed diagnostic action must identify at least one root-cause unknown it would resolve.",
+    );
+    expect(lifecycle).toContain(
+      "Do not run another dependent test or broader suite until the prerequisite is restored or the user gives explicit direction.",
+    );
+    expect(agents).toContain("Separate observations, hypotheses, and proven conclusions.");
+    expect(agents).toContain("State that the cause is unknown when the evidence does not prove it.");
+
+    for (const consumer of [applySkill, bugSkill, verifySkill]) {
+      expect(consumer).toContain("diagnosis gate in `../references/testing-lifecycle.md`");
+      expect(consumer).not.toContain(
+        "Partial or incomparable evidence supports a hypothesis only until sufficient comparable evidence eliminates material alternatives.",
+      );
+    }
   });
 
   it("stops failed delivery and preserves user steering", async () => {
@@ -673,15 +723,15 @@ describe("skill contracts", () => {
     expect(refactorSkill).not.toContain("Capture a baseline first, then keep it.");
   });
 
-  it("identifies release 0.4.1 in package metadata", async () => {
+  it("identifies release 0.4.2 in package metadata", async () => {
     const [packageJson, packageLock] = await Promise.all([
       rootFile("package.json").then(JSON.parse),
       rootFile("package-lock.json").then(JSON.parse),
     ]);
 
-    expect(packageJson.version).toBe("0.4.1");
-    expect(packageLock.version).toBe("0.4.1");
-    expect(packageLock.packages[""].version).toBe("0.4.1");
+    expect(packageJson.version).toBe("0.4.2");
+    expect(packageLock.version).toBe("0.4.2");
+    expect(packageLock.packages[""].version).toBe("0.4.2");
   });
 
   it("keeps data-schema changes material with a narrow mechanics exception", async () => {

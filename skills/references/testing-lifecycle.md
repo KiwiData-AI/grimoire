@@ -39,6 +39,25 @@ An answered spike may refine only affected unchecked implementation mechanics. I
 
 After three failed delivery attempts, stop delivery. Create a findings-only spike that records what changed, what remained constant, and the unresolved question. Present the findings and require human direction before attempt four. The findings-only spike cannot authorize more delivery work.
 
+## Diagnose failures before rerunning
+
+After any test or deterministic-check failure, apply this diagnosis gate before another test execution:
+
+1. Inspect the failing assertion, the complete observed result, the expected contract, the relevant code path, and the earliest concrete prerequisite error.
+2. Establish the expected outcome from an authoritative artifact. Current implementation behavior does not establish intent.
+3. When no authoritative artifact establishes the expected outcome, ask the user before changing code or tests.
+4. Separate observations, hypotheses, and proven conclusions. State that the cause is unknown when the evidence does not prove it.
+5. Before another test execution, name at least one explicit root-cause unknown that the existing evidence cannot resolve.
+6. The diagnostic test must resolve that unknown. Select the narrowest deterministic test that can resolve that unknown.
+
+Broaden diagnostic scope only for a named plausible interaction or an explicitly justified integration boundary. Mandatory baseline and final configured-suite runs remain boundary exceptions. Apply this diagnosis gate to every failure they produce.
+
+Partial or incomparable evidence supports a hypothesis only until sufficient comparable evidence eliminates material alternatives. A proven conclusion requires comparable evidence that eliminates those alternatives.
+
+An unknown cause is a successful diagnosis outcome when it includes established observations and targeted diagnostic actions. Each proposed diagnostic action must identify at least one root-cause unknown it would resolve.
+
+Treat a proven unavailable service or prerequisite as a blocker. Do not run another dependent test or broader suite until the prerequisite is restored or the user gives explicit direction.
+
 ## Planned-change delivery
 
 For every substantial section:

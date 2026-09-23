@@ -227,7 +227,7 @@ For this repository, the configured command is:
 node bin/grimoire.js check lint format duplicates complexity dead_code security dep_audit secrets doc_style --changed
 ```
 
-If a deterministic check fails, diagnose and report it. Do not hide it inside the later persona review.
+If a deterministic check fails, apply the diagnosis gate in `../references/testing-lifecycle.md` before another check or test execution. Do not hide it inside the later persona review.
 
 ### 6. Pre-Commit Review and Corrections
 
@@ -241,7 +241,7 @@ Run each configured unit and BDD suite once. Do not run either suite when it alr
 
 Compare every failure with `baseline.md`. A failure absent from the accepted baseline is new and blocks finalization. A failure present in the baseline remains pre-existing. Without an accepted baseline, list failures as unclassified.
 
-Focused reruns diagnose only an observed final-suite failure. Do not rerun passing suites or add a duplicate feature-complete command.
+Apply the diagnosis gate in `../references/testing-lifecycle.md` to every final-suite failure before a focused rerun. Do not rerun passing suites or add a duplicate feature-complete command.
 
 ### 8. Generate Report
 Produce a structured report:
