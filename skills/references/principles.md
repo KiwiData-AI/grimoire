@@ -31,8 +31,9 @@ Every piece of knowledge has a single, unambiguous representation.
   demand — never freeze it into a doc that drifts. Generated overviews regenerate;
   they are not hand-edited.
 - Reuse before write: search the graph for an existing function/utility before
-  writing a new one. Three near-identical copies is the trigger to converge — but
-  do not abstract before the third (see KISS).
+  writing a new one. The third occurrence of near-identical code triggers
+  consolidation or one explicit user decision to retain duplication. Do not
+  abstract before the third occurrence (see KISS).
 - Duplication of *content* (the same rule in three skill files, the same constant in
   three modules, the same scenario in feature + MADR) is the target. Eliminate it.
 
@@ -67,6 +68,30 @@ The simplest thing that fully solves the *stated* problem wins.
 - **Tell:** an abstraction, indirection, or dependency whose only justification is a
   hypothetical. Cut it.
 
+### Mechanism admission
+
+A new mechanism requires a direct accepted requirement. Models, tables, migrations,
+persistent records, caches, temporary storage, signatures, tokens, queues, limits,
+configuration values, formats, loaders, route-specific exceptions, middleware paths,
+test infrastructure, workflows, abstractions, utilities, registries, and extension
+points are mechanisms.
+
+Before adding a mechanism, answer in order:
+
+1. Which accepted user outcome, user-requested decision, or proven constraint fails without it?
+2. Which existing project mechanism was considered first?
+3. Why is the existing mechanism insufficient?
+4. Which new failure modes does the mechanism create?
+5. Can deleting the mechanism still satisfy every accepted requirement?
+
+If the first answer names only an implementation preference, omit the mechanism. Do
+not replace a working fixture, test infrastructure, loader, or workflow unless an
+accepted requirement requests replacement or the existing mechanism concretely blocks
+delivery. Extend the existing owner of validation, logging, size policy, temporary
+state, or persistence instead of creating a second owner. A constraint created only to
+support another new mechanism is evidence that the original mechanism should be
+reconsidered.
+
 ---
 
 ## How the stages apply these
@@ -81,3 +106,5 @@ The simplest thing that fully solves the *stated* problem wins.
   any task that adds an abstraction, dependency, or second mechanism.
 - **review** — a dedicated principles pass: hunt for duplicate homes, derivable-but-
   stored facts, reinvented wheels, and speculative complexity. Each is a finding.
+- **apply** — stop before implementing a mechanism that lacks the approved plan's
+  direct requirement trace.

@@ -10,7 +10,7 @@ These principles govern all grimoire work — drafting, planning, reviewing, and
 
 **Less code is more.** Every line is a liability — it must be read, tested, maintained, and debugged. Delete what you can. Inline what's used once. Don't write code "in case we need it later."
 
-**Don't abstract early.** Three copies of similar code is fine. An abstraction should be extracted when a clear, stable pattern has emerged — not when you see the first hint of repetition. Wrong abstractions are harder to fix than duplicated code.
+**Don't abstract early.** The third occurrence of similar code triggers consolidation or one explicit user decision to retain duplication. Two copies are not yet a stable pattern. Wrong abstractions are harder to fix than duplicated code.
 
 **YAGNI — solve the problem in front of you.** You aren't gonna need it. Do not add configurability, feature flags, extension points, plugin systems, or generic interfaces unless the task specifically calls for them. Build for the current requirement, not imagined future ones — a speculative need is the signal to *skip it* and say so in one line, not to build it.
 

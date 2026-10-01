@@ -84,6 +84,11 @@ Where `<type>` is `feat`, `fix`, `refactor`, or `chore` based on the change. If 
 
 The branch links Git history to the change through the `Change: <change-id>` commit trailer. The branch provides isolation, and the ordinary Git index provides staging.
 
+Before setting the manifest to `implementing` or changing tests or production code,
+compare every task with the approved Scope Guard. If a task introduces a new mechanism
+absent from the approved Scope Guard, stop and request one user decision. Do not
+implement the mechanism first. Plans without new mechanisms correctly omit Scope Guard.
+
 Run every configured test suite once before code changes and record `baseline.md`. Present any pre-existing failures to the user and get acceptance before proceeding. Skippable when no test command is configured or the user opts out. Record the skip. Full protocol: `../references/test-baseline.md`.
 
 The point: a failure is "pre-existing" only if it is in `baseline.md`. This replaces end-of-run "that's a pre-existing failure" surprises with a start-of-run acceptance.
@@ -271,7 +276,8 @@ Present a brief summary:
 
 ## References
 
-**Before writing code**, read all five:
+**Before writing code**, read all six:
+- `../references/principles.md` — shared mechanism admission and simplicity policy.
 - `../references/testing-lifecycle.md` — authoritative mode selection, spike exits, delivery cadence, section confirmation, and final verification cadence.
 - `../references/pattern-guard.md` — reuse discovery and call validation. Skip graph-specific work when the graph is unavailable.
 - `../references/code-quality.md` — writing guidance for reuse, branching, naming, trust boundaries, abstractions, and comments.

@@ -65,6 +65,8 @@ Before persona evaluation, validate the plan's executable shape in the same init
 - Confirm final verification is absent from task sections.
 - Reject manufactured Gherkin for internal nuances, refactors, optimizations, contracts, benchmarks, constraints, or architectural decisions.
 - When multiple sections exist, check dependency completeness, backward-only order, cycle freedom, and task order.
+- When the plan introduces a new mechanism, require Scope Guard with retained systems, each mechanism's direct accepted requirement, and explicitly excluded cleanup. Reject an empty Scope Guard on a mechanism-free plan.
+- Treat a mechanism as a blocker when another new mechanism created the problem, it replaces a working system without an accepted requirement, or more than one component owns the same policy or event.
 
 Verify declared dependencies match referenced symbols, imports, schema or migration prerequisites, generated artifacts, fixtures, routes, and context files. Treat an invalid dependency graph or an intermediate human gate in implementation work as a blocker. Report all plan blockers together; do not silently edit `tasks.md`.
 
@@ -114,6 +116,7 @@ Persona scope for design review:
   - **DRY** — is any fact given a second home (a capability in feature + MADR + constraint; a constant/rule duplicated)? Does any task store something derivable from code/mcp? → blocker.
   - **Don't reinvent the wheel** — does any task build a mechanism that an existing tool/library/proven pattern already provides (custom crypto/auth, a bespoke change-tracking/diff/staging process where git suffices)? → blocker.
   - **Keep it simple** — any abstraction, indirection, new dependency, or new file justified only by a hypothetical, or scope reaching past a non-goal? → suggestion (blocker if it adds a maintained surface).
+  - **Mechanism admission** — apply `../references/principles.md`: block a mechanism when another new mechanism created the problem, it replaces a working system without an accepted requirement, or more than one component owns the same policy or event.
   - Also enforce the **artifact-jurisdiction** rule: any `.feature` scenario that is really a constraint (security/NFR/observability), an internal technical detail, or a non-functional concern is a blocker — it belongs in `constraints.md` or a MADR, not Gherkin.
 
 ### 5.5 Visual Fidelity (cheap tier)

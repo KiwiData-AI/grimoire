@@ -143,10 +143,11 @@ Discipline for the loop:
 6. **Capture, don't extrapolate.** "Out of scope for now" → record as a non-goal and stop. Don't design a scenario "just in case".
 7. **When the user delegates** ("just write something reasonable"), record it explicitly as an Open→RESOLVED row: "Defaulting to <choice> per user delegation — flag in review if wrong." The assumption stays visible.
 8. **Sort facts by kind as they emerge.** An invariant (security control, NFR, performance budget, observability guarantee) is not a behavior — capture it in the *Constraints* section, not as a behavioral sketch. Apply the rough behaviour-vs-invariant test as you design (does an external actor observe it without reading code/logs?) so projection's admission test (in `grimoire-plan`) gets clean input instead of slop to reroute. The fine fact-to-home routing still happens at projection; this just keeps the design honest while you think.
+9. **Trace mechanisms to requirements.** Map every proposed mechanism to its direct accepted requirement. Use the mechanism-admission questions in `../references/principles.md`; do not copy them here. An implementation preference such as statelessness is not a requirement unless the user requested it.
 
 **Never silently fill an open question.** Either ask it (as an *Open* row), defer it to a non-goal, or record the inference explicitly in *Decided*. The *Decided/Open* ledger IS the requirements summary — before declaring the design done, walk it back to the user so they see every call and every guess.
 
-**Nothing is written to `features/`, `.grimoire/docs/constraints.md`, or `.grimoire/decisions/` during this loop.** Everything lives in `draft.md`. The design is "done" when *Decided* is stable and *Open* is empty-or-deferred — and the user agrees.
+**Nothing is written to `features/`, `.grimoire/docs/constraints.md`, or `.grimoire/decisions/` during this loop.** Everything lives in `draft.md`. Run a mechanism deletion pass before asking for design approval. Remove every proposed mechanism whose deletion still permits every accepted requirement. The design is "done" when *Decided* is stable and *Open* is empty-or-deferred — and the user agrees.
 
 Do NOT hand off to `grimoire-plan` without explicit user approval of the design.
 

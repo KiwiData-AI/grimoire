@@ -12,6 +12,32 @@ Feature: Turn an approved spec into a plan
     Then I get an ordered list of tasks that cover the spec
     And each task says how it will be verified
 
+  Scenario: Planning records why new mechanisms are required
+    Given an approved spec requires a new mechanism
+    When I ask grimoire to plan the work
+    Then the plan identifies the existing systems that remain in place
+    And it maps each new mechanism to its accepted requirement
+    And it identifies unrelated cleanup that remains excluded
+
+  Scenario: Planning adds no empty mechanism guard
+    Given an approved spec requires no new mechanism
+    When I ask grimoire to plan the work
+    Then the plan does not add an empty mechanism justification section
+
+  Scenario: Planning blocks unjustified mechanisms
+    Given a proposed plan contains new mechanisms
+    When I review the plan for approval
+    Then approval is blocked when a mechanism exists only because another new mechanism created a problem
+    And approval is blocked when the plan replaces a working system without an accepted requirement
+    And approval is blocked when more than one component owns the same policy or event
+    And work unnecessary for every accepted requirement is removed before approval
+
+  Scenario: A third test preparation case without an owner requires a decision
+    Given two equivalent test preparation cases exist without an established owner
+    When I ask grimoire to plan another test that needs it
+    Then grimoire shows me the repetition evidence
+    And I decide whether to consolidate the preparation or retain another local case
+
   Scenario: Planning refuses when nothing is approved
     Given there is no approved spec to plan from
     When I ask grimoire to plan the work

@@ -16,6 +16,13 @@ Feature: Review a change before coding begins
     When I ask grimoire to review it
     Then the serious problem is marked as a blocker to fix before coding
 
+  Scenario: Review blocks unjustified mechanisms
+    Given a planned change contains new mechanisms
+    When I ask grimoire to review it
+    Then a mechanism caused only by another new mechanism is a blocker
+    And replacing a working system without an accepted requirement is a blocker
+    And split ownership of the same policy or event is a blocker
+
   Scenario: Accepted review findings receive one correction batch
     Given a completed review has accepted blocking findings
     When the findings are corrected without materially changing the design
