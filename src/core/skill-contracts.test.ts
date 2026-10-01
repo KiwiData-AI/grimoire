@@ -198,9 +198,9 @@ describe("skill contracts", () => {
     expect(marketplace).toContain("question-driven spikes");
     expect(marketplace).toContain("verification-boundary delivery");
     expect(marketplace).not.toContain("red-green development for AI agents");
-    expect(packageJson.version).toBe("0.4.2");
-    expect(packageLock.version).toBe("0.4.2");
-    expect(packageLock.packages[""].version).toBe("0.4.2");
+    expect(packageJson.version).toBe("0.4.3");
+    expect(packageLock.version).toBe("0.4.3");
+    expect(packageLock.packages[""].version).toBe("0.4.3");
   });
 
   it("plans substantial sections with lifecycle-owned confirmation", async () => {
@@ -723,15 +723,95 @@ describe("skill contracts", () => {
     expect(refactorSkill).not.toContain("Capture a baseline first, then keep it.");
   });
 
-  it("identifies release 0.4.2 in package metadata", async () => {
+  it("centralizes mechanism admission and applies it during Draft", async () => {
+    const [principles, draftSkill] = await Promise.all([
+      reference("principles.md").then(normalize),
+      skill("grimoire-draft").then(normalize),
+    ]);
+
+    expect(principles).toContain("A new mechanism requires a direct accepted requirement.");
+    expect(principles).toContain(
+      "Models, tables, migrations, persistent records, caches, temporary storage, signatures, tokens, queues, limits, configuration values, formats, loaders, route-specific exceptions, middleware paths, test infrastructure, workflows, abstractions, utilities, registries, and extension points are mechanisms.",
+    );
+    expectOrdered(principles, [
+      "Which accepted user outcome, user-requested decision, or proven constraint fails without it?",
+      "Which existing project mechanism was considered first?",
+      "Why is the existing mechanism insufficient?",
+      "Which new failure modes does the mechanism create?",
+      "Can deleting the mechanism still satisfy every accepted requirement?",
+    ]);
+    expect(draftSkill).toContain("Map every proposed mechanism to its direct accepted requirement.");
+    expect(draftSkill).toContain(
+      "An implementation preference such as statelessness is not a requirement unless the user requested it.",
+    );
+    expect(draftSkill).toContain("Run a mechanism deletion pass before asking for design approval.");
+    expect(draftSkill).not.toContain("Models, tables, migrations, persistent records");
+  });
+
+  it("blocks unjustified mechanisms across Plan, Review, and Apply", async () => {
+    const [planSkill, reviewSkill, applySkill] = await Promise.all([
+      skill("grimoire-plan").then(normalize),
+      skill("grimoire-review").then(normalize),
+      skill("grimoire-apply").then(normalize),
+    ]);
+
+    expect(planSkill).toContain("## Scope Guard");
+    expect(planSkill).toContain("Existing systems retained:");
+    expect(planSkill).toContain("New mechanisms required:");
+    expect(planSkill).toContain("Explicitly excluded cleanup:");
+    expect(planSkill).toContain("Plans without a new mechanism omit Scope Guard.");
+    expect(planSkill).toContain("A new mechanism absent from Scope Guard cannot enter an implementation task.");
+    expect(planSkill).toContain("Perform a deletion pass before presenting tasks for approval.");
+
+    for (const content of [planSkill, reviewSkill]) {
+      expect(content).toContain("another new mechanism created the problem");
+      expect(content).toContain("replaces a working system without an accepted requirement");
+      expect(content).toContain("more than one component owns the same policy or event");
+    }
+
+    expectOrdered(applySkill, [
+      "Before setting the manifest to `implementing` or changing tests or production code",
+      "stop and request one user decision",
+    ]);
+    expect(applySkill).toContain("absent from the approved Scope Guard");
+    expect(applySkill).toContain("../references/principles.md");
+  });
+
+  it("uses one third-occurrence threshold for production and test setup", async () => {
+    const [agents, principles, quality, reviewPolicy, contracts, planSkill] = await Promise.all([
+      rootFile("AGENTS.md").then(normalize),
+      reference("principles.md").then(normalize),
+      reference("code-quality.md").then(normalize),
+      reference("review-personas.md").then(normalize),
+      reference("testing-contracts.md").then(normalize),
+      skill("grimoire-plan").then(normalize),
+    ]);
+
+    for (const content of [agents, principles, quality, reviewPolicy]) {
+      expect(content).toContain("third occurrence");
+    }
+    expectOrdered(contracts, [
+      "Find the existing owner",
+      "Reuse or extend that owner when it fits.",
+      "The first and second equivalent cases",
+      "Before adding the third equivalent case",
+      "request one user decision",
+    ]);
+    expect(contracts).not.toContain("Project's standard data factory / generator (default)");
+    expect(contracts).not.toContain("prefer inline");
+    expect(planSkill).toContain("Before adding a test task, find the existing owner");
+    expect(planSkill).toContain("Before a third ownerless equivalent case, request one user decision");
+  });
+
+  it("identifies release 0.4.3 in package metadata", async () => {
     const [packageJson, packageLock] = await Promise.all([
       rootFile("package.json").then(JSON.parse),
       rootFile("package-lock.json").then(JSON.parse),
     ]);
 
-    expect(packageJson.version).toBe("0.4.2");
-    expect(packageLock.version).toBe("0.4.2");
-    expect(packageLock.packages[""].version).toBe("0.4.2");
+    expect(packageJson.version).toBe("0.4.3");
+    expect(packageLock.version).toBe("0.4.3");
+    expect(packageLock.packages[""].version).toBe("0.4.3");
   });
 
   it("keeps data-schema changes material with a narrow mechanics exception", async () => {

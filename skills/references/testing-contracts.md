@@ -22,22 +22,29 @@ Never treat a repository orchestration stub as provider contract evidence. Never
 
 ## Test Data Generation
 
-**Do not ask the user for test data, sample records, or example scenarios.** Scenarios are derived from the spec (`.feature` scenarios, constraints, contracts); the *data* that exercises them is generated. Asking the user to supply fixtures by hand front-loads the work onto them and produces brittle, hand-curated values. Generate it instead, in this order of preference:
+Tests follow required production behavior. Do not change production code or shared test
+infrastructure merely to unify test setup.
 
-1. **Project's standard data factory / generator (default).** Check `config.tools` and existing test imports for the tool already in use and follow it:
-   - **Python**: `factory_boy`, `model_bakery`/`model-mommy`, `faker`, `Hypothesis` (property-based)
-   - **JS/TS**: `@faker-js/faker`, `fishery`, `test-data-bot`, `fast-check` (property-based)
-   - **Ruby**: `factory_bot`, `faker`
-   - **Go**: `gofakeit`, table-driven fixtures
-   - **Java/Kotlin**: `instancio`, `easy-random`, `jqwik` (property-based)
+Before adding test data or setup:
 
-   Build records through the factory, override only the fields the scenario actually pins, and let the tool fill the rest. For invariants ("never accepts a negative amount", "round-trips any valid payload"), prefer **property-based generation** (Hypothesis / fast-check / jqwik) over a handful of literals — it covers the input space the spec describes instead of one example.
+1. Find the existing owner of the same invariant and the area's fixture, factory,
+   setup, and teardown pattern.
+2. Reuse or extend that owner when it fits.
+3. The first and second equivalent cases without a fitting owner use the smallest
+   established local test pattern.
+4. Before adding the third equivalent case, present the existing cases and request
+   one user decision: consolidate now or retain another local case.
 
-2. **Recorded / fixture responses** for external-API contracts — authoritative observed concrete instances of the `schema.yml` contract. These are captured shapes, not invented ones.
+Do not add shared test infrastructure because repetition might occur later. Do not
+replace working fixtures, factories, setup, teardown, or production workflows merely
+to standardize a test. Do not delete pre-existing duplicate tests as incidental cleanup;
+remove duplication introduced by the current plan unless the user approves broader
+consolidation.
 
-3. **AI-authored literal test data — last resort, only on explicit instruction.** Hand-writing literal records (the agent inventing `{name: "Acme Corp", amount: 4200, ...}`) is permitted **only when the user explicitly asks for generated test data**, or no factory tooling exists in the project *and* the case needs one specific crafted value (a known edge constant, a regression repro). When you fall back to this, say so — note in the task/test why a factory wasn't used. Never silently invent a dataset.
-
-No data-factory tool configured and the project has tests? Match whatever those tests already do. Proposing a *new* factory dependency is a plan-stage decision, not something to pull in mid-implementation.
+Recorded responses remain the data source for external-provider contracts. Property-
+based generation remains appropriate when an accepted invariant covers an input space.
+AI-authored literal data is acceptable when it is the smallest established local pattern
+for a specific case; do not invent a broad dataset or new factory around it.
 
 ## Contract Test Requirements
 

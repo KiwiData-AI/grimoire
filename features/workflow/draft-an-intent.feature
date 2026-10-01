@@ -14,6 +14,13 @@ Feature: Capture an intent as the right kind of spec
     Then it is worked out with me on one design document before any specs are written
     And the behaviour, decision, and constraint records are produced from that document only after I agree
 
+  Scenario: A proposed mechanism needs an accepted reason
+    Given I propose a change that includes a new mechanism
+    When I ask grimoire to capture it
+    Then the mechanism is linked to an accepted user outcome, a user-requested decision, or a proven constraint
+    And an implementation preference alone does not justify the mechanism
+    And the mechanism is excluded when every accepted requirement can be met without it
+
   Scenario: A trivial change skips the design document
     Given I describe a trivial change such as a copy or configuration tweak
     When I ask grimoire to capture it

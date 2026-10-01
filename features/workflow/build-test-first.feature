@@ -64,6 +64,12 @@ Feature: Build understood work test-first
     Then it asks me for direction before changing the plan
     And only my direction can create active-section drift
 
+  Scenario: An unapproved mechanism stops implementation
+    Given an approved plan has recorded its required new mechanisms
+    When an implementation task introduces a new mechanism without that justification
+    Then grimoire stops before changing tests or production code
+    And grimoire asks me to decide whether the mechanism belongs in scope
+
   Scenario: Full verification runs once after pre-commit review
     Given implementation and pre-commit review corrections are complete
     When grimoire verifies the change

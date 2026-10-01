@@ -69,7 +69,7 @@ Fail: any local named `data`, `result`, `temp`, `obj`, `item`, or `value` when a
 
 ### 6. No premature abstraction (YAGNI)
 
-Three near-identical copies is acceptable. Extract on the fourth, or when the shared shape is stable and named. Wrong abstractions are harder to undo than duplication.
+The third occurrence of near-identical code triggers consolidation or one explicit user decision to retain duplication. Two copies are acceptable. Wrong abstractions are harder to undo than duplication.
 
 Drop:
 - Generic interfaces with one implementation.

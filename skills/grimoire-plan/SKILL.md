@@ -254,7 +254,27 @@ and verification prerequisite. No human gate may interrupt implementation. In
 the approval presentation, state that the plan is not autonomous end-to-end and
 obtain agreement during plan approval.
 
-Before presenting tasks for approval, include a complete strategy table before the first task:
+When planning identifies at least one new mechanism under `../references/principles.md`,
+add this section before the strategy table:
+
+```markdown
+## Scope Guard
+
+- Existing systems retained: <fixtures, loaders, logging owner, cache, or other relevant owners>
+- New mechanisms required: <mechanism → direct accepted requirement>
+- Explicitly excluded cleanup: <unrelated refactors and replacements>
+```
+
+Plans without a new mechanism omit Scope Guard. A new mechanism absent from Scope
+Guard cannot enter an implementation task.
+
+Perform a deletion pass before presenting tasks for approval. Remove every task,
+file, mechanism, and assertion whose removal still permits every accepted requirement.
+Block approval when a mechanism exists only because another new mechanism created the
+problem, the plan replaces a working system without an accepted requirement, or more
+than one component owns the same policy or event.
+
+Then include a complete strategy table before the first task:
 
 | Section | Depends on | Activities | Review timing | Section justification |
 |---------|------------|------------|---------------|-----------------------|
@@ -374,7 +394,7 @@ Good task (specific enough to execute):
 
 **Integration boundaries:** Follow `../references/testing-contracts.md`. Do not restate its provider mechanics in tasks.
 
-**Test data:** Do not add tasks that ask the user for sample data or example scenarios. Per `../references/testing-contracts.md` (Test Data Generation), every test task that needs data must name the generation source — the project's existing data factory / property-based tool (`factory_boy`, `@faker-js/faker`, `model_bakery`, `Hypothesis`, `fast-check`, etc., detected from `config.tools` / existing test imports), and which fields the scenario pins vs. lets the factory fill. AI-authored literal data is a last resort: only plan it when the user explicitly asked for generated data, or no factory exists and a specific crafted value is needed — and say which in the task. If the project has no data-factory tooling and the change clearly needs one, surface adopting it as a build-vs-buy line, don't smuggle the dependency into an implementation task.
+**Test ownership:** Before adding a test task, find the existing owner of the same invariant and the area's fixture, factory, setup, and teardown pattern. Reuse or extend a fitting owner. When no owner fits, allow the first and second equivalent cases to follow the smallest established local pattern. Before a third ownerless equivalent case, request one user decision: consolidate now or retain another local case. Follow `../references/testing-contracts.md`; do not add a factory, fixture hierarchy, setup path, teardown path, or test dependency for hypothetical reuse.
 
 **From manifest Assumptions:**
 - Each unvalidated assumption on the critical path → a referenced spike with one question, required evidence, a probe boundary, and affected unchecked tasks
@@ -400,6 +420,10 @@ Good task (specific enough to execute):
 - Query the graph (`search_graph` by concept/name) for existing utilities that apply to this change; area docs give conventions, the graph gives the reusable symbols
 - If `grimoire health`/mcp shows existing clones in the area you're touching, tasks should consolidate rather than add more
 - Add a "Reuse" section at the top of tasks.md listing specific functions/classes to import instead of rewriting
+
+When the plan has new mechanisms, place its conditional `## Scope Guard` immediately
+after `## Reuse` and before `## Approved strategy`. Use the three required fields from
+the generation rule above. Omit the section when the plan has no new mechanism.
 
 **Section confirmation:** Each substantial section names one optional post-section confirmation. It must be the cheapest meaningful command that shows the section loads or its primary path works. Defer it when it requires database or container startup. Do not plan a red run, broad suite, lint bundle, coverage run, or comprehensive feature command for section completion. Final verification is absent from task sections; apply invokes `grimoire-verify` once after implementation.
 
@@ -464,6 +488,8 @@ Before presenting to the user, verify the plan:
 - [ ] Tasks within each section are ordered so no task requires a later task.
 - [ ] Every implementation activity has one review marker immediately beneath its checkbox.
 - [ ] The complete activity review-timing table appears before the first task and is ready for user approval.
+- [ ] Scope Guard exists only when the plan introduces a new mechanism, and every such mechanism maps to a direct accepted requirement.
+- [ ] The deletion pass and all three mechanism blockers pass before approval.
 - [ ] Autonomous sections contain only deterministic commands or agent-executable work and contain no human gate.
 - [ ] Any unavoidable external acceptance is consolidated into one terminal section; plan approval explicitly agrees that execution is not autonomous end-to-end.
 - [ ] The plan defaults to one substantial section, uses two only for distinct outcomes or context boundaries, and justifies every section beyond two.
